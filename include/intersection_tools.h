@@ -27,4 +27,6 @@ std::tuple<cv::Mat, cv::Mat, cv::Mat> get_depth_map_through_meshes(const std::ve
     const int v_width, const int v_height,
     const Eigen::Matrix3f& v_intrinsic);
 
+const Point_cloud remove_points_inside(const Surface_mesh& v_mesh, const std::vector<Point_3>& v_points);
+
 #endif // INTERSECTION_TOOLS_H

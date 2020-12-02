@@ -1,0 +1,55 @@
+#pragma once
+/*
+ * Convert coordinates in airsim, unreal, mesh, image
+ */
+#include<eigen3/Eigen/Dense>
+
+#define M_PI 3.14159265358
+
+struct Pos_Pack
+{
+	Eigen::Vector3f pos_image;
+	Eigen::Vector3f pos_mesh;
+	Eigen::Vector3f pos_airsim;
+	Eigen::Vector3f direction_image;
+	Eigen::Isometry3f camera_matrix;
+
+	float yaw, pitch;
+};
+
+class MapConverter {
+public:
+    MapConverter();
+
+    Eigen::Vector3f mDroneStart;
+
+    float mImageStartX;
+    float mImageStartY;
+
+    bool initDroneDone = false;
+    bool initImageDone = false;
+
+    void initDroneStart(const Eigen::Vector3f& vPos);
+
+    Eigen::Vector3f convertUnrealToAirsim(const Eigen::Vector3f& vWorldPos) const;
+
+    void initImageStart(const float vStartX, const float vStartY);
+
+    Eigen::Vector3f convertUnrealToImage(const Eigen::Vector3f& vWorldPos) const;
+
+    Eigen::Vector3f convertUnrealToMesh(const Eigen::Vector3f& vWorldPos) const;
+
+    Eigen::Vector3f convertMeshToUnreal(const Eigen::Vector3f& vMeshPos) const;
+
+    Eigen::Vector3f convertImageToUnreal(const Eigen::Vector3f& vPos) const;
+
+    Eigen::Vector3f convertImageToMesh(const Eigen::Vector3f& vPos) const;
+
+    Eigen::Matrix3f convert_yaw_pitch_to_matrix_mesh(const float yaw, const float pitch);
+
+    Eigen::Isometry3f get_camera_matrix(const float yaw, const float pitch, const Eigen::Vector3f& v_pos);
+
+    Eigen::Vector3f convert_yaw_pitch_to_direction_vector(const float yaw, const float pitch);
+
+    Pos_Pack get_pos_pack_from_unreal(const Eigen::Vector3f& v_pos_unreal, float yaw, float pitch);
+};

@@ -1,5 +1,6 @@
 #include "intersection_tools.h"
 
+#include <algorithm>
 
 std::tuple<cv::Mat, cv::Mat, cv::Mat> get_depth_map_through_meshes(const std::vector<Surface_mesh>& v_meshes,
 	const int v_width,const int v_height,
@@ -55,4 +56,97 @@ std::tuple<cv::Mat, cv::Mat, cv::Mat> get_depth_map_through_meshes(const std::ve
 	//cv::waitKey();
 
 	return { img_instance,img_distance_planar, img_distance_perspective};
+}
+
+const Point_cloud remove_points_inside(const Surface_mesh& v_mesh, const std::vector<Point_3>& v_points)
+{
+	Tree tree;
+	tree.insert(CGAL::faces(v_mesh).first, CGAL::faces(v_mesh).second, v_mesh);
+	tree.build();
+
+	// Define scanner camera's position
+	std::vector<Point_3> camera;
+	float min_x = std::numeric_limits<float>::max();
+	float min_y = std::numeric_limits<float>::max();
+	float min_z = std::numeric_limits<float>::max();
+	float max_z = std::numeric_limits<float>::min();
+	float max_y = std::numeric_limits<float>::min();
+	float max_x = std::numeric_limits<float>::min();
+	
+	for (auto vertex : v_mesh.vertices())
+	{
+		min_x = v_mesh.point(vertex).x() < min_x ? v_mesh.point(vertex).x() : min_x;
+		min_y = v_mesh.point(vertex).y() < min_y ? v_mesh.point(vertex).y() : min_y;
+		min_z = v_mesh.point(vertex).z() < min_z ? v_mesh.point(vertex).z() : min_z;
+		max_x = v_mesh.point(vertex).x() > max_x ? v_mesh.point(vertex).x() : max_x;
+		max_y = v_mesh.point(vertex).y() > max_y ? v_mesh.point(vertex).y() : max_y;
+		max_z = v_mesh.point(vertex).z() > max_z ? v_mesh.point(vertex).z() : max_z;
+	}
+
+	float diff_x = max_x - min_x;
+	float diff_y = max_y - min_y;
+	float diff_z = max_z - min_z;
+
+	float max_diff = std::max({ diff_x, diff_y, diff_z });
+	float pad = max_diff * 5;
+
+	// Back
+	camera.emplace_back(min_x-pad, min_y-pad, min_z-pad);
+	camera.emplace_back(min_x-pad, (min_y + max_y) / 2, min_z-pad);
+	camera.emplace_back(min_x - pad, max_y + pad, min_z - pad);
+
+	camera.emplace_back(min_x-pad, min_y-pad, (min_z + max_z) / 2);
+	camera.emplace_back(min_x-pad, (min_y + max_y) / 2, (min_z + max_z) / 2);
+	camera.emplace_back(min_x-pad, max_y + pad, (min_z + max_z) / 2);
+
+	camera.emplace_back(min_x - pad, min_y - pad, max_z+pad);
+	camera.emplace_back(min_x - pad, (min_y + max_y) / 2, max_z+pad);
+	camera.emplace_back(min_x - pad, max_y + pad, max_z+pad);
+
+	// Mid
+	camera.emplace_back((min_x + max_x) / 2, min_y - pad, min_z - pad);
+	camera.emplace_back((min_x + max_x) / 2, (min_y + max_y) / 2, min_z - pad);
+	camera.emplace_back((min_x + max_x) / 2, max_y + pad, min_z - pad);
+
+	camera.emplace_back((min_x + max_x) / 2, min_y - pad, (min_z + max_z) / 2);
+	camera.emplace_back((min_x + max_x) / 2, max_y + pad, (min_z + max_z) / 2);
+
+	camera.emplace_back((min_x + max_x) / 2, min_y - pad, max_z + pad);
+	camera.emplace_back((min_x + max_x) / 2, (min_y + max_y) / 2, max_z + pad);
+	camera.emplace_back((min_x + max_x) / 2, max_y + pad, max_z + pad);
+
+	// Front
+	camera.emplace_back(max_x + pad, min_y - pad, min_z - pad);
+	camera.emplace_back(max_x + pad, (min_y + max_y) / 2, min_z - pad);
+	camera.emplace_back(max_x + pad, max_y + pad, min_z - pad);
+
+	camera.emplace_back(max_x + pad, min_y - pad, (min_z + max_z) / 2);
+	camera.emplace_back(max_x + pad, (min_y + max_y) / 2, (min_z + max_z) / 2);
+	camera.emplace_back(max_x + pad, max_y + pad, (min_z + max_z) / 2);
+
+	camera.emplace_back(max_x + pad, min_y - pad, max_z + pad);
+	camera.emplace_back(max_x + pad, (min_y + max_y) / 2, max_z + pad);
+	camera.emplace_back(max_x + pad, max_y + pad, max_z + pad);
+	
+	Point_cloud out_points;
+
+//#pragma omp parallel for
+	for (int i=0;i<v_points.size();i++)
+	{
+		int visible_flag = 0;
+		for (int i_camera = 0; i_camera < camera.size(); ++i_camera) {
+			Ray ray(v_points[i], camera[i_camera]);
+			int result = tree.number_of_intersected_primitives(ray);
+			if (result<=1)
+			{
+				visible_flag += 1;
+			}
+		}
+		if (visible_flag > 0) {
+//#pragma omp critical
+			out_points.insert(v_points[i]);
+		}
+
+	}
+	return out_points;
 }

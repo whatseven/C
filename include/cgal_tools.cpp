@@ -35,3 +35,25 @@ Surface_mesh convert_obj_from_tinyobjloader_to_surface_mesh(
 
     return out;
 }
+
+CGAL::Bbox_3 get_bounding_box(const Point_set& v_point_set)
+{
+    float xmin = 1e8, ymin = 1e8, zmin = 1e8;
+    float xmax = -1e8, ymax = -1e8, zmax = -1e8;
+
+	for(Point_set::Index idx:v_point_set)
+	{
+        float vx = v_point_set.point(idx).x();
+        float vy = v_point_set.point(idx).y();
+        float vz = v_point_set.point(idx).z();
+        xmin = xmin < vx ? xmin : vx;
+        ymin = ymin < vy ? ymin : vy;
+        zmin = zmin < vz ? zmin : vz;
+
+        xmax = xmax > vx ? xmax : vx;
+        ymax = ymax > vy ? ymax : vy;
+        zmax = zmax > vz ? zmax : vz;
+	}
+
+    return CGAL::Bbox_3(xmin, ymin, zmin, xmax, ymax, zmax);
+}

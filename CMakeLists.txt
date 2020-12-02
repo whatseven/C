@@ -4,8 +4,28 @@ PROJECT(C)
 set(is_build_model true)
 
 IF (CMAKE_SYSTEM_NAME MATCHES "Linux")
+    set(AIRSIM_ROOT "/root/code/AirSim")
 ELSE ()
+    set(AIRSIM_ROOT "D:/env/AirSim")
+    set (CMAKE_EXE_LINKER_FLAGS "/incremental ${CMAKE_EXE_LINKER_FLAGS}")
 ENDIF (CMAKE_SYSTEM_NAME MATCHES "Linux")
+
+function (configure_airsim)
+    INCLUDE_DIRECTORIES("${AIRSIM_ROOT}/AirLib/include")
+endfunction ()
+
+function (link_airsim arg)
+    IF (CMAKE_SYSTEM_NAME MATCHES "Linux")
+        message(${ARGV0})
+        target_link_libraries(${ARGV0} "/root/code/AirSim/AirLib/lib/libAirLib.a")
+        target_link_libraries(${ARGV0} general "/root/code/AirSim/AirLib/deps/rpclib/lib/librpc.a")
+    ELSE ()
+        target_link_libraries(${ARGV0} debug "${AIRSIM_ROOT}/AirLib/deps/rpclib/lib/x64/Debug/rpc.lib")
+        target_link_libraries(${ARGV0} debug "${AIRSIM_ROOT}/AirLib/lib/x64/Debug/AirLib.lib")
+        target_link_libraries(${ARGV0} optimized "${AIRSIM_ROOT}/AirLib/lib/x64/Release/AirLib.lib")
+        target_link_libraries(${ARGV0} optimized "${AIRSIM_ROOT}/AirLib/deps/rpclib/lib/x64/Release/rpc.lib")
+    ENDIF (CMAKE_SYSTEM_NAME MATCHES "Linux")
+endfunction ()
 
 if(${is_build_model})
     
@@ -36,6 +56,7 @@ endfunction()
 
 FILE(GLOB LIBRARY_FILE "include/*.cpp" "include/*.h")
 
+configure_airsim()
 add_library(C ${LIBRARY_FILE})
 target_include_directories(C PRIVATE ${Boost_INCLUDE_DIRS})
 

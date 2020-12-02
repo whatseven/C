@@ -1,2 +1,5 @@
 add_subdirectory(split_obj_example)
 add_subdirectory(ray_tracing)
+add_subdirectory(remove_points_inside)
+add_subdirectory(sig20)
+add_subdirectory(rename_material)
