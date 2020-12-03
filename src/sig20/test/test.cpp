@@ -33,9 +33,9 @@ void write_unreal_path(const std::vector<std::pair<Eigen::Vector3f, Eigen::Vecto
 		const Eigen::Vector3f& direction = v_trajectories[i].second;
 		boost::format fmt("%04d.png,%s,%s,%s,%s,0,%s\n");
 		float pitch = std::atan2f(direction[2], std::sqrtf(direction[0] * direction[0] + direction[1] * direction[1])) * 180. / MM_PI;
-		float yaw = std::atan2f(direction[1], direction[0]) * 180./ MM_PI;
+		float yaw = -std::atan2f(direction[1], direction[0]) * 180./ MM_PI + 90.f;
 		
-		pose << (fmt %i% position[0] % -position[1] % position[2] % -pitch% -yaw).str();
+		pose << (fmt %i% -position[0] % position[1] % position[2] % -pitch% yaw).str();
 	}
 	
 	pose.close();
@@ -79,7 +79,7 @@ int main(int argc, char** argv){
 	// Delete ground planes
 	{
 		for (int idx = point_cloud.size() - 1; idx >= 0; idx--) {
-			if (point_cloud.point(idx).z() < .5)
+			if (point_cloud.point(idx).z() < 2.)
 				point_cloud.remove(idx);
 		}
 
