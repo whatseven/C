@@ -74,49 +74,67 @@ public:
         m_start = Eigen::Vector3f(bounds.xmin(), bounds.ymin(), bounds.zmin());
         Eigen::Vector3f end(bounds.xmax(), bounds.ymax(), bounds.zmax());
         Eigen::Vector3f delta = (end - m_start) / m_resolution;
-        m_map = Eigen::MatrixXf((int)delta[1] + 1, (int)delta[0] + 1);
-        m_map.fill(std::numeric_limits<float>::lowest());
+        m_map = cv::Mat((int)delta[1] + 1, (int)delta[0] + 1,CV_32FC1);
+        m_map.setTo(std::numeric_limits<float>::lowest());
 
         for (const auto& id_point : v_point_cloud) {
             const Point_3& point = v_point_cloud.point(id_point);
-            float cur_height = m_map((int)((point.y() - m_start[1])/m_resolution), (int)((point.x() - m_start[0])/m_resolution));
+            float cur_height = m_map.at<float>((int)((point.y() - m_start[1])/m_resolution), (int)((point.x() - m_start[0])/m_resolution));
             if (cur_height < point.z())
-                m_map((int)((point.y() - m_start[1]) / m_resolution), (int)((point.x() - m_start[0]) / m_resolution)) = point.z();
+                m_map.at<float>((int)((point.y() - m_start[1]) / m_resolution), (int)((point.x() - m_start[0]) / m_resolution)) = point.z();
         }
+    }
+
+    Height_map(const Eigen::Vector3f& v_min, const Eigen::Vector3f& v_max, const float v_resolution)
+	:m_resolution(v_resolution),m_start(v_min) {
+        Eigen::Vector3f delta = (v_max - m_start) / m_resolution;
+        m_map = cv::Mat((int)delta[1] + 1, (int)delta[0] + 1, CV_32FC1);
+        m_map.setTo(std::numeric_limits<float>::lowest());
     }
 
 	float get_height(float x,float y)
     {
         int m_y = (int)((y - m_start[1]) / m_resolution);
         int m_x = (int)((x - m_start[0]) / m_resolution);
-        if (!(0 <= m_y && 0 <= m_x && m_y < m_map.rows() && m_x < m_map.cols()))
+        if (!(0 <= m_y && 0 <= m_x && m_y < m_map.rows && m_x < m_map.cols))
             return std::numeric_limits<float>::lowest();
-        return m_map(m_y, m_x);
+        return m_map.at<float>(m_y, m_x);
     }
 
+    void update(const CGAL::Bbox_3& v_box)
+    {
+        int xmin = (v_box.xmin() - m_start[0]) / m_resolution;
+        int ymin = (v_box.xmin() - m_start[1]) / m_resolution;
+    	int xmax = (v_box.xmax() - m_start[0]) / m_resolution+1;
+        int ymax = (v_box.xmax() - m_start[1]) / m_resolution+1;
+        xmin = std::max(xmin, 0);
+        xmax = std::min(xmax, m_map.cols-1);
+        ymin = std::max(ymin, 0);
+        ymax = std::min(ymax, m_map.rows-1);
+        for (int y = ymin; y <= ymax; ++y)
+            for (int x = xmin; x <= xmax; ++x)
+                m_map.at<float>(y, x) = m_map.at<float>(y, x) > v_box.zmax() ? m_map.at<float>(y, x) : v_box.zmax();
+    }
+	
     void save_height_map_png(const std::string& v_path,const float v_threshold=0.f)
     {
         //std::cout << m_map.rows() << "," << m_map.cols() << std::endl;
-        cv::Mat map(m_map.rows(), m_map.cols(), CV_8UC3);
-        for (int y = 0; y < m_map.rows(); ++y)
-            for (int x = 0; x < m_map.cols(); ++x)
-                if (m_map(y, x) > v_threshold)
+        cv::Mat map(m_map.rows, m_map.cols, CV_8UC3);
+        for (int y = 0; y < m_map.rows; ++y)
+            for (int x = 0; x < m_map.cols; ++x)
+                if (m_map.at<float>(y, x) > v_threshold)
                     map.at<cv::Vec3b>(y, x) = cv::Vec3b(0, 0, 255);
         cv::imwrite(v_path, map);
     }
 
     void save_height_map_tiff(const std::string& v_path) {
         //std::cout << m_map.rows() << "," << m_map.cols() << std::endl;
-        cv::Mat map(m_map.rows(), m_map.cols(), CV_32FC1);
-        for (int y = 0; y < m_map.rows(); ++y)
-            for (int x = 0; x < m_map.cols(); ++x)
-                map.at<float>(y, x) = m_map(y,x);
-        cv::imwrite(v_path, map);
+        cv::imwrite(v_path, m_map);
     }
 	
     Eigen::Vector3f m_start;
     float m_resolution;
-    Eigen::MatrixXf m_map;
+    cv::Mat m_map;
 };
 
 #endif // MODEL_TOOLS_H

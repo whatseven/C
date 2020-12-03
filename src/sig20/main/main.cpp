@@ -22,6 +22,8 @@ struct Building
 const Eigen::Vector3f UNREAL_START(0.f, 0.f, 0.f);
 const Eigen::Vector2f IMAGE_START(-70.f, -55.f);
 const Eigen::Vector3f MAIN_START(-5000.f, 0.f, 2000.f);
+const Eigen::Vector3f MAP_START(-70.f, -55.f, 0.f);
+const Eigen::Vector3f MAP_END(70.f, 55.f, 35.f);
 const cv::Vec3b BACKGROUND_COLOR(57,181,55);
 Eigen::Matrix3f INTRINSIC;
 const bool SYNTHETIC_POINT_CLOUD = true;
@@ -93,6 +95,8 @@ int main(int argc, char** argv){
 	}
 
 	bool end = false;
+	Height_map height_map(MAP_START, MAP_END, 2);
+	
 	while(!end)
 	{
 		// Get current image and pose
@@ -239,19 +243,33 @@ int main(int argc, char** argv){
 		std::vector<Building> previous_buildings;
 		std::vector<Building> current_buildings;
 		{
-			for(const auto& item_previous_building:previous_buildings)
-			{
-				for (const auto& item_bbox_3 : bboxes_3_world_space)
+			for (const auto& item_bbox_3 : bboxes_3_world_space) {
+				size_t index_box = &item_bbox_3 - &bboxes_3_world_space[0];
+				bool is_register_new = true;
+				for (auto& item_previous_building : previous_buildings) {
+					if(do_overlap(item_bbox_3, item_previous_building.bounding_box))
+					{
+						is_register_new = false;
+						item_previous_building.bounding_box += item_bbox_3;
+						for (const auto& item_point : current_points[index_box].points())
+							item_previous_building.points.insert(item_point);
+					}
+				}
+				if(is_register_new)
 				{
-					
+					Building building;
+					building.bounding_box = item_bbox_3;
+					for(const auto& item_point: current_points[index_box].points())
+						building.points.insert(item_point);
+					current_buildings.push_back(building);
 				}
 			}
+			
 		}
 
 		// Generating trajectory
 		// No guarantee for the validation of camera position, check it later
 		{
-			Height_map height_map(point_cloud, 3);
 			height_map.save_height_map_png("1.png", 2);
 			height_map.save_height_map_tiff("1.tiff");
 
@@ -346,7 +364,9 @@ int main(int argc, char** argv){
 		}
 
 		// Merging trajectory
-
+		{
+			
+		}
 		// Shot
 
 		// Cluster building

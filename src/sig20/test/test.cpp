@@ -17,10 +17,12 @@ struct Building
 	Point_set points;
 };
 
-const float BOUNDS = 10;
+const float BOUNDS = 5;
 const float Z_UP_BOUNDS = 5;
 const float Z_DOWN_BOUND = 5;
-const float STEP = 5;
+const float STEP = 3;
+const float CENTER_Z1 = 0.5;
+const float CENTER_Z2 = 0.25;
 const float MM_PI = 3.14159265358;
 const bool DOUBLE_FLAG = true;
 
@@ -130,12 +132,12 @@ int main(int argc, char** argv){
 			Eigen::Vector3f box_third_points_2(
 				(xmin + xmax)/2,
 				(ymin + ymax)/2,
-				(zmin + zmax)/3*2
+				(zmin + zmax)* CENTER_Z1
 			);
 			Eigen::Vector3f box_third_points(
 				(xmin + xmax)/2,
 				(ymin + ymax)/2,
-				(zmin + zmax)/3
+				(zmin + zmax)* CENTER_Z2
 			);
 			
 
