@@ -181,7 +181,7 @@ int main(int argc, char** argv){
 					}
 				}
 			for (const auto& pixel_points : bboxes_points) {
-				cv::Rect2f rect = cv::minAreaRect(pixel_points).boundingRect2f();
+				cv::Rect2f rect = cv::boundingRect(pixel_points);
 				cv::rectangle(current_image["segmentation"], rect, cv::Scalar(0, 0, 255));
 				current_buildings[&pixel_points - &*bboxes_points.begin()].bounding_box_2d = CGAL::Bbox_2(rect.x, rect.y, rect.x + rect.width, rect.y + rect.height);
 			}
