@@ -27,8 +27,8 @@ Eigen::Vector3f MapConverter::convertUnrealToMesh(const Eigen::Vector3f& vWorldP
 	if (!initDroneDone)
 		throw "Init is not done";
 	Eigen::Vector3f result;
-	result[0] = (vWorldPos[0] / 100);
-	result[1] = -(vWorldPos[1] / 100);
+	result[0] = -(vWorldPos[0] / 100);
+	result[1] = (vWorldPos[1] / 100);
 	result[2] = vWorldPos[2] / 100;
 	return result;
 }
@@ -37,8 +37,8 @@ Eigen::Vector3f MapConverter::convertMeshToUnreal(const Eigen::Vector3f& vMeshPo
 	if (!initDroneDone)
 		throw "Init is not done";
 	Eigen::Vector3f result;
-	result[0] = (vMeshPos[0] * 100);
-	result[1] = -(vMeshPos[1] * 100);
+	result[0] = -(vMeshPos[0] * 100);
+	result[1] = (vMeshPos[1] * 100);
 	result[2] = vMeshPos[2] * 100;
 	return result;
 }
@@ -55,9 +55,9 @@ Eigen::Isometry3f MapConverter::get_camera_matrix(const float yaw, const float p
 	Eigen::Isometry3f result = Eigen::Isometry3f::Identity();
 
 	result.rotate(Eigen::AngleAxisf(yaw, Eigen::Vector3f::UnitZ()));
-	result.rotate(Eigen::AngleAxisf(-pitch, Eigen::Vector3f::UnitY()));
+	result.rotate(Eigen::AngleAxisf(pitch, Eigen::Vector3f::UnitY()));
 
-	result.rotate(Eigen::AngleAxisf(M_PI / 2, Eigen::Vector3f::UnitX()));
+	result.rotate(Eigen::AngleAxisf(-M_PI / 2, Eigen::Vector3f::UnitX()));
 	result.rotate(Eigen::AngleAxisf(M_PI / 2, Eigen::Vector3f::UnitY()));
 
 	result.pretranslate(v_pos);

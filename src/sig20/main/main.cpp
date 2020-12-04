@@ -15,8 +15,10 @@
 
 struct Building
 {
-	CGAL::Bbox_3 bounding_box;
-	Point_set points;
+	CGAL::Bbox_3 bounding_box_3d;
+	Point_set points_camera_space;
+	Point_set points_world_space;
+	CGAL::Bbox_2 bounding_box_2d;
 };
 
 const Eigen::Vector3f UNREAL_START(0.f, 0.f, 0.f);
@@ -95,17 +97,17 @@ int main(int argc, char** argv){
 
 	bool end = false;
 	Height_map height_map(MAP_START, MAP_END, 2);
-	std::vector<Building> current_buildings;
-	std::vector<vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>>> previous_trajectory;
-	int now_building_ID = 0;
-	int now_point_ID = 0;
+	std::vector<Building> total_buildings;
+	int current_building_id = 0;
+	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> previous_trajectory;
+	Pos_Pack current_pos = map_converter.get_pos_pack_from_unreal(MAIN_START, -MM_PI / 2, 0);
+
 	while(!end)
 	{
 		// Get current image and pose
 		// Input: 
 		// Output: Image(cv::Mat), Camera matrix(Pos_pack)
 		std::map<std::string, cv::Mat> current_image;
-		Pos_Pack current_pos = map_converter.get_pos_pack_from_unreal(MAIN_START, 0.f, 0.f);
 		{
 			airsim_client.adjust_pose(current_pos);
 			current_image = airsim_client.get_images();
@@ -113,8 +115,10 @@ int main(int argc, char** argv){
 
 		// SLAM
 		// Input: Image(cv::Mat), Camera matrix(cv::Iso)
-		// Output: Point cloud, Refined Camera matrix(cv::Iso), num of clusters
-		std::vector<Point_set> current_points;
+		// Output: Vector of building with Point cloud in camera frames (std::vector<Building>)
+		//		   Refined Camera matrix(cv::Iso)
+		//		   num of clusters (int)
+		std::vector<Building> current_buildings;
 		std::vector<cv::Vec3b> color_map;
 		int num_cluster;
 		{
@@ -145,80 +149,84 @@ int main(int argc, char** argv){
 					auto find_result = std::find(color_map.begin(), color_map.end(), point_color);
 					if (find_result == color_map.end()) {
 						color_map.push_back(point_color);
-						current_points.push_back(Point_set());
-						current_points[current_points.size() - 1].insert(Point_3(point(0), point(1), point(2)));
+						current_buildings.push_back(Building());
+						current_buildings[current_buildings.size() - 1].points_camera_space.insert(Point_3(point(0), point(1), point(2)));
 					}
 					else {
-						current_points[&*find_result - &color_map[0]].insert(Point_3(point(0), point(1), point(2)));
+						current_buildings[&*find_result - &color_map[0]].points_camera_space.insert(Point_3(point(0), point(1), point(2)));
 					}
 				}
-				for (const auto& item : current_points)
-					CGAL::write_ply_point_set(std::ofstream(std::to_string(&item - &current_points[0]) + ".ply"), item);
+				for (const auto& item : current_buildings)
+					CGAL::write_ply_point_set(std::ofstream(std::to_string(&item - &current_buildings[0]) + ".ply"), item.points_camera_space);
 				//debug_img(std::vector{ current_image["rgb"] });
 			}
-			num_cluster = current_points.size();
+			num_cluster = current_buildings.size();
+		}
+		
+		// Object detection
+		// Input: Vector of building (std::vector<Building>)
+		// Output: Vector of building with 2D bounding box (std::vector<Building>)
+		{
+			std::vector<std::vector<cv::Point>> bboxes_points(num_cluster);
+			for (int y = 0; y < current_image["segmentation"].rows; ++y)
+				for (int x = 0; x < current_image["segmentation"].cols; ++x) {
+					for (int seg_id = 0; seg_id < color_map.size(); ++seg_id) {
+						if (color_map[seg_id] == current_image["segmentation"].at<cv::Vec3b>(y, x))
+							bboxes_points[seg_id].push_back(cv::Point2f(x, y));
+					}
+				}
+			for (const auto& pixel_points : bboxes_points) {
+				cv::Rect2f rect = cv::minAreaRect(pixel_points).boundingRect2f();
+				cv::rectangle(current_image["segmentation"], rect, cv::Scalar(0, 0, 255));
+				current_buildings[&pixel_points - &*bboxes_points.begin()].bounding_box_2d = CGAL::Bbox_2(rect.x, rect.y, rect.x + rect.width, rect.y + rect.height);
+			}
+			debug_img(std::vector{ current_image["segmentation"] });
 		}
 
 		// Post process point cloud
-		// Input: Point cloud
-		// Output: Clustered Point cloud without ground
+		// Input: Vector of building (std::vector<Building>)
+		// Output: Vector of building with point cloud in world space (std::vector<Building>)
+		std::vector<Point_set> current_points_world_space(num_cluster);
 		{
-			// Done in previous step
+			for (auto& item_building : current_buildings) {
+				size_t cluster_index = &item_building - &current_buildings[0];
+				for (const auto& item_point : item_building.points_camera_space.points()) {
+					Eigen::Vector3f point_eigen(item_point.x(), item_point.y(), item_point.z());
+					point_eigen = current_pos.camera_matrix.inverse() * point_eigen;
+					item_building.points_world_space.insert(Point_3(point_eigen.x(), point_eigen.y(), point_eigen.z()));
+				}
+				CGAL::write_ply_point_set(std::ofstream(std::to_string(cluster_index) + "_world.ply"), item_building.points_world_space);
+			}
+			
 		}
 
 		// Mapping
 		// Input: *
-		// Output: 3D bounding box of current frame
-		std::vector<CGAL::Bbox_3> bboxes_3_world_space(num_cluster);
+		// Output: Vector of building with 3D bounding box (std::vector<Building>)
 		{
 			if (MAP_2D_BOX_TO_3D) {
-				// Get bounding box
-				std::vector<CGAL::Bbox_2> bboxes(num_cluster);
-				std::vector<std::vector<cv::Point>> bboxes_points(num_cluster);
-				for (int y = 0; y < current_image["segmentation"].rows; ++y)
-					for (int x = 0; x < current_image["segmentation"].cols; ++x) {
-						for (int seg_id = 0; seg_id < color_map.size(); ++seg_id) {
-							if (color_map[seg_id] == current_image["segmentation"].at<cv::Vec3b>(y, x))
-								bboxes_points[seg_id].push_back(cv::Point2f(x, y));
-						}
-					}
-				for (const auto& pixel_points : bboxes_points) {
-					cv::Rect2f rect = cv::minAreaRect(pixel_points).boundingRect2f();
-					cv::rectangle(current_image["segmentation"], rect, cv::Scalar(0, 0, 255));
-					bboxes[&pixel_points - &*bboxes_points.begin()] = CGAL::Bbox_2(rect.x, rect.y, rect.x + rect.width, rect.y + rect.height);
-				}
-				debug_img(std::vector{ current_image["segmentation"] });
-
 				// Calculate Z distance and get 3D bounding box
 				std::vector<float> z_mins(num_cluster, std::numeric_limits<float>::max());
 				std::vector<float> z_maxs(num_cluster, std::numeric_limits<float>::min());
-				for (const auto& item_cluster_points : current_points) {
-					size_t cluster_index = &item_cluster_points - &current_points[0];
-					z_mins[cluster_index] = std::min_element(item_cluster_points.range(item_cluster_points.point_map()).begin(), item_cluster_points.range(item_cluster_points.point_map()).end(),
+				for (const auto& item_building : current_buildings) {
+					size_t cluster_index = &item_building - &current_buildings[0];
+					z_mins[cluster_index] = std::min_element(item_building.points_camera_space.range(item_building.points_camera_space.point_map()).begin(), item_building.points_camera_space.range(item_building.points_camera_space.point_map()).end(),
 						[](const auto& a, const auto& b) {
 						return a.z() < b.z();
 					})->z();
-					z_maxs[cluster_index] = std::max_element(item_cluster_points.range(item_cluster_points.point_map()).begin(), item_cluster_points.range(item_cluster_points.point_map()).end(),
+					z_maxs[cluster_index] = std::max_element(item_building.points_camera_space.range(item_building.points_camera_space.point_map()).begin(), item_building.points_camera_space.range(item_building.points_camera_space.point_map()).end(),
 						[](const auto& a, const auto& b) {
 						return a.z() < b.z();
 					})->z();
-					Point_set world_points;
-					for (const auto& item_point : item_cluster_points.points()) {
-						Eigen::Vector3f point_eigen(item_point.x(), item_point.y(), item_point.z());
-						point_eigen = current_pos.camera_matrix.inverse() * point_eigen;
-						world_points.insert(Point_3(point_eigen.x(), point_eigen.y(), point_eigen.z()));
-					}
-					bboxes_3_world_space[cluster_index] = get_bounding_box(world_points);
-					CGAL::write_ply_point_set(std::ofstream(std::to_string(cluster_index) + "_world.ply"), world_points);
 				}
 
 				// Calculate height of the building, Get 3D bbox world space
 				Eigen::Matrix3f rotate_to_XZ = Eigen::AngleAxisf(current_pos.pitch, Eigen::Vector3f::UnitX()).toRotationMatrix();
-				for (const auto& item_cluster_points : current_points) {
-					size_t cluster_index = &item_cluster_points - &current_points[0];
+				for (auto& item_building : current_buildings) {
+					size_t cluster_index = &item_building - &current_buildings[0];
 					float min_distance = z_mins[cluster_index];
 					float max_distance = z_maxs[cluster_index];
-					float y_min_2d = bboxes[cluster_index].ymin();
+					float y_min_2d = item_building.bounding_box_2d.ymin();
 
 					Eigen::Vector3f point_pos_img(0, y_min_2d, 1);
 					Eigen::Vector3f point_pos_camera_XZ = rotate_to_XZ.inverse() * INTRINSIC.inverse() * point_pos_img;
@@ -234,173 +242,176 @@ int main(int argc, char** argv){
 						final_height = (point_pos_camera_XZ * scale)[1];
 					}
 
-					bboxes_3_world_space[cluster_index] = CGAL::Bbox_3(bboxes_3_world_space[cluster_index].xmin(), bboxes_3_world_space[cluster_index].ymin(), current_pos.pos_mesh[2] + final_height, bboxes_3_world_space[cluster_index].xmax(), bboxes_3_world_space[cluster_index].ymax(), 0);
+					item_building.bounding_box_3d = get_bounding_box(item_building.points_world_space);
+					item_building.bounding_box_3d = CGAL::Bbox_3(item_building.bounding_box_3d.xmin(), item_building.bounding_box_3d.ymin(), 0, item_building.bounding_box_3d.xmax(), item_building.bounding_box_3d.ymax(), current_pos.pos_mesh[2] + final_height);
 				}
 			}
 		}
 
 		// Merging
 		// Input: 3D bounding box of current frame and previous frame
-		// Output: Building vectors (std::vector<Building>)
+		// Output: Total building vectors (std::vector<Building>)
 		{
-			for (const auto& item_bbox_3 : bboxes_3_world_space) {
-				size_t index_box = &item_bbox_3 - &bboxes_3_world_space[0];
-				bool is_register_new = true;
-				for (auto& item_previous_building : current_buildings) {
-					if(do_overlap(item_bbox_3, item_previous_building.bounding_box))
-					{
-						is_register_new = false;
-						item_previous_building.bounding_box += item_bbox_3;
-						for (const auto& item_point : current_points[index_box].points())
-							item_previous_building.points.insert(item_point);
+			std::vector<bool> need_register(num_cluster, true);
+			for (auto& item_building : total_buildings) {
+				for (const auto& item_current_building : current_buildings) {
+					size_t index_box = &item_current_building - &current_buildings[0];
+					if (do_overlap(item_current_building.bounding_box_3d, item_building.bounding_box_3d)) {
+						need_register[index_box] = false;
+						item_building.bounding_box_3d += item_current_building.bounding_box_3d;
+						for (const auto& item_point : item_current_building.points_world_space.points())
+							item_building.points_world_space.insert(item_point);
 					}
 				}
-				if(is_register_new)
+			}
+			for (int i = 0; i < need_register.size();++i) {
+				if(need_register[i])
 				{
-					Building building;
-					building.bounding_box = item_bbox_3;
-					for(const auto& item_point: current_points[index_box].points())
-						building.points.insert(item_point);
-					current_buildings.push_back(building);
+					total_buildings.push_back(current_buildings[i]);
 				}
 			}
-			
+
+			// Updata height map
+			for (auto& item_building : total_buildings) {
+				height_map.update(item_building.bounding_box_3d);
+			}
 		}
 
 		// Generating trajectory
 		// No guarantee for the validation of camera position, check it later
 		// Input: Building vectors (std::vector<Building>)
 		// Output: Total 3D bounding box
-		
-		std::vector<std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>>> current_trajectory(current_buildings.size());
+		std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> current_trajectory;
 		{
+			Building& building= total_buildings[current_building_id];
 			height_map.save_height_map_png("1.png", 2);
 			height_map.save_height_map_tiff("1.tiff");
-			for (int id_building = 0; id_building < current_buildings.size(); ++id_building) {
-				current_buildings[id_building].bounding_box = get_bounding_box(current_buildings[id_building].points);
-				float xmin = current_buildings[id_building].bounding_box.xmin();
-				float ymin = current_buildings[id_building].bounding_box.ymin();
-				float zmin = current_buildings[id_building].bounding_box.zmin();
-				float xmax = current_buildings[id_building].bounding_box.xmax();
-				float ymax = current_buildings[id_building].bounding_box.ymax();
-				float zmax = current_buildings[id_building].bounding_box.zmax();
-				Eigen::Vector3f box_third_points_2(
-					(xmin + xmax) / 2,
-					(ymin + ymax) / 2,
-					(zmin + zmax) / 3 * 2
-				);
-				Eigen::Vector3f box_third_points(
-					(xmin + xmax) / 2,
-					(ymin + ymax) / 2,
-					(zmin + zmax) / 3
-				);
+			float xmin = building.bounding_box_3d.xmin();
+			float ymin = building.bounding_box_3d.ymin();
+			float zmin = building.bounding_box_3d.zmin();
+			float xmax = building.bounding_box_3d.xmax();
+			float ymax = building.bounding_box_3d.ymax();
+			float zmax = building.bounding_box_3d.zmax();
+			Eigen::Vector3f box_third_points_2(
+				(xmin + xmax) / 2,
+				(ymin + ymax) / 2,
+				(zmin + zmax) / 3 * 2
+			);
+			Eigen::Vector3f box_third_points(
+				(xmin + xmax) / 2,
+				(ymin + ymax) / 2,
+				(zmin + zmax) / 3
+			);
 
 
-				Eigen::Vector3f cur_pos(xmin - BOUNDS, ymin - BOUNDS, zmax + Z_UP_BOUNDS);
-				while (cur_pos.x() <= xmax + BOUNDS) {
-					trajectory_current[id_building].push_back(std::make_pair(
-						cur_pos, box_third_points_2 - cur_pos
+			Eigen::Vector3f cur_pos(xmin - BOUNDS, ymin - BOUNDS, zmax + Z_UP_BOUNDS);
+			while (cur_pos.x() <= xmax + BOUNDS) {
+				current_trajectory.push_back(std::make_pair(
+					cur_pos, box_third_points_2 - cur_pos
+				));
+				if (DOUBLE_FLAG) {
+					Eigen::Vector3f cur_pos_copy(cur_pos[0], cur_pos[1], cur_pos[2] / 3);
+					current_trajectory.push_back(std::make_pair(
+						cur_pos_copy, box_third_points - cur_pos_copy
 					));
-					if (DOUBLE_FLAG) {
-						Eigen::Vector3f cur_pos_copy(cur_pos[0], cur_pos[1], cur_pos[2] / 3);
-						trajectory_current[id_building].push_back(std::make_pair(
-							cur_pos_copy, box_third_points - cur_pos_copy
-						));
-					}
-					cur_pos[0] += STEP;
 				}
-				while (cur_pos.y() <= ymax + BOUNDS) {
-					trajectory_current[id_building].push_back(std::make_pair(
-						cur_pos, box_third_points_2 - cur_pos
+				cur_pos[0] += STEP;
+			}
+			while (cur_pos.y() <= ymax + BOUNDS) {
+				current_trajectory.push_back(std::make_pair(
+					cur_pos, box_third_points_2 - cur_pos
+				));
+				if (DOUBLE_FLAG) {
+					Eigen::Vector3f cur_pos_copy(cur_pos[0], cur_pos[1], cur_pos[2] / 3);
+					current_trajectory.push_back(std::make_pair(
+						cur_pos_copy, box_third_points - cur_pos_copy
 					));
-					if (DOUBLE_FLAG) {
-						Eigen::Vector3f cur_pos_copy(cur_pos[0], cur_pos[1], cur_pos[2] / 3);
-						trajectory_current[id_building].push_back(std::make_pair(
-							cur_pos_copy, box_third_points - cur_pos_copy
-						));
-					}
-					cur_pos[1] += STEP;
 				}
-				while (cur_pos.x() >= xmin - BOUNDS) {
-					trajectory_current[id_building].push_back(std::make_pair(
-						cur_pos, box_third_points_2 - cur_pos
+				cur_pos[1] += STEP;
+			}
+			while (cur_pos.x() >= xmin - BOUNDS) {
+				current_trajectory.push_back(std::make_pair(
+					cur_pos, box_third_points_2 - cur_pos
+				));
+				if (DOUBLE_FLAG) {
+					Eigen::Vector3f cur_pos_copy(cur_pos[0], cur_pos[1], cur_pos[2] / 3);
+					current_trajectory.push_back(std::make_pair(
+						cur_pos_copy, box_third_points - cur_pos_copy
 					));
-					if (DOUBLE_FLAG) {
-						Eigen::Vector3f cur_pos_copy(cur_pos[0], cur_pos[1], cur_pos[2] / 3);
-						trajectory_current[id_building].push_back(std::make_pair(
-							cur_pos_copy, box_third_points - cur_pos_copy
-						));
-					}
-					cur_pos[0] -= STEP;
 				}
-				while (cur_pos.y() >= ymin - BOUNDS) {
-					trajectory_current[id_building].push_back(std::make_pair(
-						cur_pos, box_third_points_2 - cur_pos
+				cur_pos[0] -= STEP;
+			}
+			while (cur_pos.y() >= ymin - BOUNDS) {
+				current_trajectory.push_back(std::make_pair(
+					cur_pos, box_third_points_2 - cur_pos
+				));
+				if (DOUBLE_FLAG) {
+					Eigen::Vector3f cur_pos_copy(cur_pos[0], cur_pos[1], cur_pos[2] / 3);
+					current_trajectory.push_back(std::make_pair(
+						cur_pos_copy, box_third_points - cur_pos_copy
 					));
-					if (DOUBLE_FLAG) {
-						Eigen::Vector3f cur_pos_copy(cur_pos[0], cur_pos[1], cur_pos[2] / 3);
-						trajectory_current[id_building].push_back(std::make_pair(
-							cur_pos_copy, box_third_points - cur_pos_copy
-						));
-					}
-					cur_pos[1] -= STEP;
 				}
-
-				// Check the camera position
-				for (int i = 0; i < trajectory_current[id_building].size(); ++i) {
-					Eigen::Vector3f position = trajectory_current[id_building][i].first;
-					Eigen::Vector3f camera_focus = trajectory_current[id_building][i].first + trajectory_current[id_building][i].second;
-
-					while (height_map.get_height(position.x(), position.y()) + Z_DOWN_BOUND > position.z()) {
-						position[2] += 5;
-					}
-					Eigen::Vector3f camera_direction = camera_focus - position;
-					trajectory_current[id_building][i].second = camera_direction.normalized();
-					trajectory_current[id_building][i].first = position;
-				}
+				cur_pos[1] -= STEP;
 			}
 
+			// Check the camera position
+			for (int i = 0; i < current_trajectory.size(); ++i) {
+				Eigen::Vector3f position = current_trajectory[i].first;
+				Eigen::Vector3f camera_focus = current_trajectory[i].first + current_trajectory[i].second;
+
+				while (height_map.get_height(position.x(), position.y()) + Z_DOWN_BOUND > position.z()) {
+					position[2] += 5;
+				}
+				Eigen::Vector3f camera_direction = camera_focus - position;
+				current_trajectory[i].second = camera_direction.normalized();
+				current_trajectory[i].first = position;
+			}
 		}
 
 		// Merging trajectory
-		int next_point_ID = 0;
+		// Returen -1 if shot for the current building is done
+		Eigen::Vector3f next_pos;
+		Eigen::Vector3f next_direction;
 		{
-			std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> single_building_trajectory;
-			std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> single_building_trajectory_previous;
-			std::vector<bool> has_taken_picture_current(current_trajectory[now_building_ID].size(), false);
-			std::vector<bool> has_taken_picture_previous(previous_trajectory[now_building_ID].size(), false);
-			{
-				if (!now_point_ID) {
-					single_building_trajectory = current_trajectory[now_building_ID];
-					single_building_trajectory_previous = previous_trajectory[now_building_ID];
-					for (int i = 0; i <= now_point_ID; i++) {
-						if (has_taken_picture_previous[i]) {
-							Eigen::Vector3f previous_point_coord = single_building_trajectory_previous[i].first;
-							for (int j = 0; j < has_taken_picture_current.size(); j++) {
-								Eigen::Vector3f now_point_coord = single_building_trajectory[j].first;
-								float distance = (now_point_coord - previous_point_coord).norm();
-								if (distance < THRESHOLD) {
-									has_taken_picture_current[j] = true;
-									if (j > next_point_ID)
-										next_point_ID = j;
-									break;
-								}
-							}
-						}
-					}
-				}
-			}
-			previous_trajectory = current_trajectory;
+			//std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> points_has_shotted;
+			//{
+			//	for (auto& point_has_shotted : points_has_shotted) {
+			//		Eigen::Vector3f previous_point_coord = point_has_shotted.first;
+			//		for (auto it = current_trajectory.begin(); it != current_trajectory.end();) {
+			//			Eigen::Vector3f now_point_coord = *it.first;
+			//			float distance = (now_point_coord - previous_point_coord).norm();
+			//			if (distance < THRESHOLD) {
+			//				points_has_shotted = *it;
+			//				it = current_trajectory.erase(it);
+			//			}
+			//			else
+			//				it++;
+			//		}
+			//	}
+			//}
+
+			////Find next point to go
+			//float min_distance = 999;
+			//std::pair<Eigen::Vector3f, Eigen::Vector3f> next_point;
+			//Eigen::Vector3f now_point_coord = points_has_shotted[points_has_shotted.size() - 1].first;
+			//for (auto it = current_trajectory.begin(); it != current_trajectory.end(); it++) {
+			//	Eigen::Vector3f next_point_coord = *it.first;
+			//	float distance = (now_point_coord - next_point_coord).norm();
+			//	if (distance < min_distance) {
+			//		next_point = *it;
+			//	}
+			//}
+			//points_has_shotted.push_back(next_point);
 		}
 
 		
 		// Shot
+		//
+		// Output: current_pos
 		{
-			Eigen::Vector3f next_pos = current_trajectory[now_building_ID][now_point_ID].first;
-			Eigen::Vector3f next_direction = current_trajectory[now_building_ID][now_point_ID].second;
-			// Shot
-
-			
+			float pitch= std::atan2f(next_direction[2], std::sqrtf(next_direction[0]* next_direction[0]+ next_direction[1]* next_direction[0]));
+			float yaw = std::atan2f(next_direction[1], next_direction[0]);
+			current_pos = map_converter.get_pos_pack_from_unreal(map_converter.convertMeshToUnreal(next_pos), yaw, pitch);
 		}
 
 
