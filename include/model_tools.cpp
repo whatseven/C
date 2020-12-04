@@ -761,3 +761,4 @@ void rename_material(const std::string& file_dir, const std::string& file_name, 
 	write_obj((output_root / "1.obj").string(), attrib, shapes, materials);
 	return;
 }
+

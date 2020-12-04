@@ -23,31 +23,13 @@ Eigen::Vector3f MapConverter::convertUnrealToAirsim(const Eigen::Vector3f& vWorl
 	return result;
 }
 
-void MapConverter::initImageStart(const float vStartX,const float vStartY) {
-	mImageStartX = vStartX;
-	mImageStartY = vStartY;
-	initImageDone = true;
-}
-
-Eigen::Vector3f MapConverter::convertUnrealToImage(const Eigen::Vector3f& vWorldPos) const {
-	if (!initDroneDone)
-		throw "Init is not done";
-	Eigen::Vector3f result;
-	result[0] = -(vWorldPos[1] / 100 + this->mImageStartX) ;
-	result[1] = (vWorldPos[0] / 100 - this->mImageStartY);
-	result[2] = -vWorldPos[2] / 100;
-	return result;
-}
-
 Eigen::Vector3f MapConverter::convertUnrealToMesh(const Eigen::Vector3f& vWorldPos) const {
 	if (!initDroneDone)
 		throw "Init is not done";
-	if (!initDroneDone)
-		throw "Init is not done";
 	Eigen::Vector3f result;
-	result[0] = -(vWorldPos[1] / 100);
-	result[1] = (vWorldPos[0] / 100);
-	result[2] = -vWorldPos[2] / 100;
+	result[0] = (vWorldPos[0] / 100);
+	result[1] = -(vWorldPos[1] / 100);
+	result[2] = vWorldPos[2] / 100;
 	return result;
 }
 
@@ -55,25 +37,10 @@ Eigen::Vector3f MapConverter::convertMeshToUnreal(const Eigen::Vector3f& vMeshPo
 	if (!initDroneDone)
 		throw "Init is not done";
 	Eigen::Vector3f result;
-	result[0] = (vMeshPos[1] * 100);
-	result[1] = -(vMeshPos[0] * 100);
-	result[2] = -vMeshPos[2] * 100;
+	result[0] = (vMeshPos[0] * 100);
+	result[1] = -(vMeshPos[1] * 100);
+	result[2] = vMeshPos[2] * 100;
 	return result;
-}
-
-Eigen::Vector3f MapConverter::convertImageToUnreal(const Eigen::Vector3f& vPos) const{
-	if (!initImageDone)
-		throw "Init is not done";
-	Eigen::Vector3f result;
-	result[0] = (vPos[1] + this->mImageStartY) * 100;
-	result[1] = (-vPos[0] + -this->mImageStartX) * 100;
-	result[2] = -vPos[2] * 100;
-
-	return result;
-}
-
-Eigen::Vector3f MapConverter::convertImageToMesh(const Eigen::Vector3f& vPos) const {
-	return Eigen::Vector3f(vPos[0] + this->mImageStartX, vPos[1] + this->mImageStartY, vPos[2]);
 }
 
 Eigen::Matrix3f MapConverter::convert_yaw_pitch_to_matrix_mesh(const float yaw,const float pitch)
@@ -111,12 +78,8 @@ Pos_Pack MapConverter::get_pos_pack_from_unreal(const Eigen::Vector3f& v_pos_unr
 	Pos_Pack pos_pack;
 	pos_pack.yaw = yaw;
 	pos_pack.pitch = pitch;
-	pos_pack.pos_image= convertUnrealToImage(v_pos_unreal);
-	pos_pack.pos_mesh = convertImageToMesh(pos_pack.pos_image);
-	Eigen::Vector3f test_pos = convertImageToUnreal(pos_pack.pos_image);
-	assert((test_pos - v_pos_unreal).norm() < 1);
+	pos_pack.pos_mesh = convertUnrealToMesh(v_pos_unreal);
 	pos_pack.pos_airsim = convertUnrealToAirsim(v_pos_unreal);
-	pos_pack.direction_image = convert_yaw_pitch_to_direction_vector(yaw, pitch);
 	pos_pack.camera_matrix = get_camera_matrix(yaw, pitch, pos_pack.pos_mesh);
 	
 	return pos_pack;
