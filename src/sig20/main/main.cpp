@@ -2,7 +2,7 @@
 
 #include <CGAL/Point_set_3.h>
 #include <CGAL/Point_set_3/IO.h>
-#include <CGAL/cluster_point_set.h>
+//#include <CGAL/cluster_point_set.h>
 #include <CGAL/Random.h>
 #include <glog/logging.h>
 #include <boost/format.hpp>
@@ -27,6 +27,7 @@ const Eigen::Vector3f MAP_START(-70.f, -55.f, 0.f);
 const Eigen::Vector3f MAP_END(70.f, 55.f, 35.f);
 const float THRESHOLD = 5;
 const cv::Vec3b BACKGROUND_COLOR(57,181,55);
+const cv::Vec3b SKY_COLOR(161, 120, 205);
 Eigen::Matrix3f INTRINSIC;
 const bool SYNTHETIC_POINT_CLOUD = true;
 const bool MAP_2D_BOX_TO_3D = true;
@@ -291,6 +292,7 @@ int main(int argc, char** argv){
 			Building& building= total_buildings[current_building_id];
 			height_map.save_height_map_png("1.png", 2);
 			height_map.save_height_map_tiff("1.tiff");
+
 			float xmin = building.bounding_box_3d.xmin();
 			float ymin = building.bounding_box_3d.ymin();
 			float zmin = building.bounding_box_3d.zmin();
@@ -374,6 +376,7 @@ int main(int argc, char** argv){
 		}
 
 		// Merging trajectory
+
 		// Returen -1 if shot for the current building is done
 		Eigen::Vector3f next_pos;
 		Eigen::Vector3f next_direction;
@@ -398,18 +401,26 @@ int main(int argc, char** argv){
 			//Find next point to go
 			float min_distance = 999;
 			std::pair<Eigen::Vector3f, Eigen::Vector3f> next_point;
-			Eigen::Vector3f now_point_coord = points_has_shotted[points_has_shotted.size() - 1].first;
-			for (auto it = current_trajectory.begin(); it != current_trajectory.end(); it++) {
-				Eigen::Vector3f next_point_coord = (*it).first;
-				float distance = (now_point_coord - next_point_coord).norm();
-				if (distance < min_distance) {
-					next_point = *it;
+			if (points_has_shotted.size() == 0)
+			{
+				next_point = current_trajectory[0];
+			}
+			else {
+				Eigen::Vector3f now_point_coord = points_has_shotted[points_has_shotted.size() - 1].first;
+				for (auto it = current_trajectory.begin(); it != current_trajectory.end(); it++) {
+					Eigen::Vector3f next_point_coord = (*it).first;
+					float distance = (now_point_coord - next_point_coord).norm();
+					if (distance < min_distance) {
+						next_point = *it;
+					}
 				}
 			}
+			
 			points_has_shotted.push_back(next_point);
 			next_pos = next_point.first;
 			next_direction = next_point.second;
-			if (current_trajectory.size() == 1) {
+			if (current_trajectory.size() == 1)
+			{
 				current_building_id++;
 				points_has_shotted.clear();
 			}
@@ -420,7 +431,7 @@ int main(int argc, char** argv){
 		//
 		// Output: current_pos
 		{
-			float pitch= std::atan2f(next_direction[2], std::sqrtf(next_direction[0]* next_direction[0]+ next_direction[1]* next_direction[0]));
+			float pitch= -std::atan2f(next_direction[2], std::sqrtf(next_direction[0]* next_direction[0]+ next_direction[1]* next_direction[1]));
 			float yaw = std::atan2f(next_direction[1], next_direction[0]);
 			current_pos = map_converter.get_pos_pack_from_unreal(map_converter.convertMeshToUnreal(next_pos), yaw, pitch);
 		}

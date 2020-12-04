@@ -73,10 +73,21 @@ void Airsim_tools::reset_color(const std::string& v_key_words) {
     int num = 1;
     for(const auto& item:m_agent->simListSceneObjects())
     {
+<<<<<<< HEAD
+        if (v_key_words.size() > 0 && item.find(v_key_words) != item.npos)
+        {
+            m_agent->simSetSegmentationObjectID(item, num);
+            num += 1;
+        }
+        else {
+            m_agent->simSetSegmentationObjectID(item, 0);
+        }
+=======
     	if(v_key_words.size()>0&& item.find(v_key_words)!=item.npos)
             m_agent->simSetSegmentationObjectID(item, num++);
         else
 			m_agent->simSetSegmentationObjectID(item, 0);
+>>>>>>> 2a97e5f7f7b5d0f3d7d6dc48416182d9fc30c3d3
     }
     return;
 }
