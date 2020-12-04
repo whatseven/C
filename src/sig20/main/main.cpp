@@ -31,6 +31,7 @@ const float Z_UP_BOUNDS = 20;
 const float Z_DOWN_BOUND = 5;
 const float STEP = 5;
 const float MM_PI = 3.14159265358;
+const float THRESHOLD = 5;
 const bool DOUBLE_FLAG = true;
 
 MapConverter map_converter;
@@ -250,12 +251,13 @@ int main(int argc, char** argv){
 
 		// Generating trajectory
 		// No guarantee for the validation of camera position, check it later
+		std::vector<vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>>> trajectory_total;
 		{
 			Height_map height_map(point_cloud, 3);
 			height_map.save_height_map_png("1.png", 2);
 			height_map.save_height_map_tiff("1.tiff");
 
-			std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> trajectory;
+			std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> trajectory_single;
 			{
 				for (int id_building = 0; id_building < nb_clusters; ++id_building) {
 					buildings[id_building].bounding_box = get_bounding_box(buildings[id_building].points);
@@ -279,48 +281,48 @@ int main(int argc, char** argv){
 
 					Eigen::Vector3f cur_pos(xmin - BOUNDS, ymin - BOUNDS, zmax + Z_UP_BOUNDS);
 					while (cur_pos.x() <= xmax + BOUNDS) {
-						trajectory.push_back(std::make_pair(
+						trajectory_single.push_back(std::make_pair(
 							cur_pos, box_third_points_2 - cur_pos
 						));
 						if (DOUBLE_FLAG) {
 							Eigen::Vector3f cur_pos_copy(cur_pos[0], cur_pos[1], cur_pos[2] / 3);
-							trajectory.push_back(std::make_pair(
+							trajectory_single.push_back(std::make_pair(
 								cur_pos_copy, box_third_points - cur_pos_copy
 							));
 						}
 						cur_pos[0] += STEP;
 					}
 					while (cur_pos.y() <= ymax + BOUNDS) {
-						trajectory.push_back(std::make_pair(
+						trajectory_single.push_back(std::make_pair(
 							cur_pos, box_third_points_2 - cur_pos
 						));
 						if (DOUBLE_FLAG) {
 							Eigen::Vector3f cur_pos_copy(cur_pos[0], cur_pos[1], cur_pos[2] / 3);
-							trajectory.push_back(std::make_pair(
+							trajectory_single.push_back(std::make_pair(
 								cur_pos_copy, box_third_points - cur_pos_copy
 							));
 						}
 						cur_pos[1] += STEP;
 					}
 					while (cur_pos.x() >= xmin - BOUNDS) {
-						trajectory.push_back(std::make_pair(
+						trajectory_single.push_back(std::make_pair(
 							cur_pos, box_third_points_2 - cur_pos
 						));
 						if (DOUBLE_FLAG) {
 							Eigen::Vector3f cur_pos_copy(cur_pos[0], cur_pos[1], cur_pos[2] / 3);
-							trajectory.push_back(std::make_pair(
+							trajectory_single.push_back(std::make_pair(
 								cur_pos_copy, box_third_points - cur_pos_copy
 							));
 						}
 						cur_pos[0] -= STEP;
 					}
 					while (cur_pos.y() >= ymin - BOUNDS) {
-						trajectory.push_back(std::make_pair(
+						trajectory_single.push_back(std::make_pair(
 							cur_pos, box_third_points_2 - cur_pos
 						));
 						if (DOUBLE_FLAG) {
 							Eigen::Vector3f cur_pos_copy(cur_pos[0], cur_pos[1], cur_pos[2] / 3);
-							trajectory.push_back(std::make_pair(
+							trajectory_single.push_back(std::make_pair(
 								cur_pos_copy, box_third_points - cur_pos_copy
 							));
 						}
@@ -331,21 +333,57 @@ int main(int argc, char** argv){
 
 			// Check the camera position
 			{
-				for (int i = 0; i < trajectory.size(); ++i) {
-					Eigen::Vector3f position = trajectory[i].first;
-					Eigen::Vector3f camera_focus = trajectory[i].first + trajectory[i].second;
+				for (int i = 0; i < trajectory_single.size(); ++i) {
+					Eigen::Vector3f position = trajectory_single[i].first;
+					Eigen::Vector3f camera_focus = trajectory_single[i].first + trajectory_single[i].second;
 
 					while (height_map.get_height(position.x(), position.y()) + Z_DOWN_BOUND > position.z()) {
 						position[2] += 5;
 					}
 					Eigen::Vector3f camera_direction = camera_focus - position;
-					trajectory[i].second = camera_direction.normalized();
-					trajectory[i].first = position;
+					trajectory_single[i].second = camera_direction.normalized();
+					trajectory_single[i].first = position;
 				}
 			}
+			trajectory_total.push_back(trajectory_single);
 		}
 
 		// Merging trajectory
+		// Take trajectory_total as previous trajectory
+		std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> single_building_trajectory;
+		std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> single_building_trajectory_previous;
+		std::vector<vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>>> trajectory_total_previous;
+		int now_point_ID = 0;
+		int now_building_ID = 0;
+		int next_point_ID = 0;
+		std::vector<bool> has_taken_picture_current(trajectory_total[now_building_ID].size(), false);
+		std::vector<bool> has_taken_picture_previous(trajectory_total_previous[now_building_ID].size(), false);
+		{
+			if (!now_point_ID)
+			{
+				single_building_trajectory = trajectory_total[now_building_ID];
+				single_building_trajectory_previous = trajectory_total_previous[now_building_ID];
+				for (int i = 0; i <= now_point_ID; i++)
+				{
+					if (has_taken_picture_previous[i])
+					{
+						Eigen::Vector3f previous_point_coord = single_building_trajectory_previous[i].first;
+						for (int j = 0; j < has_taken_picture_current.size(); j++)
+						{
+							Eigen::Vector3f now_point_coord = single_building_trajectory[j].first;
+							float distance = (now_point_coord - previous_point_coord).norm();
+							if (distance < THRESHOLD)
+							{
+								has_taken_picture_current[j] = true;
+								if (j > next_point_ID)
+									next_point_ID = j;
+								break;
+							}
+						}
+					}
+				}
+			}	
+		}
 
 		// Shot
 
