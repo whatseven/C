@@ -227,7 +227,6 @@ int main(int argc, char** argv){
 				}
 
 				// Calculate height of the building, Get 3D bbox world space
-				Eigen::Matrix3f rotate_to_XZ = Eigen::AngleAxisf(current_pos.pitch, Eigen::Vector3f::UnitX()).toRotationMatrix();
 				for (auto& item_building : current_buildings) {
 					size_t cluster_index = &item_building - &current_buildings[0];
 					float min_distance = z_mins[cluster_index];
@@ -235,21 +234,23 @@ int main(int argc, char** argv){
 					float y_min_2d = item_building.bounding_box_2d.ymin();
 
 					Eigen::Vector3f point_pos_img(0, y_min_2d, 1);
-					Eigen::Vector3f point_pos_camera_XZ = rotate_to_XZ.inverse() * INTRINSIC.inverse() * point_pos_img;
+					Eigen::Vector3f point_pos_camera_XZ = INTRINSIC.inverse() * point_pos_img;
 
 					float distance_candidate = min_distance;
 					float scale = distance_candidate / point_pos_camera_XZ[2];
+					Eigen::Vector3f point_pos_world = current_pos.camera_matrix.inverse() * (scale*point_pos_camera_XZ) ;
 
-					float final_height = (point_pos_camera_XZ * scale)[1];
-					// Short than camera, recalculate using max distance
-					if (final_height > 0) {
+					float final_height = point_pos_world[2];
+					// Shorter than camera, recalculate using max distance
+					if (final_height < current_pos.pos_mesh[2]) {
 						distance_candidate = max_distance;
 						scale = distance_candidate / point_pos_camera_XZ[2];
-						final_height = (point_pos_camera_XZ * scale)[1];
+						point_pos_world = current_pos.camera_matrix.inverse() * (scale * point_pos_camera_XZ);
+						final_height = point_pos_world[2];
 					}
 
 					item_building.bounding_box_3d = get_bounding_box(item_building.points_world_space);
-					item_building.bounding_box_3d = CGAL::Bbox_3(item_building.bounding_box_3d.xmin(), item_building.bounding_box_3d.ymin(), 0, item_building.bounding_box_3d.xmax(), item_building.bounding_box_3d.ymax(), current_pos.pos_mesh[2] + final_height);
+					item_building.bounding_box_3d = CGAL::Bbox_3(item_building.bounding_box_3d.xmin(), item_building.bounding_box_3d.ymin(), 0, item_building.bounding_box_3d.xmax(), item_building.bounding_box_3d.ymax(), final_height);
 				}
 			}
 		}
