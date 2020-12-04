@@ -59,7 +59,7 @@ std::map<std::string, cv::Mat> Airsim_tools::get_images()
 
 void Airsim_tools::adjust_pose(const Pos_Pack& v_pos_pack){
     Eigen::Quaternionf directionQuaternion= Eigen::Quaternionf::Identity();
-    directionQuaternion= Eigen::AngleAxisf(v_pos_pack.yaw - M_PI / 2, Eigen::Vector3f::UnitZ())* Eigen::AngleAxisf(
+    directionQuaternion= Eigen::AngleAxisf(-v_pos_pack.yaw + M_PI, Eigen::Vector3f::UnitZ())* Eigen::AngleAxisf(
         -v_pos_pack.pitch, Eigen::Vector3f::UnitY());
 
     m_agent->simSetVehiclePose(msr::airlib::Pose(v_pos_pack.pos_airsim,
@@ -73,10 +73,14 @@ void Airsim_tools::reset_color(const std::string& v_key_words) {
     int num = 1;
     for(const auto& item:m_agent->simListSceneObjects())
     {
-    	if(v_key_words.size()>0&& item.find(v_key_words)!=-1)
-            m_agent->simSetSegmentationObjectID(item, num++);
-        else
-			m_agent->simSetSegmentationObjectID(item, 0);
+        if (v_key_words.size() > 0 && item.find(v_key_words) != item.npos)
+        {
+            m_agent->simSetSegmentationObjectID(item, num);
+            num += 1;
+        }
+        else {
+            m_agent->simSetSegmentationObjectID(item, 0);
+        }
     }
     return;
 }

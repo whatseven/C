@@ -13,7 +13,7 @@
 
 struct Building
 {
-	CGAL::Bbox_3 bounding_box;
+	CGAL::Bbox_3 bounding_box_3d;
 	Point_set points;
 };
 
@@ -122,13 +122,13 @@ int main(int argc, char** argv){
 	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> trajectory;
 	{
 		for (int id_building = 0; id_building < nb_clusters; ++id_building) {
-			buildings[id_building].bounding_box = get_bounding_box(buildings[id_building].points);
-			float xmin = buildings[id_building].bounding_box.xmin();
-			float ymin = buildings[id_building].bounding_box.ymin();
-			float zmin = buildings[id_building].bounding_box.zmin();
-			float xmax = buildings[id_building].bounding_box.xmax();
-			float ymax = buildings[id_building].bounding_box.ymax();
-			float zmax = buildings[id_building].bounding_box.zmax();
+			buildings[id_building].bounding_box_3d = get_bounding_box(buildings[id_building].points);
+			float xmin = buildings[id_building].bounding_box_3d.xmin();
+			float ymin = buildings[id_building].bounding_box_3d.ymin();
+			float zmin = buildings[id_building].bounding_box_3d.zmin();
+			float xmax = buildings[id_building].bounding_box_3d.xmax();
+			float ymax = buildings[id_building].bounding_box_3d.ymax();
+			float zmax = buildings[id_building].bounding_box_3d.zmax();
 			Eigen::Vector3f box_third_points_2(
 				(xmin + xmax)/2,
 				(ymin + ymax)/2,
