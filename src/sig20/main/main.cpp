@@ -4,7 +4,7 @@
 #include <CGAL/Point_set_3/IO.h>
 //#include <CGAL/cluster_point_set.h>
 #include <CGAL/Random.h>
-
+#include <glog/logging.h>
 #include <boost/format.hpp>
 
 #include "model_tools.h"
@@ -75,6 +75,7 @@ void write_normal_path(const std::vector<std::pair<Eigen::Vector3f, Eigen::Vecto
 
 int main(int argc, char** argv){
 	// Read arguments
+	google::InitGoogleLogging(argv[0]);
 	argparse::ArgumentParser program("Jointly exploration, navigation and reconstruction");
 	{
 		try {
@@ -94,6 +95,7 @@ int main(int argc, char** argv){
 		map_converter.initDroneStart(UNREAL_START);
 		airsim_client.reset_color("building");
 		INTRINSIC << 400, 0, 400, 0, 400, 400, 0, 0, 1;
+		LOG(INFO) << "Initialization done";
 	}
 
 	bool end = false;
@@ -102,9 +104,11 @@ int main(int argc, char** argv){
 	int current_building_id = 0;
 	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> previous_trajectory;
 	Pos_Pack current_pos = map_converter.get_pos_pack_from_unreal(MAIN_START, -MM_PI / 2, 0);
-
+	int cur_frame_id = 0;
 	while(!end)
 	{
+		LOG(INFO) << "<<<<<<<<<<<<< Frame "<<cur_frame_id<<" <<<<<<<<<<<<<";
+
 		// Get current image and pose
 		// Input: 
 		// Output: Image(cv::Mat), Camera matrix(Pos_pack)
@@ -112,6 +116,7 @@ int main(int argc, char** argv){
 		{
 			airsim_client.adjust_pose(current_pos);
 			current_image = airsim_client.get_images();
+			LOG(INFO) << "Image done";
 		}
 
 		// SLAM
