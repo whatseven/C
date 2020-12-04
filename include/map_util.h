@@ -8,10 +8,8 @@
 
 struct Pos_Pack
 {
-	Eigen::Vector3f pos_image;
 	Eigen::Vector3f pos_mesh;
 	Eigen::Vector3f pos_airsim;
-	Eigen::Vector3f direction_image;
 	Eigen::Isometry3f camera_matrix;
 
 	float yaw, pitch;
@@ -33,17 +31,9 @@ public:
 
     Eigen::Vector3f convertUnrealToAirsim(const Eigen::Vector3f& vWorldPos) const;
 
-    void initImageStart(const float vStartX, const float vStartY);
-
-    Eigen::Vector3f convertUnrealToImage(const Eigen::Vector3f& vWorldPos) const;
-
     Eigen::Vector3f convertUnrealToMesh(const Eigen::Vector3f& vWorldPos) const;
 
     Eigen::Vector3f convertMeshToUnreal(const Eigen::Vector3f& vMeshPos) const;
-
-    Eigen::Vector3f convertImageToUnreal(const Eigen::Vector3f& vPos) const;
-
-    Eigen::Vector3f convertImageToMesh(const Eigen::Vector3f& vPos) const;
 
     Eigen::Matrix3f convert_yaw_pitch_to_matrix_mesh(const float yaw, const float pitch);
 
