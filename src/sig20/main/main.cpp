@@ -167,6 +167,7 @@ int main(int argc, char** argv){
 				//debug_img(std::vector{ current_image["rgb"] });
 			}
 			num_cluster = current_buildings.size();
+			LOG(INFO) << "Sparse point cloud generation and building cluster done";
 		}
 		
 		// Object detection
@@ -187,6 +188,7 @@ int main(int argc, char** argv){
 				current_buildings[&pixel_points - &*bboxes_points.begin()].bounding_box_2d = CGAL::Bbox_2(rect.x, rect.y, rect.x + rect.width, rect.y + rect.height);
 			}
 			debug_img(std::vector{ current_image["segmentation"] });
+			LOG(INFO) << "Object detection done";
 		}
 
 		// Post process point cloud
@@ -203,7 +205,6 @@ int main(int argc, char** argv){
 				}
 				CGAL::write_ply_point_set(std::ofstream(std::to_string(cluster_index) + "_world.ply"), item_building.points_world_space);
 			}
-			
 		}
 
 		// Mapping
@@ -252,6 +253,8 @@ int main(int argc, char** argv){
 					item_building.bounding_box_3d = CGAL::Bbox_3(item_building.bounding_box_3d.xmin(), item_building.bounding_box_3d.ymin(), 0, item_building.bounding_box_3d.xmax(), item_building.bounding_box_3d.ymax(), current_pos.pos_mesh[2] + final_height);
 				}
 			}
+			LOG(INFO) << "2D Bbox to 3D Bbox done";
+
 		}
 
 		// Merging
@@ -281,6 +284,8 @@ int main(int argc, char** argv){
 			for (auto& item_building : total_buildings) {
 				height_map.update(item_building.bounding_box_3d);
 			}
+			LOG(INFO) << "Building BBox update: DONE!";
+
 		}
 
 		// Generating trajectory
@@ -373,6 +378,8 @@ int main(int argc, char** argv){
 				current_trajectory[i].second = camera_direction.normalized();
 				current_trajectory[i].first = position;
 			}
+			LOG(INFO) << "New trajectory GENERATED!";
+
 		}
 
 		// Merging trajectory
@@ -424,6 +431,8 @@ int main(int argc, char** argv){
 				current_building_id++;
 				points_has_shotted.clear();
 			}
+			LOG(INFO) << "Update Trajectory¡Ì";
+
 		}
 
 		
