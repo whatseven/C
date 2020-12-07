@@ -11,15 +11,9 @@
 #include "intersection_tools.h"
 #include "airsim_control.h"
 #include "map_util.h"
+#include "viz.h"
+#include "building.h"
 
-
-struct Building
-{
-	CGAL::Bbox_3 bounding_box_3d;
-	Point_set points_camera_space;
-	Point_set points_world_space;
-	CGAL::Bbox_2 bounding_box_2d;
-};
 
 const Eigen::Vector3f UNREAL_START(0.f, 0.f, 0.f);
 const Eigen::Vector3f MAIN_START(-5000.f, 0.f, 2000.f);
@@ -75,6 +69,7 @@ void write_normal_path(const std::vector<std::pair<Eigen::Vector3f, Eigen::Vecto
 
 int main(int argc, char** argv){
 	// Read arguments
+	FLAGS_logtostderr = 1;
 	google::InitGoogleLogging(argv[0]);
 	argparse::ArgumentParser program("Jointly exploration, navigation and reconstruction");
 	{
@@ -87,9 +82,9 @@ int main(int argc, char** argv){
 			exit(0);
 		}
 	}
-
 	// Prepare environment
 	// Reset segmentation color, initialize map converter
+	Visualizer viz;
 	Airsim_tools airsim_client(UNREAL_START);
 	{
 		map_converter.initDroneStart(UNREAL_START);
@@ -435,6 +430,16 @@ int main(int argc, char** argv){
 			float pitch= -std::atan2f(next_direction[2], std::sqrtf(next_direction[0]* next_direction[0]+ next_direction[1]* next_direction[1]));
 			float yaw = std::atan2f(next_direction[1], next_direction[0]);
 			current_pos = map_converter.get_pos_pack_from_unreal(map_converter.convertMeshToUnreal(next_pos), yaw, pitch);
+		}
+
+		// Visualize
+		{
+			viz.lock();
+			viz.m_buildings = total_buildings;
+			viz.m_pos = current_pos.pos_mesh;
+			viz.m_direction = next_direction;
+			viz.m_trajectories;
+			viz.unlock();
 		}
 
 
