@@ -105,6 +105,7 @@ int main(int argc, char** argv){
 	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> previous_trajectory;
 	Pos_Pack current_pos = map_converter.get_pos_pack_from_unreal(MAIN_START, -MM_PI / 2, 0);
 	int cur_frame_id = 0;
+	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> points_has_shotted;
 	while(!end)
 	{
 		LOG(INFO) << "<<<<<<<<<<<<< Frame "<<cur_frame_id<<" <<<<<<<<<<<<<";
@@ -187,7 +188,7 @@ int main(int argc, char** argv){
 				cv::rectangle(current_image["segmentation"], rect, cv::Scalar(0, 0, 255));
 				current_buildings[&pixel_points - &*bboxes_points.begin()].bounding_box_2d = CGAL::Bbox_2(rect.x, rect.y, rect.x + rect.width, rect.y + rect.height);
 			}
-			debug_img(std::vector{ current_image["segmentation"] });
+			//debug_img(std::vector{ current_image["segmentation"] });
 			LOG(INFO) << "Object detection done";
 		}
 
@@ -285,6 +286,7 @@ int main(int argc, char** argv){
 			for (auto& item_building : total_buildings) {
 				height_map.update(item_building.bounding_box_3d);
 			}
+			//debug_img(std::vector{ height_map.m_map });
 			LOG(INFO) << "Building BBox update: DONE!";
 
 		}
@@ -296,8 +298,8 @@ int main(int argc, char** argv){
 		std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> current_trajectory;
 		{
 			Building& building= total_buildings[current_building_id];
-			height_map.save_height_map_png("1.png", 2);
-			height_map.save_height_map_tiff("1.tiff");
+			height_map.save_height_map_png(std::to_string(cur_frame_id) + ".png", 2);
+			height_map.save_height_map_tiff(std::to_string(cur_frame_id) + ".tiff");
 
 			float xmin = building.bounding_box_3d.xmin();
 			float ymin = building.bounding_box_3d.ymin();
@@ -305,20 +307,100 @@ int main(int argc, char** argv){
 			float xmax = building.bounding_box_3d.xmax();
 			float ymax = building.bounding_box_3d.ymax();
 			float zmax = building.bounding_box_3d.zmax();
-			Eigen::Vector3f box_third_points_2(
+			//Declear control points
+			Eigen::Vector3f center(
 				(xmin + xmax) / 2,
 				(ymin + ymax) / 2,
-				(zmin + zmax) / 3 * 2
+				zmax
 			);
-			Eigen::Vector3f box_third_points(
-				(xmin + xmax) / 2,
-				(ymin + ymax) / 2,
-				(zmin + zmax) / 3
+			Eigen::Vector3f top_left(
+				xmin - BOUNDS,
+				ymax + BOUNDS,
+				zmax
 			);
+			Eigen::Vector3f top_right(
+				xmax + BOUNDS,
+				ymax + BOUNDS,
+				zmax
+			);
+			Eigen::Vector3f bottom_left(
+				xmin - BOUNDS,
+				ymin - BOUNDS,
+				zmax
+			);
+			Eigen::Vector3f bottom_right(
+				xmax + BOUNDS,
+				ymin - BOUNDS,
+				zmax
+			);
+			Eigen::Vector3f left = center - Eigen::Vector3f(((xmax - xmin) / 2 + BOUNDS) * 2, 0, 0);
+			Eigen::Vector3f top = center + Eigen::Vector3f(0, ((ymax - ymin) / 2 + BOUNDS) * 2, 0);
+			Eigen::Vector3f bottom = center - Eigen::Vector3f(0, ((ymax - ymin) / 2 + BOUNDS) * 2, 0);
+			Eigen::Vector3f right = center + Eigen::Vector3f(((xmax - xmin) / 2 + BOUNDS) * 2, 0, 0);
 
+			//Calculate step num
+			int horizontal_step_num = int((xmax - xmin + 2 * BOUNDS) / STEP + 1);
+			int vertical_step_num = int((ymax - ymin + 2 * BOUNDS) / STEP + 1);
+			int total_step_num = 2 * (horizontal_step_num + vertical_step_num);
 
-			Eigen::Vector3f cur_pos(xmin - BOUNDS, ymin - BOUNDS, zmax + Z_UP_BOUNDS);
-			while (cur_pos.x() <= xmax + BOUNDS) {
+			//Calculate iteration num
+			int iteration_num = int((zmax - zmin + BOUNDS) / (2 * BOUNDS));
+			float z_step = 2 * BOUNDS / total_step_num;
+			if (iteration_num == 0)
+			{
+				iteration_num = 1;
+				z_step = (zmax - zmin + BOUNDS) / total_step_num;
+			}
+
+			for (int i = 0; i < iteration_num; i++)
+			{
+				float iteration_zmax = (zmax + BOUNDS) - 2 * BOUNDS * i;
+
+				//Set gaze target
+				Eigen::Vector3f gaze_target = center;
+				gaze_target[2] = iteration_zmax - BOUNDS * 2;
+
+				Eigen::Vector3f seg_start, seg_end, current_pos;
+
+				for (int j = 0; j < vertical_step_num; j++)
+				{
+					seg_start = top_left + (left - top_left) / vertical_step_num * j;
+					seg_end = left + (bottom_left - left) / vertical_step_num * j;
+					current_pos = seg_start + (seg_end - seg_start) / vertical_step_num * j;
+					current_pos[2] = iteration_zmax - z_step * j;
+					current_trajectory.push_back(std::make_pair(current_pos, gaze_target - current_pos));
+				}
+
+				for (int j = 0; j < horizontal_step_num; j++)
+				{
+					seg_start = bottom_left + ((bottom - bottom_left) / horizontal_step_num * j);
+					seg_end = bottom + (bottom_right - bottom) / horizontal_step_num * j;
+					current_pos = seg_start + (seg_end - seg_start) / horizontal_step_num * j;
+					current_pos[2] = iteration_zmax - z_step * j - vertical_step_num * z_step;
+					current_trajectory.push_back(std::make_pair(current_pos, gaze_target - current_pos));
+				}
+
+				for (int j = 0; j < vertical_step_num; j++)
+				{
+					seg_start = bottom_right + (right - bottom_right) / vertical_step_num * j;
+					seg_end = right + (top_right - right) / vertical_step_num * j;
+					current_pos = seg_start + (seg_end - seg_start) / vertical_step_num * j;
+					current_pos[2] = iteration_zmax - z_step * j - (vertical_step_num + horizontal_step_num) * z_step;
+					current_trajectory.push_back(std::make_pair(current_pos, gaze_target - current_pos));
+				}
+
+				for (int j = 0; j < horizontal_step_num; j++)
+				{
+					seg_start = top_right + (top - top_right) / horizontal_step_num * j;
+					seg_end = top + (top_left - top) / horizontal_step_num * j;
+					current_pos = seg_start + (seg_end - seg_start) / horizontal_step_num * j;
+					current_pos[2] = iteration_zmax - z_step * j - (2 * vertical_step_num + horizontal_step_num) * z_step;
+					current_trajectory.push_back(std::make_pair(current_pos, gaze_target - current_pos));
+				}
+			}
+
+			
+			/*while (cur_pos.x() <= xmax + BOUNDS) {
 				current_trajectory.push_back(std::make_pair(
 					cur_pos, box_third_points_2 - cur_pos
 				));
@@ -365,7 +447,7 @@ int main(int argc, char** argv){
 					));
 				}
 				cur_pos[1] -= STEP;
-			}
+			}*/
 
 			// Check the camera position
 			for (int i = 0; i < current_trajectory.size(); ++i) {
@@ -389,7 +471,6 @@ int main(int argc, char** argv){
 		Eigen::Vector3f next_pos;
 		Eigen::Vector3f next_direction;
 		{
-			std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> points_has_shotted;
 			{
 				for (auto& point_has_shotted : points_has_shotted) {
 					Eigen::Vector3f previous_point_coord = point_has_shotted.first;
@@ -420,14 +501,16 @@ int main(int argc, char** argv){
 					float distance = (now_point_coord - next_point_coord).norm();
 					if (distance < min_distance) {
 						next_point = *it;
+						min_distance = distance;
 					}
 				}
+				//std::cout << "fsjkdlajfklsdajflsdajfjas" << std::endl;
 			}
 			
 			points_has_shotted.push_back(next_point);
 			next_pos = next_point.first;
 			next_direction = next_point.second;
-			if (current_trajectory.size() == 1)
+			if (current_trajectory.size() <= 1)
 			{
 				current_building_id++;
 				points_has_shotted.clear();
@@ -444,7 +527,12 @@ int main(int argc, char** argv){
 			float pitch= -std::atan2f(next_direction[2], std::sqrtf(next_direction[0]* next_direction[0]+ next_direction[1]* next_direction[1]));
 			float yaw = std::atan2f(next_direction[1], next_direction[0]);
 			current_pos = map_converter.get_pos_pack_from_unreal(map_converter.convertMeshToUnreal(next_pos), yaw, pitch);
+			cur_frame_id++;
 		}
+
+		// End
+		if (current_building_id >= total_buildings.size())
+			break;
 
 
 		//for (int i = 0; i < trajectory.size(); ++i) {

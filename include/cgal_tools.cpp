@@ -55,5 +55,6 @@ CGAL::Bbox_3 get_bounding_box(const Point_set& v_point_set)
         zmax = zmax > vz ? zmax : vz;
 	}
 
+
     return CGAL::Bbox_3(xmin, ymin, zmin, xmax, ymax, zmax);
 }

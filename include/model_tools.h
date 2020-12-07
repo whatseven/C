@@ -104,9 +104,9 @@ public:
     void update(const CGAL::Bbox_3& v_box)
     {
         int xmin = (v_box.xmin() - m_start[0]) / m_resolution;
-        int ymin = (v_box.xmin() - m_start[1]) / m_resolution;
+        int ymin = (v_box.ymin() - m_start[1]) / m_resolution;
     	int xmax = (v_box.xmax() - m_start[0]) / m_resolution+1;
-        int ymax = (v_box.xmax() - m_start[1]) / m_resolution+1;
+        int ymax = (v_box.ymax() - m_start[1]) / m_resolution+1;
         xmin = std::max(xmin, 0);
         xmax = std::min(xmax, m_map.cols-1);
         ymin = std::max(ymin, 0);
