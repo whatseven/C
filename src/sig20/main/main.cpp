@@ -11,18 +11,13 @@
 #include "intersection_tools.h"
 #include "airsim_control.h"
 #include "map_util.h"
+#include "viz.h"
+#include "building.h"
+#include "metrics.h"
 
-
-struct Building
-{
-	CGAL::Bbox_3 bounding_box_3d;
-	Point_set points_camera_space;
-	Point_set points_world_space;
-	CGAL::Bbox_2 bounding_box_2d;
-};
 
 const Eigen::Vector3f UNREAL_START(0.f, 0.f, 0.f);
-const Eigen::Vector3f MAIN_START(-5000.f, 0.f, 2000.f);
+const Eigen::Vector3f MAIN_START(4429.995117, -85.101341, 1484.44397);
 const Eigen::Vector3f MAP_START(-70.f, -55.f, 0.f);
 const Eigen::Vector3f MAP_END(70.f, 55.f, 35.f);
 const float THRESHOLD = 5;
@@ -37,6 +32,8 @@ const float Z_DOWN_BOUND = 5;
 const float STEP = 5;
 const float MM_PI = 3.14159265358;
 const bool DOUBLE_FLAG = true;
+std::string sample_point_path = "F:\\Unreal\\sndd\\Env\\Content\\Maps\\sample_points_Bridge.obj";
+std::string obj_path = "F:\\Unreal\\sndd\\Env\\Content\\Maps\\Bridge.obj";
 
 MapConverter map_converter;
 
@@ -75,6 +72,7 @@ void write_normal_path(const std::vector<std::pair<Eigen::Vector3f, Eigen::Vecto
 
 int main(int argc, char** argv){
 	// Read arguments
+	FLAGS_logtostderr = 1;
 	google::InitGoogleLogging(argv[0]);
 	argparse::ArgumentParser program("Jointly exploration, navigation and reconstruction");
 	{
@@ -87,9 +85,9 @@ int main(int argc, char** argv){
 			exit(0);
 		}
 	}
-
 	// Prepare environment
 	// Reset segmentation color, initialize map converter
+	Visualizer viz;
 	Airsim_tools airsim_client(UNREAL_START);
 	{
 		map_converter.initDroneStart(UNREAL_START);
@@ -102,8 +100,8 @@ int main(int argc, char** argv){
 	Height_map height_map(MAP_START, MAP_END, 2);
 	std::vector<Building> total_buildings;
 	int current_building_id = 0;
-	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> previous_trajectory;
-	Pos_Pack current_pos = map_converter.get_pos_pack_from_unreal(MAIN_START, -MM_PI / 2, 0);
+	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> final_trajectory;
+	Pos_Pack current_pos = map_converter.get_pos_pack_from_unreal(MAIN_START, MM_PI / 2, 0);
 	int cur_frame_id = 0;
 	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> points_has_shotted;
 	while(!end)
@@ -157,6 +155,7 @@ int main(int argc, char** argv){
 					if (find_result == color_map.end()) {
 						color_map.push_back(point_color);
 						current_buildings.push_back(Building());
+						current_buildings[current_buildings.size() - 1].segmentation_color = point_color;
 						current_buildings[current_buildings.size() - 1].points_camera_space.insert(Point_3(point(0), point(1), point(2)));
 					}
 					else {
@@ -268,10 +267,13 @@ int main(int argc, char** argv){
 				for (const auto& item_current_building : current_buildings) {
 					size_t index_box = &item_current_building - &current_buildings[0];
 					if (do_overlap(item_current_building.bounding_box_3d, item_building.bounding_box_3d)) {
-						need_register[index_box] = false;
 						item_building.bounding_box_3d += item_current_building.bounding_box_3d;
 						for (const auto& item_point : item_current_building.points_world_space.points())
 							item_building.points_world_space.insert(item_point);
+					}
+					if (item_current_building.segmentation_color == item_building.segmentation_color)
+					{
+						need_register[index_box] = false;
 					}
 				}
 			}
@@ -399,7 +401,7 @@ int main(int argc, char** argv){
 				}
 			}
 
-			
+
 			/*while (cur_pos.x() <= xmax + BOUNDS) {
 				current_trajectory.push_back(std::make_pair(
 					cur_pos, box_third_points_2 - cur_pos
@@ -466,7 +468,7 @@ int main(int argc, char** argv){
 		}
 
 		// Merging trajectory
-
+		final_trajectory = current_trajectory;
 		// Returen -1 if shot for the current building is done
 		Eigen::Vector3f next_pos;
 		Eigen::Vector3f next_direction;
@@ -502,16 +504,17 @@ int main(int argc, char** argv){
 					if (distance < min_distance) {
 						next_point = *it;
 						min_distance = distance;
+						std::cout << min_distance << std::endl;
 					}
 				}
-				//std::cout << "fsjkdlajfklsdajflsdajfjas" << std::endl;
 			}
-			
 			points_has_shotted.push_back(next_point);
 			next_pos = next_point.first;
 			next_direction = next_point.second;
 			if (current_trajectory.size() <= 1)
 			{
+				
+
 				current_building_id++;
 				points_has_shotted.clear();
 			}
@@ -519,7 +522,17 @@ int main(int argc, char** argv){
 
 		}
 
-		
+		// Calculate reconstructability
+
+		//{
+		//	Building building = total_buildings[current_building_id];
+		//	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> point_set;
+		//	read_point_set(sample_point_path, point_set, building.bounding_box_3d);
+		//	std::list<SC_Triangle> triangles;
+		//	readObj(obj_path, triangles);
+		//	reconstructability_hueristic(final_trajectory, point_set, triangles);
+		//}
+		//
 		// Shot
 		//
 		// Output: current_pos
@@ -530,9 +543,20 @@ int main(int argc, char** argv){
 			cur_frame_id++;
 		}
 
+
 		// End
 		if (current_building_id >= total_buildings.size())
 			break;
+
+		// Visualize
+		{
+			viz.lock();
+			viz.m_buildings = total_buildings;
+			viz.m_pos = current_pos.pos_mesh;
+			viz.m_direction = next_direction;
+			viz.m_trajectories = final_trajectory;
+			viz.unlock();
+		}
 
 
 		//for (int i = 0; i < trajectory.size(); ++i) {
