@@ -8,3 +8,8 @@ struct Building {
 	CGAL::Bbox_2 bounding_box_2d;
 	cv::Vec3b segmentation_color;
 };
+
+struct Building_Set {
+	std::vector<Building> buildings;
+	bool hasShot;
+};
