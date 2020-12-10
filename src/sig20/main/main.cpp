@@ -251,8 +251,8 @@ int main(int argc, char** argv){
 					}
 
 					item_building.bounding_box_3d = get_bounding_box(item_building.points_world_space);
-					item_building.bounding_box_3d
-					item_building.bounding_box_3d = CGAL::Bbox_3(item_building.bounding_box_3d.xmin(), item_building.bounding_box_3d.ymin(), 0, item_building.bounding_box_3d.xmax(), item_building.bounding_box_3d.ymax(), final_height);
+					item_building.bounding_box_3d.min()[2] = 0;
+					item_building.bounding_box_3d.max()[2] = final_height;
 				}
 			}
 			LOG(INFO) << "2D Bbox to 3D Bbox done";
@@ -267,8 +267,8 @@ int main(int argc, char** argv){
 			for (auto& item_building : total_buildings) {
 				for (const auto& item_current_building : current_buildings) {
 					size_t index_box = &item_current_building - &current_buildings[0];
-					if (do_overlap(item_current_building.bounding_box_3d, item_building.bounding_box_3d)) {
-						item_building.bounding_box_3d += item_current_building.bounding_box_3d;
+					if (item_current_building.bounding_box_3d.intersects(item_building.bounding_box_3d)) {
+						item_building.bounding_box_3d= item_building.bounding_box_3d.merged(item_current_building.bounding_box_3d) ;
 						for (const auto& item_point : item_current_building.points_world_space.points())
 							item_building.points_world_space.insert(item_point);
 					}
@@ -304,12 +304,12 @@ int main(int argc, char** argv){
 			height_map.save_height_map_png(std::to_string(cur_frame_id) + ".png", 2);
 			height_map.save_height_map_tiff(std::to_string(cur_frame_id) + ".tiff");
 
-			float xmin = building.bounding_box_3d.xmin();
-			float ymin = building.bounding_box_3d.ymin();
-			float zmin = building.bounding_box_3d.zmin();
-			float xmax = building.bounding_box_3d.xmax();
-			float ymax = building.bounding_box_3d.ymax();
-			float zmax = building.bounding_box_3d.zmax();
+			float xmin = building.bounding_box_3d.min()[0];
+			float ymin = building.bounding_box_3d.min()[1];
+			float zmin = building.bounding_box_3d.min()[2];
+			float xmax = building.bounding_box_3d.max()[0];
+			float ymax = building.bounding_box_3d.max()[1];
+			float zmax = building.bounding_box_3d.max()[2];
 			//Declear control points
 			Eigen::Vector3f center(
 				(xmin + xmax) / 2,

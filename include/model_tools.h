@@ -70,9 +70,9 @@ void rename_material(const std::string& file_dir, const std::string& file_name, 
 class Height_map {
 public:
     Height_map(const Point_set& v_point_cloud, const float v_resolution) :m_resolution(v_resolution) {
-        CGAL::Bbox_3 bounds = get_bounding_box(v_point_cloud);
-        m_start = Eigen::Vector3f(bounds.xmin(), bounds.ymin(), bounds.zmin());
-        Eigen::Vector3f end(bounds.xmax(), bounds.ymax(), bounds.zmax());
+        Eigen::AlignedBox3f bounds = get_bounding_box(v_point_cloud);
+        m_start = bounds.min();
+        Eigen::Vector3f end(bounds.max());
         Eigen::Vector3f delta = (end - m_start) / m_resolution;
         m_map = cv::Mat((int)delta[1] + 1, (int)delta[0] + 1,CV_32FC1);
         m_map.setTo(std::numeric_limits<float>::lowest());
@@ -101,19 +101,19 @@ public:
         return m_map.at<float>(m_y, m_x);
     }
 
-    void update(const CGAL::Bbox_3& v_box)
+    void update(const Eigen::AlignedBox3f& v_box)
     {
-        int xmin = (v_box.xmin() - m_start[0]) / m_resolution;
-        int ymin = (v_box.ymin() - m_start[1]) / m_resolution;
-    	int xmax = (v_box.xmax() - m_start[0]) / m_resolution+1;
-        int ymax = (v_box.ymax() - m_start[1]) / m_resolution+1;
+        int xmin = (v_box.min()[0] - m_start[0]) / m_resolution;
+        int ymin = (v_box.min()[1] - m_start[1]) / m_resolution;
+    	int xmax = (v_box.max()[0] - m_start[0]) / m_resolution+1;
+        int ymax = (v_box.max()[1] - m_start[1]) / m_resolution+1;
         xmin = std::max(xmin, 0);
         xmax = std::min(xmax, m_map.cols-1);
         ymin = std::max(ymin, 0);
         ymax = std::min(ymax, m_map.rows-1);
         for (int y = ymin; y <= ymax; ++y)
             for (int x = xmin; x <= xmax; ++x)
-                m_map.at<float>(y, x) = m_map.at<float>(y, x) > v_box.zmax() ? m_map.at<float>(y, x) : v_box.zmax();
+                m_map.at<float>(y, x) = m_map.at<float>(y, x) > v_box.max()[2] ? m_map.at<float>(y, x) : v_box.max()[2];
     }
 	
     void save_height_map_png(const std::string& v_path,const float v_threshold=0.f)
