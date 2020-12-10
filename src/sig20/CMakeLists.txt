@@ -1,2 +1,3 @@
 add_subdirectory(test)
 add_subdirectory(main)
+add_subdirectory(test_trajectory_generation)

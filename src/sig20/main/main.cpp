@@ -251,6 +251,7 @@ int main(int argc, char** argv){
 					}
 
 					item_building.bounding_box_3d = get_bounding_box(item_building.points_world_space);
+					item_building.bounding_box_3d
 					item_building.bounding_box_3d = CGAL::Bbox_3(item_building.bounding_box_3d.xmin(), item_building.bounding_box_3d.ymin(), 0, item_building.bounding_box_3d.xmax(), item_building.bounding_box_3d.ymax(), final_height);
 				}
 			}
@@ -400,56 +401,6 @@ int main(int argc, char** argv){
 					current_trajectory.push_back(std::make_pair(current_pos, gaze_target - current_pos));
 				}
 			}
-
-
-			/*while (cur_pos.x() <= xmax + BOUNDS) {
-				current_trajectory.push_back(std::make_pair(
-					cur_pos, box_third_points_2 - cur_pos
-				));
-				if (DOUBLE_FLAG) {
-					Eigen::Vector3f cur_pos_copy(cur_pos[0], cur_pos[1], cur_pos[2] / 3);
-					current_trajectory.push_back(std::make_pair(
-						cur_pos_copy, box_third_points - cur_pos_copy
-					));
-				}
-				cur_pos[0] += STEP;
-			}
-			while (cur_pos.y() <= ymax + BOUNDS) {
-				current_trajectory.push_back(std::make_pair(
-					cur_pos, box_third_points_2 - cur_pos
-				));
-				if (DOUBLE_FLAG) {
-					Eigen::Vector3f cur_pos_copy(cur_pos[0], cur_pos[1], cur_pos[2] / 3);
-					current_trajectory.push_back(std::make_pair(
-						cur_pos_copy, box_third_points - cur_pos_copy
-					));
-				}
-				cur_pos[1] += STEP;
-			}
-			while (cur_pos.x() >= xmin - BOUNDS) {
-				current_trajectory.push_back(std::make_pair(
-					cur_pos, box_third_points_2 - cur_pos
-				));
-				if (DOUBLE_FLAG) {
-					Eigen::Vector3f cur_pos_copy(cur_pos[0], cur_pos[1], cur_pos[2] / 3);
-					current_trajectory.push_back(std::make_pair(
-						cur_pos_copy, box_third_points - cur_pos_copy
-					));
-				}
-				cur_pos[0] -= STEP;
-			}
-			while (cur_pos.y() >= ymin - BOUNDS) {
-				current_trajectory.push_back(std::make_pair(
-					cur_pos, box_third_points_2 - cur_pos
-				));
-				if (DOUBLE_FLAG) {
-					Eigen::Vector3f cur_pos_copy(cur_pos[0], cur_pos[1], cur_pos[2] / 3);
-					current_trajectory.push_back(std::make_pair(
-						cur_pos_copy, box_third_points - cur_pos_copy
-					));
-				}
-				cur_pos[1] -= STEP;
-			}*/
 
 			// Check the camera position
 			for (int i = 0; i < current_trajectory.size(); ++i) {

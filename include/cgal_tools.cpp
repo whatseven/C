@@ -36,7 +36,7 @@ Surface_mesh convert_obj_from_tinyobjloader_to_surface_mesh(
     return out;
 }
 
-CGAL::Bbox_3 get_bounding_box(const Point_set& v_point_set)
+Eigen::AlignedBox3f get_bounding_box(const Point_set& v_point_set)
 {
     float xmin = 1e8, ymin = 1e8, zmin = 1e8;
     float xmax = -1e8, ymax = -1e8, zmax = -1e8;
@@ -56,5 +56,5 @@ CGAL::Bbox_3 get_bounding_box(const Point_set& v_point_set)
 	}
 
 
-    return CGAL::Bbox_3(xmin, ymin, zmin, xmax, ymax, zmax);
+    return Eigen::AlignedBox3f(Eigen::Vector3f(xmin, ymin, zmin), Eigen::Vector3f(xmax, ymax, zmax));
 }
