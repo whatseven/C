@@ -30,45 +30,12 @@ const float BOUNDS = 20;
 const float Z_UP_BOUNDS = 20;
 const float Z_DOWN_BOUND = 5;
 const float STEP = 5;
-const float MM_PI = 3.14159265358;
 const bool DOUBLE_FLAG = true;
 std::string sample_point_path = "F:\\Unreal\\sndd\\Env\\Content\\Maps\\sample_points_Bridge.obj";
 std::string obj_path = "F:\\Unreal\\sndd\\Env\\Content\\Maps\\Bridge.obj";
 
 MapConverter map_converter;
 
-
-void write_unreal_path(const std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>>& v_trajectories,const std::string& v_path)
-{
-	std::ofstream pose(v_path);
-	for (int i = 0; i < v_trajectories.size(); ++i)
-	{
-		const Eigen::Vector3f& position = v_trajectories[i].first*100;
-		const Eigen::Vector3f& direction = v_trajectories[i].second;
-		boost::format fmt("%04d.png,%s,%s,%s,%s,0,%s\n");
-		float pitch = std::atan2f(direction[2], std::sqrtf(direction[0] * direction[0] + direction[1] * direction[1])) * 180. / MM_PI;
-		float yaw = std::atan2f(direction[1], direction[0]) * 180./ MM_PI;
-		
-		pose << (fmt %i% position[0] % -position[1] % position[2] % -pitch% -yaw).str();
-	}
-	
-	pose.close();
-}
-
-void write_normal_path(const std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>>& v_trajectories, const std::string& v_path) {
-	std::ofstream pose(v_path);
-	for (int i = 0; i < v_trajectories.size(); ++i) {
-		const Eigen::Vector3f& position = v_trajectories[i].first;
-		const Eigen::Vector3f& direction = v_trajectories[i].second;
-		boost::format fmt("%04d.png,%s,%s,%s,%s,0,%s\n");
-		float pitch = std::atan2f(direction[2], std::sqrtf(direction[0] * direction[0] + direction[1] * direction[1])) * 180. / MM_PI;
-		float yaw = std::atan2f(direction[1], direction[0]) * 180. / MM_PI;
-
-		pose << (fmt % i % position[0] % position[1] % position[2] % pitch % yaw).str();
-	}
-
-	pose.close();
-}
 
 int main(int argc, char** argv){
 	// Read arguments
