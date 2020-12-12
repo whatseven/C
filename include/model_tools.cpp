@@ -43,7 +43,7 @@ std::tuple<tinyobj::attrib_t, std::vector<tinyobj::shape_t>, std::vector<tinyobj
 		int num_face = 0;
 		for (const auto& shape : shapes)
 			num_face += shape.mesh.indices.size() / 3;
-		std::cout << "Read with" << attrib.vertices.size() << " vertices," << attrib.normals.size() << " normals," <<
+		std::cout << "Read with " << attrib.vertices.size() << " vertices," << attrib.normals.size() << " normals," <<
 			num_face << " faces" << std::endl;
 	}
 	return {attrib, shapes, materials};
@@ -100,12 +100,13 @@ bool write_obj(const std::string& filename, const tinyobj::attrib_t& attributes,
 		return false;
 	}
 
-	std::string basename = GetFileBasename(filename);
-	std::string material_filename = basename + ".mtl";
+	boost::filesystem::path output_file(filename);
+	std::string basename = output_file.filename().stem().string() + ".mtl";
+	std::string material_filename = (output_file.parent_path()/ basename).string();
 
 	int prev_material_id = -1;
 
-	fprintf(fp, "mtllib %s\n\n", material_filename.c_str());
+	fprintf(fp, "mtllib %s\n\n", basename.c_str());
 
 	// facevarying vtx
 	for (size_t k = 0; k < attributes.vertices.size(); k += 3)
@@ -319,7 +320,7 @@ void clean_vertex(tinyobj::attrib_t& attrib, tinyobj::shape_t& shape)
 
 	// Adjust index from face to vertex according to the vertex_redirect array
 	// Also delete duplicated faces
-	std::vector<Eigen::VectorXi> face_already_assigned;
+	std::set<std::tuple<int, int, int, int, int, int, int, int, int>> face_already_assigned;
 	std::vector<bool> face_should_delete;
 	for (size_t face_id = 0; face_id < shape.mesh.num_face_vertices.size(); face_id++)
 	{
@@ -330,6 +331,15 @@ void clean_vertex(tinyobj::attrib_t& attrib, tinyobj::shape_t& shape)
 		tinyobj::index_t& idx1 = shape.mesh.indices[index_offset + 1];
 		tinyobj::index_t& idx2 = shape.mesh.indices[index_offset + 2];
 
+		auto key = std::make_tuple(idx0.vertex_index, idx1.vertex_index, idx2.vertex_index,
+			idx0.normal_index, idx1.normal_index, idx2.normal_index,
+			idx0.texcoord_index, idx1.texcoord_index, idx2.texcoord_index);
+
+		if (face_already_assigned.insert(key).second)
+			face_should_delete.push_back(false);
+		else
+			face_should_delete.push_back(true);
+		
 		idx0.vertex_index = vertex_redirect[idx0.vertex_index] - 1;
 		idx0.normal_index = vertex_redirect[idx0.normal_index] - 1;
 		idx0.texcoord_index = tex_redirect[idx0.texcoord_index] - 1;
@@ -349,28 +359,30 @@ void clean_vertex(tinyobj::attrib_t& attrib, tinyobj::shape_t& shape)
 		assert(idx2.vertex_index != -1);
 		assert(idx2.normal_index != -1);
 		assert(idx2.texcoord_index != -1);
-
-		Eigen::VectorXi key(9);
-		key << idx0.vertex_index, idx1.vertex_index, idx2.vertex_index,
-		    idx0.normal_index, idx1.normal_index, idx2.normal_index,
-		    idx0.texcoord_index, idx1.texcoord_index, idx2.texcoord_index;
-
-		if (std::find(face_already_assigned.begin(), face_already_assigned.end(), key) == face_already_assigned.end())
-		{
-			face_should_delete.push_back(false);
-			face_already_assigned.push_back(key);
-		}
-		else
-			face_should_delete.push_back(true);
+		
 	}
-	// Bug
-	//shape.mesh.indices.erase(
-	//	std::remove_if(shape.mesh.indices.begin(), shape.mesh.indices.end(),
-	//	               [&](const tinyobj::index_t& idx)
-	//	               {
-	//		               return face_should_delete[(&idx - &*shape.mesh.indices.begin()) / 3] == true;
-	//	               }),
-	//	shape.mesh.indices.end());
+	shape.mesh.indices.erase(
+		std::remove_if(shape.mesh.indices.begin(), shape.mesh.indices.end(),
+		               [&,index=0](const tinyobj::index_t& idx) mutable
+		               {
+			               return face_should_delete[index++ / 3] == true;
+		               }),
+		shape.mesh.indices.end());
+	shape.mesh.material_ids.erase(
+		std::remove_if(shape.mesh.material_ids.begin(), shape.mesh.material_ids.end(),
+			[&, index = 0](const auto& idx) mutable
+	{
+		return face_should_delete[index++] == true;
+	}),
+		shape.mesh.material_ids.end());
+	shape.mesh.num_face_vertices.erase(
+		std::remove_if(shape.mesh.num_face_vertices.begin(), shape.mesh.num_face_vertices.end(),
+			[&, index = 0](const auto& idx) mutable
+	{
+		return face_should_delete[index++] == true;
+	}),
+		shape.mesh.num_face_vertices.end());
+	
 }
 
 
@@ -389,13 +401,14 @@ void merge_obj(const std::string& v_file,
 		return;
 	}
 
-	std::string basename = GetFileBasename(v_file);
-	std::string material_filename = basename + ".mtl";
+	boost::filesystem::path output_file(v_file);
+	std::string basename = output_file.filename().stem().string() + ".mtl";
+	std::string material_filename = (output_file.parent_path() / basename).string();
 
 	int prev_material_id = -1;
 
-	fprintf(fp, "mtllib %s\n\n", material_filename.c_str());
-
+	fprintf(fp, "mtllib %s\n\n", basename.c_str());
+	
 	size_t vertex_already_assigned = 0;
 	size_t tex_already_assigned = 0;
 	for (int i_mesh = 0; i_mesh < v_attribs.size(); i_mesh += 1)
@@ -470,13 +483,7 @@ void merge_obj(const std::string& v_file,
 		tex_already_assigned += attributes.texcoords.size() / 2;
 	}
 	fclose(fp);
-}
-
-std::string GetFileBasename(const std::string& FileName)
-{
-	if (FileName.find_last_of(".") != std::string::npos)
-		return FileName.substr(0, FileName.find_last_of("."));
-	return "";
+	bool ret = WriteMat(material_filename, materials);
 }
 
 // @brief: Split the whole obj into small object and store them separatly. 
@@ -490,6 +497,8 @@ std::string GetFileBasename(const std::string& FileName)
 // @ret: 
 void split_obj(const std::string& file_dir, const std::string& file_name, const float resolution)
 {
+	std::cout << "----------Start split obj----------" << std::endl;
+
 	const float Z_THRESHOLD = -8;
 	std::cout << "1/6 Read mesh" << std::endl;
 	tinyobj::attrib_t attrib;
@@ -707,13 +716,27 @@ void split_obj(const std::string& file_dir, const std::string& file_name, const 
 	}
 	std::cout << "6/6 Save whole split obj" << std::endl;
 	merge_obj(file_dir + "/" + "total_split.obj", saved_attrib, saved_shapes, materials);
+	std::cout << "----------Split obj done----------" << std::endl << std::endl;
+
 }
 
 void rename_material(const std::string& file_dir, const std::string& file_name, const std::string& v_output_dir)
 {
+	std::cout << "----------Start rename material----------" << std::endl;
+
 	boost::filesystem::path output_root(v_output_dir);
-	if (!boost::filesystem::exists(output_root))
+	boost::system::error_code ec;
+	try
+	{
+		if (boost::filesystem::exists(output_root))
+			boost::filesystem::remove_all(output_root, ec);
 		boost::filesystem::create_directories(v_output_dir);
+		boost::filesystem::create_directories(v_output_dir + "/mat");
+	}
+	catch (...)
+	{
+		std::cout << ec << std::endl;
+	}
 
 	tinyobj::attrib_t attrib;
 	std::vector<tinyobj::shape_t> shapes;
@@ -744,7 +767,7 @@ void rename_material(const std::string& file_dir, const std::string& file_name, 
 		{
 			std::string extension_name = boost::filesystem::path(img_name_old).extension().string();
 
-			img_name_new = (boost::format("tex_%s%s") % texture_set.size() % extension_name).str();
+			img_name_new = (boost::format("mat/tex_%s%s") % texture_set.size() % extension_name).str();
 			texture_set.insert(std::make_pair(img_name_old, img_name_new));
 
 			boost::filesystem::path img_path_old(file_dir);
@@ -758,7 +781,9 @@ void rename_material(const std::string& file_dir, const std::string& file_name, 
 		if (material.ambient_texname == img_name_old)
 			material.ambient_texname = img_name_new;
 	}
-	write_obj((output_root / "1.obj").string(), attrib, shapes, materials);
+	write_obj((output_root / "renamed_material.obj").string(), attrib, shapes, materials);
+	std::cout << "----------Rename material done----------" << std::endl << std::endl;
+
 	return;
 }
 
