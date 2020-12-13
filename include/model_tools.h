@@ -53,7 +53,7 @@ void merge_obj(const std::string& v_file,
 //          OBJ file name
 //          Resolution indicates the resolution of the height map. (How far will the two building is considered to be one component)
 // @ret:
-void split_obj(const std::string& file_dir, const std::string& file_name, const float resolution);
+void split_obj(const std::string& file_dir, const std::string& file_name, const float resolution, const float v_filter_height=-99999);
 
 // @brief: Rename the material and image name
 //         Unreal can not cope with complicate image name

@@ -495,11 +495,11 @@ void merge_obj(const std::string& v_file,
 //          OBJ file name
 //          Resolution indicates the resolution of the height map. (How far will the two building is considered to be one component)
 // @ret: 
-void split_obj(const std::string& file_dir, const std::string& file_name, const float resolution)
+void split_obj(const std::string& file_dir, const std::string& file_name, const float resolution,const float v_filter_height)
 {
 	std::cout << "----------Start split obj----------" << std::endl;
 
-	const float Z_THRESHOLD = -8;
+	const float Z_THRESHOLD = v_filter_height;
 	std::cout << "1/6 Read mesh" << std::endl;
 	tinyobj::attrib_t attrib;
 	std::vector<tinyobj::shape_t> shapes;

@@ -20,9 +20,11 @@ int main(int argc, char** argv){
 	std::string model_directory = program.get<std::string>("--model_directory");
 	std::string model_name = program.get<std::string>("--model_name");
 	float resolution = std::atof(program.get<std::string>("--resolution").c_str());
-    split_obj(
+	// Shenzhen v_filter_height: -8
+	split_obj(
 		model_directory,
 		model_name,
-		resolution
+		resolution,
+		-99999
 	);
 }
