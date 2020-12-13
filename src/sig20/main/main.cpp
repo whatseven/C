@@ -304,42 +304,8 @@ int main(int argc, char** argv){
 			height_map.save_height_map_png(std::to_string(cur_frame_id) + ".png", 2);
 			height_map.save_height_map_tiff(std::to_string(cur_frame_id) + ".tiff");
 
-			float xmin = building.bounding_box_3d.min()[0];
-			float ymin = building.bounding_box_3d.min()[1];
-			float zmin = building.bounding_box_3d.min()[2];
-			float xmax = building.bounding_box_3d.max()[0];
-			float ymax = building.bounding_box_3d.max()[1];
-			float zmax = building.bounding_box_3d.max()[2];
 			//Declear control points
-			Eigen::Vector3f center(
-				(xmin + xmax) / 2,
-				(ymin + ymax) / 2,
-				zmax
-			);
-			Eigen::Vector3f top_left(
-				xmin - BOUNDS,
-				ymax + BOUNDS,
-				zmax
-			);
-			Eigen::Vector3f top_right(
-				xmax + BOUNDS,
-				ymax + BOUNDS,
-				zmax
-			);
-			Eigen::Vector3f bottom_left(
-				xmin - BOUNDS,
-				ymin - BOUNDS,
-				zmax
-			);
-			Eigen::Vector3f bottom_right(
-				xmax + BOUNDS,
-				ymin - BOUNDS,
-				zmax
-			);
-			Eigen::Vector3f left = center - Eigen::Vector3f(((xmax - xmin) / 2 + BOUNDS) * 2, 0, 0);
-			Eigen::Vector3f top = center + Eigen::Vector3f(0, ((ymax - ymin) / 2 + BOUNDS) * 2, 0);
-			Eigen::Vector3f bottom = center - Eigen::Vector3f(0, ((ymax - ymin) / 2 + BOUNDS) * 2, 0);
-			Eigen::Vector3f right = center + Eigen::Vector3f(((xmax - xmin) / 2 + BOUNDS) * 2, 0, 0);
+			building.update();
 
 			//Calculate step num
 			int horizontal_step_num = int((xmax - xmin + 2 * BOUNDS) / STEP + 1);

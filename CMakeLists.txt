@@ -6,7 +6,7 @@ set(is_build_model true)
 IF (CMAKE_SYSTEM_NAME MATCHES "Linux")
     set(AIRSIM_ROOT "/root/code/AirSim")
 ELSE ()
-    set(AIRSIM_ROOT "d://env/AirSim")
+    set(AIRSIM_ROOT "F:\\Unreal\\UE_4.24\\AirSim")
     set (CMAKE_EXE_LINKER_FLAGS "/incremental ${CMAKE_EXE_LINKER_FLAGS}")
 ENDIF (CMAKE_SYSTEM_NAME MATCHES "Linux")
 
