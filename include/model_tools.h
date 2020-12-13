@@ -44,8 +44,6 @@ void merge_obj(const std::string& v_file,
     const std::vector<tinyobj::attrib_t>& v_attribs, const std::vector<tinyobj::shape_t>& saved_shapes,
     const std::vector<tinyobj::_material_t>& materials);
 
-std::string GetFileBasename(const std::string& FileName);
-
 // @brief: Split the whole obj into small object and store them separatly. 
 //         Each Object is store separatly and normalize near origin. The transformation is also stored in the txt
 //         We also get a whole obj with "g" attribute to indicate each component. This obj can be imported into unreal with separate actor
