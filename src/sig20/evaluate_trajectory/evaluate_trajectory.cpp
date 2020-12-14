@@ -22,12 +22,14 @@ const float CENTER_Z1 = 0.5;
 const float CENTER_Z2 = 0.25;
 const bool DOUBLE_FLAG = true;
 
-const std::string asia_ny = "D:\\SIG21\\asia_path\\ny-asiaproxy-our-85-min-smoothnormal-tsp-filter.utj";
+const std::string asia_ny = "D:\\SIG21\\asia_path\\test.utj";
 const std::string ny_proxy = "C:\\repo\\C\\temp\\ny_sample_points.ply";
 
 float evaluate_length(const std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> v_trajectory)
 {
 	float total_length=0;
+	if (v_trajectory.size() < 2)
+		return 0;
 	for(int idx=0;idx< v_trajectory.size()-1;++idx)
 	{
 		total_length += (v_trajectory[idx+1].first - v_trajectory[idx].first).norm();

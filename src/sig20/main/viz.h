@@ -102,10 +102,7 @@ public:
         	pangolin::glDrawLine(m_pos[0], m_pos[1], m_pos[2], look_at[0], look_at[1], look_at[2]);
             for (const auto& item_building : m_buildings)
             {
-                draw_cube(Eigen::AlignedBox3f(
-                    Eigen::Vector3f(item_building.bounding_box_3d.min()[0], item_building.bounding_box_3d.min()[1], item_building.bounding_box_3d.min()[2]),
-                    Eigen::Vector3f(item_building.bounding_box_3d.max()[0], item_building.bounding_box_3d.max()[0], item_building.bounding_box_3d.max()[2])
-                ),
+                draw_cube(item_building.bounding_box_3d,
                     Eigen::Vector4f(1.f, 1.f, 1.f, 0.75f));
             }
             for (const auto& item_trajectory : m_trajectories) {

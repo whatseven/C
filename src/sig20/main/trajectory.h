@@ -45,9 +45,14 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> read_unreal_trajectory(
 	if (!pose.is_open()) throw "File not opened";
 
 	std::string line;
-	std::getline(pose, line);
-	while(!pose.eof()&&line.size()>3)
+	do
 	{
+		std::getline(pose, line);
+		if(line.size() < 3)
+		{
+			std::getline(pose, line);
+			continue;
+		}
 		std::vector<std::string> tokens;
 		boost::split(tokens, line, boost::is_any_of(","));
 
@@ -65,8 +70,7 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> read_unreal_trajectory(
 			direction.normalized()
 		));
 		
-		std::getline(pose, line);
-	}
+	} while (!pose.eof());
 	
 	pose.close();
 	return o_trajectories;

@@ -42,6 +42,21 @@ int main(int argc, char** argv){
 	buildings.buildings[3].bounding_box_3d = Eigen::AlignedBox3f(Eigen::Vector3f(-30, -32, 0), Eigen::Vector3f(-4, -20, 25));
 	buildings.buildings[4].bounding_box_3d = Eigen::AlignedBox3f(Eigen::Vector3f(1, -32, 0), Eigen::Vector3f(29, -3, 30));
 
+	{
+		// Find start position
+
+		// Get next curvature
+		// Input: Bounding box of current building (Eigen::AlignedBox3f),
+		//
+		// Output: Horizontal and vertical curvature
+
+		// If visualization is enabled, generate the full trajectory
+		// While current z > Z_bounds
+
+		// 
+	}
+
+	
 	// Calculate how many iteration needed
 	std::vector<float> z_heights;
 	float zmax = 0;

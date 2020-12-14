@@ -2,7 +2,7 @@
 #include "model_tools.h"
 
 struct Building {
-	const float BOUNDS = 20;
+	float BOUNDS = 20;
 	Eigen::AlignedBox3f bounding_box_3d;
 	Point_set points_camera_space;
 	Point_set points_world_space;
