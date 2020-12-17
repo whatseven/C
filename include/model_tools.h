@@ -73,8 +73,10 @@ public:
         Eigen::Vector3f end(bounds.max());
         Eigen::Vector3f delta = (end - m_start) / m_resolution;
         m_map = cv::Mat((int)delta[1] + 1, (int)delta[0] + 1,CV_32FC1);
-        m_map.setTo(std::numeric_limits<float>::lowest());
-
+        m_map.setTo(-99999);
+        m_map_dilated = cv::Mat((int)delta[1] + 1, (int)delta[0] + 1, CV_32FC1);
+        m_map_dilated.setTo(-99999);
+    	
         for (const auto& id_point : v_point_cloud) {
             const Point_3& point = v_point_cloud.point(id_point);
             float cur_height = m_map.at<float>((int)((point.y() - m_start[1])/m_resolution), (int)((point.x() - m_start[0])/m_resolution));
@@ -90,13 +92,13 @@ public:
         m_map.setTo(std::numeric_limits<float>::lowest());
     }
 
-	float get_height(float x,float y)
+	float get_height(float x,float y) const
     {
         int m_y = (int)((y - m_start[1]) / m_resolution);
         int m_x = (int)((x - m_start[0]) / m_resolution);
         if (!(0 <= m_y && 0 <= m_x && m_y < m_map.rows && m_x < m_map.cols))
             return std::numeric_limits<float>::lowest();
-        return m_map.at<float>(m_y, m_x);
+        return m_map_dilated.at<float>(m_y, m_x);
     }
 
     void update(const Eigen::AlignedBox3f& v_box)
@@ -112,6 +114,7 @@ public:
         for (int y = ymin; y <= ymax; ++y)
             for (int x = xmin; x <= xmax; ++x)
                 m_map.at<float>(y, x) = m_map.at<float>(y, x) > v_box.max()[2] ? m_map.at<float>(y, x) : v_box.max()[2];
+        cv::dilate(m_map, m_map_dilated, cv::getStructuringElement(CV_SHAPE_RECT, cv::Size(3, 3)),cv::Point(-1,-1),3);
     }
 	
     void save_height_map_png(const std::string& v_path,const float v_threshold=0.f)
@@ -133,6 +136,7 @@ public:
     Eigen::Vector3f m_start;
     float m_resolution;
     cv::Mat m_map;
+    cv::Mat m_map_dilated;
 };
 
 #endif // MODEL_TOOLS_H

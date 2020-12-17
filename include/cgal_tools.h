@@ -15,6 +15,7 @@
 typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
 typedef CGAL::Triangle_3<K> Triangle_3;
 typedef CGAL::Point_3<K> Point_3;
+typedef CGAL::Direction_3<K> Direction_3;
 typedef CGAL::Vector_3<K> Vector_3;
 typedef CGAL::Surface_mesh<K::Point_3> Surface_mesh;
 typedef CGAL::Point_set_3<K::Point_3> Point_cloud;

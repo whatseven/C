@@ -22,16 +22,21 @@ const Eigen::Vector3f MAIN_START(4429.995117, -85.101341, 1484.44397);
 const Eigen::Vector3f MAP_START(-70.f, -55.f, 0.f);
 const Eigen::Vector3f MAP_END(70.f, 55.f, 35.f);
 const float THRESHOLD = 5;
+//Camera
+const float focal = 26; // equivalent to 35mm
+const float SENSOR_WIDTH = 36;
 const cv::Vec3b BACKGROUND_COLOR(57,181,55);
 const cv::Vec3b SKY_COLOR(161, 120, 205);
 Eigen::Matrix3f INTRINSIC;
 const bool SYNTHETIC_POINT_CLOUD = true;
 const bool MAP_2D_BOX_TO_3D = true;
-const float BOUNDS = 20;
+// Bounds
+const float BOUNDS_MIN = 20;
+const float BOUNDS_MAX = 60;
+const float SAFE_SPACE_BOUNDS = 5;
 const float Z_UP_BOUNDS = 20;
-const float Z_DOWN_BOUND = 5;
-const float STEP = 5;
-const bool DOUBLE_FLAG = true;
+const float Z_DOWN_BOUND = 10;
+
 std::string sample_point_path = "F:\\Unreal\\sndd\\Env\\Content\\Maps\\sample_points_Bridge.obj";
 std::string obj_path = "F:\\Unreal\\sndd\\Env\\Content\\Maps\\Bridge.obj";
 
@@ -68,10 +73,9 @@ int main(int argc, char** argv){
 	Height_map height_map(MAP_START, MAP_END, 2);
 	std::vector<Building> total_buildings;
 	int current_building_id = 0;
-	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> final_trajectory;
-	Pos_Pack current_pos = map_converter.get_pos_pack_from_unreal(MAIN_START, MM_PI / 2, 0);
+	Pos_Pack current_pos = map_converter.get_pos_pack_from_unreal(MAIN_START, M_PI / 2, 0);
 	int cur_frame_id = 0;
-	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> points_has_shotted;
+	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> passed_trajectory;
 	while(!end)
 	{
 		LOG(INFO) << "<<<<<<<<<<<<< Frame "<<cur_frame_id<<" <<<<<<<<<<<<<";
@@ -261,150 +265,61 @@ int main(int argc, char** argv){
 			LOG(INFO) << "Building BBox update: DONE!";
 
 		}
-
+		//debug_img(std::vector<cv::Mat>{height_map.m_map, height_map.m_map_dilated});
+		//cv::imwrite("map.tiff", height_map.m_map);
+		//cv::imwrite("map_d.tiff", height_map.m_map_dilated);
+		
 		// Generating trajectory
 		// No guarantee for the validation of camera position, check it later
-		// Input: Building vectors (std::vector<Building>)
+		// Input: Building vectors (std::vector<Building>), previous trajectory position
 		// Output: Trajectory on current buildings
 		std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> current_trajectory;
 		{
 			Building& building= total_buildings[current_building_id];
+			Eigen::AlignedBox3f& box = building.bounding_box_3d;
 			//height_map.save_height_map_png(std::to_string(cur_frame_id) + ".png", 2);
 			//height_map.save_height_map_tiff(std::to_string(cur_frame_id) + ".tiff");
-
-			//Declear control points
-			building.update();
-
-			//Calculate step num
-			int horizontal_step_num = int((building.top_left_BOUNDS - building.top_right_BOUNDS).norm() / STEP + 1);
-			int vertical_step_num = int((building.top_left_BOUNDS - building.bottom_left_BOUNDS).norm() / STEP + 1);
-			int total_step_num = 2 * (horizontal_step_num + vertical_step_num);
-
-			//Calculate iteration num
-			int iteration_num = int((building.bounding_box_3d.sizes().z() + BOUNDS) / (2 * BOUNDS));
-			float z_step = 2 * BOUNDS / total_step_num;
-			if (iteration_num == 0)
-			{
-				iteration_num = 1;
-				z_step = (building.bounding_box_3d.sizes().z() + BOUNDS) / total_step_num;
-			}
-
-			for (int i = 0; i < iteration_num; i++)
-			{
-				float iteration_zmax = (building.bounding_box_3d.max()[2] + BOUNDS) - 2 * BOUNDS * i;
-
-				//Set gaze target
-				Eigen::Vector3f gaze_target = building.bounding_box_3d.center();
-				gaze_target[2] = iteration_zmax - BOUNDS * 2;
-
-				Eigen::Vector3f seg_start, seg_end, current_pos;
-
-				for (int j = 0; j < vertical_step_num; j++)
-				{
-					seg_start = building.top_left_BOUNDS + (building.left - building.top_left_BOUNDS) / vertical_step_num * j;
-					seg_end = building.left + (building.bottom_left_BOUNDS - building.left) / vertical_step_num * j;
-					current_pos = seg_start + (seg_end - seg_start) / vertical_step_num * j;
-					current_pos[2] = iteration_zmax - z_step * j;
-					current_trajectory.push_back(std::make_pair(current_pos, gaze_target - current_pos));
-				}
-
-				for (int j = 0; j < horizontal_step_num; j++)
-				{
-					seg_start = building.bottom_left_BOUNDS + ((building.bottom - building.bottom_left_BOUNDS) / horizontal_step_num * j);
-					seg_end = building.bottom + (building.bottom_right_BOUNDS - building.bottom) / horizontal_step_num * j;
-					current_pos = seg_start + (seg_end - seg_start) / horizontal_step_num * j;
-					current_pos[2] = iteration_zmax - z_step * j - vertical_step_num * z_step;
-					current_trajectory.push_back(std::make_pair(current_pos, gaze_target - current_pos));
-				}
-
-				for (int j = 0; j < vertical_step_num; j++)
-				{
-					seg_start = building.bottom_right_BOUNDS + (building.right - building.bottom_right_BOUNDS) / vertical_step_num * j;
-					seg_end = building.right + (building.top_right_BOUNDS -building.right) / vertical_step_num * j;
-					current_pos = seg_start + (seg_end - seg_start) / vertical_step_num * j;
-					current_pos[2] = iteration_zmax - z_step * j - (vertical_step_num + horizontal_step_num) * z_step;
-					current_trajectory.push_back(std::make_pair(current_pos, gaze_target - current_pos));
-				}
-
-				for (int j = 0; j < horizontal_step_num; j++)
-				{
-					seg_start = building.top_right_BOUNDS + (building.top - building.top_right_BOUNDS) / horizontal_step_num * j;
-					seg_end = building.top + (building.top_left_BOUNDS - building.top) / horizontal_step_num * j;
-					current_pos = seg_start + (seg_end - seg_start) / horizontal_step_num * j;
-					current_pos[2] = iteration_zmax - z_step * j - (2 * vertical_step_num + horizontal_step_num) * z_step;
-					current_trajectory.push_back(std::make_pair(current_pos, gaze_target - current_pos));
-				}
-			}
-
-			// Check the camera position
-			for (int i = 0; i < current_trajectory.size(); ++i) {
-				Eigen::Vector3f position = current_trajectory[i].first;
-				Eigen::Vector3f camera_focus = current_trajectory[i].first + current_trajectory[i].second;
-
-				while (height_map.get_height(position.x(), position.y()) + Z_DOWN_BOUND > position.z()) {
-					position[2] += 5;
-				}
-				Eigen::Vector3f camera_direction = camera_focus - position;
-				current_trajectory[i].second = camera_direction.normalized();
-				current_trajectory[i].first = position;
-			}
+			Trajectory_params params;
+			params.view_distance = BOUNDS_MIN;
+			params.z_down_bounds = Z_DOWN_BOUND;
+			params.z_up_bounds = Z_UP_BOUNDS;
+			generate_trajectory(params,box, current_trajectory,height_map);
 			LOG(INFO) << "New trajectory GENERATED!";
-
 		}
 
 		// Merging trajectory
-		final_trajectory = current_trajectory;
 		// Returen -1 if shot for the current building is done
 		Eigen::Vector3f next_pos;
 		Eigen::Vector3f next_direction;
 		{
+			std::pair<Eigen::Vector3f, Eigen::Vector3f> next_pos_direction;
+			if(total_buildings[current_building_id].passed_trajectory.size()==0)
 			{
-				for (auto& point_has_shotted : points_has_shotted) {
-					Eigen::Vector3f previous_point_coord = point_has_shotted.first;
-					for (auto it = current_trajectory.begin(); it != current_trajectory.end();) {
-						Eigen::Vector3f now_point_coord = (*it).first;
-						float distance = (now_point_coord - previous_point_coord).norm();
-						if (distance < THRESHOLD) {
-							point_has_shotted = *it;
-							it = current_trajectory.erase(it);
-						}
-						else
-							it++;
-					}
-				}
+				next_pos_direction = current_trajectory[0];
 			}
-
-			//Find next point to go
-			float min_distance = 999;
-			std::pair<Eigen::Vector3f, Eigen::Vector3f> next_point;
-			if (points_has_shotted.size() == 0)
+			else
 			{
-				next_point = current_trajectory[0];
+				Eigen::Vector3f current_pos_on_trajectory = total_buildings[current_building_id].passed_trajectory.back().first;
+
+				auto it_min_distance = std::min_element(current_trajectory.begin(), current_trajectory.end(),
+					[&current_pos_on_trajectory](const auto& t1, const auto& t2) {
+					return (t1.first - current_pos_on_trajectory).norm() < (t2.first - current_pos_on_trajectory).norm();
+				});
+				next_pos_direction = *(++it_min_distance);
 			}
-			else {
-				Eigen::Vector3f now_point_coord = points_has_shotted[points_has_shotted.size() - 1].first;
-				for (auto it = current_trajectory.begin(); it != current_trajectory.end(); it++) {
-					Eigen::Vector3f next_point_coord = (*it).first;
-					float distance = (now_point_coord - next_point_coord).norm();
-					if (distance < min_distance) {
-						next_point = *it;
-						min_distance = distance;
-						std::cout << min_distance << std::endl;
-					}
-				}
-			}
-			points_has_shotted.push_back(next_point);
-			next_pos = next_point.first;
-			next_direction = next_point.second;
-			if (current_trajectory.size() <= 1)
+			
+			if(current_trajectory.back() == next_pos_direction)
 			{
-				
-
-				current_building_id++;
-				points_has_shotted.clear();
+				current_building_id += 1;
 			}
-			LOG(INFO) << "Update Trajectory¡Ì";
-
+			else
+			{
+				passed_trajectory.push_back(next_pos_direction);
+				total_buildings[current_building_id].passed_trajectory.push_back(next_pos_direction);
+				next_pos = next_pos_direction.first;
+				next_direction = next_pos_direction.second;
+				LOG(INFO) << "Update Trajectory¡Ì";
+			}
 		}
 
 		// Calculate reconstructability
@@ -439,19 +354,20 @@ int main(int argc, char** argv){
 			viz.m_buildings = total_buildings;
 			viz.m_pos = current_pos.pos_mesh;
 			viz.m_direction = next_direction;
-			viz.m_trajectories = final_trajectory;
+			viz.m_trajectories = current_trajectory;
 			viz.unlock();
+			//override_sleep(100);
+			//debug_img(std::vector<cv::Mat>{height_map.m_map_dilated});
 		}
-
 
 		//for (int i = 0; i < trajectory.size(); ++i) {
 		//	point_cloud.insert(Point_3(trajectory[i].first[0], trajectory[i].first[1], trajectory[i].first[2]));
 		//}
 		//CGAL::write_ply_point_set(std::ofstream("test_point.ply"), point_cloud);
-		//write_unreal_path(trajectory, "camera_after_transaction.log");
-		//write_normal_path(trajectory, "camera_normal.log");
 	}
 	
-	
+	write_unreal_path(passed_trajectory, "camera_after_transaction.log");
+	write_normal_path(passed_trajectory, "camera_normal.log");
+	LOG(INFO) << "Write trajectory done!";
 	return 0;
 }
