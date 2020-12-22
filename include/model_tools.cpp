@@ -392,7 +392,8 @@ Get split mesh with a big whole mesh
 
 void merge_obj(const std::string& v_file,
                const std::vector<tinyobj::attrib_t>& v_attribs, const std::vector<tinyobj::shape_t>& saved_shapes,
-               const std::vector<tinyobj::_material_t>& materials)
+               const std::vector<tinyobj::_material_t>& materials,
+			   const int start_id)
 {
 	FILE* fp = fopen(v_file.c_str(), "w");
 	if (!fp)
@@ -452,7 +453,7 @@ void merge_obj(const std::string& v_file,
 
 		fprintf(fp, "\n");
 
-		fprintf(fp, "g %s\n", std::to_string(i_mesh).c_str());
+		fprintf(fp, "g %s\n", std::to_string(i_mesh + start_id).c_str());
 
 		// face
 		int face_index = 0;
@@ -495,7 +496,7 @@ void merge_obj(const std::string& v_file,
 //          OBJ file name
 //          Resolution indicates the resolution of the height map. (How far will the two building is considered to be one component)
 // @ret: 
-void split_obj(const std::string& file_dir, const std::string& file_name, const float resolution,const float v_filter_height)
+void split_obj(const std::string& file_dir, const std::string& file_name, const float resolution,const float v_filter_height, const int obj_max_builidng_num)
 {
 	std::cout << "----------Start split obj----------" << std::endl;
 
@@ -643,6 +644,7 @@ void split_obj(const std::string& file_dir, const std::string& file_name, const 
 	std::vector<tinyobj::shape_t> saved_shapes;
 	std::vector<tinyobj::attrib_t> saved_attrib;
 	int building_num = 0;
+	int obj_num = 0;
 	for (int building_idx = 0; building_idx < buildings.size(); building_idx++)
 	{
 		tinyobj::attrib_t cur_attr = tinyobj::attrib_t(attrib);
@@ -698,6 +700,16 @@ void split_obj(const std::string& file_dir, const std::string& file_name, const 
 		saved_shapes.push_back(cur_shape);
 		saved_attrib.push_back(cur_attr);
 
+		if (obj_max_builidng_num > 0 && saved_shapes.size() >= obj_max_builidng_num)
+		{
+			std::cout << "5.5/6 Save max num split obj" << std::endl;
+			merge_obj(file_dir + "/" + "total_split" + std::to_string(obj_num) + ".obj", saved_attrib, saved_shapes, materials, building_num - obj_max_builidng_num + 1);
+			std::cout << "----------Partial Save done----------" << std::endl << std::endl;
+			saved_shapes.clear();
+			saved_attrib.clear();
+			obj_num++;
+		}
+
 		for (int i_vertex = 0; i_vertex < cur_attr.vertices.size(); i_vertex += 1)
 		{
 			if (i_vertex % 3 == 0)
@@ -715,7 +727,7 @@ void split_obj(const std::string& file_dir, const std::string& file_name, const 
 		building_num += 1;
 	}
 	std::cout << "6/6 Save whole split obj" << std::endl;
-	merge_obj(file_dir + "/" + "total_split.obj", saved_attrib, saved_shapes, materials);
+	merge_obj(file_dir + "/" + "total_split" + std::to_string(obj_num) + ".obj", saved_attrib, saved_shapes, materials, building_num - saved_attrib.size() + 1);
 	std::cout << "----------Split obj done----------" << std::endl << std::endl;
 
 }
@@ -785,6 +797,49 @@ void rename_material(const std::string& file_dir, const std::string& file_name, 
 	std::cout << "----------Rename material done----------" << std::endl << std::endl;
 
 	return;
+}
+
+/*
+	xmin xmax ymin ymax zmax in sequence
+*/
+std::vector<float> get_bounds(std::string path, float v_bounds)
+{
+	std::vector<float> output;
+	std::ifstream ObjFile(path);
+	std::string line;
+	float xmin = 99999;
+	float xmax = -99999;
+	float ymin = 99999;
+	float ymax = -99999;
+	float zmax = -99999;
+	while (getline(ObjFile, line))
+	{
+		std::vector<std::string> vData;
+		if (line.substr(0, line.find(" ")) == "v")
+		{
+			line = line.substr(line.find(" ") + 1);
+			for (int i = 0; i < 3; i++)
+			{
+				vData.push_back(line.substr(0, line.find(" ")));
+				line = line.substr(line.find(" ") + 1);
+			}
+			vData[2] = vData[2].substr(0, vData[2].find("\n"));
+			float x = atof(vData[0].c_str());
+			float y = atof(vData[1].c_str());
+			float z = atof(vData[2].c_str()) + v_bounds;
+			xmin = std::min(x, xmin);
+			xmax = std::max(x, xmax);
+			ymin = std::min(y, ymin);
+			ymax = std::max(y, ymax);
+			zmax = std::max(z, zmax);
+		}
+	}
+	output.push_back(xmin);
+	output.push_back(xmax);
+	output.push_back(ymin);
+	output.push_back(ymax);
+	output.push_back(zmax);
+	return output;
 }
 
 

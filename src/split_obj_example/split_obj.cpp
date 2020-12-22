@@ -25,6 +25,7 @@ int main(int argc, char** argv){
 		model_directory,
 		model_name,
 		resolution,
-		-99999
+		15,
+		500
 	);
 }
