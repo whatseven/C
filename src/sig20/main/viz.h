@@ -28,6 +28,7 @@ public:
     Eigen::Vector3f m_pos;
     Eigen::Vector3f m_direction;
     Point_set m_points;
+    std::vector<Eigen::Vector4f> m_points_color;
 	
 	Visualizer()
 	{
@@ -115,11 +116,13 @@ public:
         	{
                 for (const auto& id_point : m_points)
                 {
+                    Eigen::Vector4f color(1.f, 1.f, 1.f, 1.f);
+                    if (m_points_color.size() > 0)
+                        color = m_points_color[&id_point - &*m_points.begin()];
                     Point_3& p = m_points.point(id_point);
                     float radius = 0.1f;
                     draw_cube(Eigen::AlignedBox3f(Eigen::Vector3f(p.x()- radius, p.y()- radius, p.z()- radius), 
-                        Eigen::Vector3f(p.x() + radius, p.y() + radius, p.z() + radius))),
-                	Eigen::Vector4f(1.f,1.f,1.f,1.f);
+                        Eigen::Vector3f(p.x() + radius, p.y() + radius, p.z() + radius)), color);
                 }
         	}
             unlock();
