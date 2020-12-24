@@ -83,6 +83,7 @@ public:
             if (cur_height < point.z())
                 m_map.at<float>((int)((point.y() - m_start[1]) / m_resolution), (int)((point.x() - m_start[0]) / m_resolution)) = point.z();
         }
+        cv::dilate(m_map, m_map_dilated, cv::getStructuringElement(CV_SHAPE_RECT, cv::Size(3, 3)), cv::Point(-1, -1), 3);
     }
 
     Height_map(const Eigen::Vector3f& v_min, const Eigen::Vector3f& v_max, const float v_resolution)

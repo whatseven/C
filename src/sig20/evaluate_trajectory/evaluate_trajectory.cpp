@@ -29,14 +29,14 @@ const bool DOUBLE_FLAG = true;
 //const std::string trajectory_path = "D:\\SIG21\\asia_path\\test.utj";
 //const std::string trajectory_path = "C:\\repo\\C\\build\\src\\sig20\\main\\camera_normal.log";
 //const std::string trajectory_path = "C:\\repo\\C\\build\\src\\sig20\\generate_trajectory_with_prior\\camera_normal.log";
-// std::string trajectory_path = "C:\\repo\\C\\temp\\path0.drone_path";
+//std::string trajectory_path = "C:\\repo\\C\\temp\\path0.drone_path";
 //const std::string sample_points_path = "C:\\repo\\C\\temp\\bridge_sample_points.ply";
 
 //
-//const std::string trajectory_path = "C:\\repo\\C\\temp\\adjacent\\10_double.log";
-const std::string trajectory_path = "C:\\repo\\C\\temp\\adjacent\\10_x2_113.log";
-const std::string sample_points_path = "C:\\repo\\C\\temp\\adjacent\\10_single_points.ply";
-const std::string mesh_path = "C:\\repo\\C\\temp\\adjacent\\10_double.obj";
+//const std::string trajectory_path = "C:\\repo\\C\\temp\\adjacent\\10_single_upper.log";
+const std::string trajectory_path = "C:\\repo\\C\\temp\\adjacent\\5\\5_x2.log";
+const std::string sample_points_path = "C:\\repo\\C\\temp\\adjacent\\5\\5_single_points.ply";
+const std::string mesh_path = "C:\\repo\\C\\temp\\adjacent\\5\\5_double.obj";
 //
 
 

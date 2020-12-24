@@ -24,6 +24,22 @@ void write_unreal_path(const std::vector<std::pair<Eigen::Vector3f, Eigen::Vecto
 	pose.close();
 }
 
+void write_smith_path(const std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>>& v_trajectories, const std::string& v_path)
+{
+	std::ofstream pose(v_path);
+	for (int i = 0; i < v_trajectories.size(); ++i) {
+		const Eigen::Vector3f& position = v_trajectories[i].first * 100;
+		const Eigen::Vector3f& direction = v_trajectories[i].second;
+		boost::format fmt("%04d.png,%s,%s,%s,%s,0,%s\n");
+		float pitch = std::atan2f(direction[2], std::sqrtf(direction[0] * direction[0] + direction[1] * direction[1])) * 180. / M_PI;
+		float yaw = std::atan2f(direction[1], direction[0]) * 180. / M_PI;
+		yaw = -yaw+90;
+		pose << (fmt % i % -position[0] % position[1] % position[2] % -pitch % yaw).str();
+	}
+
+	pose.close();
+}
+
 void write_normal_path(const std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>>& v_trajectories, const std::string& v_path) {
 	std::ofstream pose(v_path);
 	for (int i = 0; i < v_trajectories.size(); ++i) {
@@ -156,6 +172,37 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> read_wgs84_trajectory(c
 	return o_trajectories;
 }
 
+std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> read_smith_spline_trajectory(const std::string& v_path) {
+	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> o_trajectories;
+	std::ifstream pose(v_path);
+	if (!pose.is_open()) throw "File not opened";
+
+	std::string line;
+	do {
+		std::getline(pose, line);
+		if (line.size() < 3) {
+			std::getline(pose, line);
+			continue;
+		}
+		std::vector<std::string> tokens;
+		boost::split(tokens, line, boost::is_any_of(","));
+
+		float z = std::atof(tokens[3].c_str()) / 100;
+		float x = -std::atof(tokens[1].c_str()) / 100;
+		float y = std::atof(tokens[2].c_str()) / 100;
+
+		o_trajectories.push_back(std::make_pair(
+			Eigen::Vector3f(x, y, z),
+			Eigen::Vector3f(0.f,0.f,0.f)
+		));
+
+	} while (!pose.eof());
+
+	pose.close();
+	return o_trajectories;
+}
+
+
 struct Trajectory_params
 {
 	float view_distance;
@@ -207,16 +254,32 @@ void generate_trajectory(const Trajectory_params& v_params,
 
 
 std::pair<Eigen::Vector3f, Eigen::Vector3f> generate_next_view(const Trajectory_params& v_params,
-	const Building& v_building,
+	Building& v_building,
 	const Eigen::Vector3f& v_cur_pos,
 	const bool v_is_inverse_order) {
 
-	const Eigen::AlignedBox3f* target_box;
-	float cur_angle;
+	const Eigen::AlignedBox3f* target_box = nullptr;
+	float cur_angle = 0.f;
+	bool start_flag = false;
+	// Init
 	if(v_cur_pos==Eigen::Vector3f(0.f,0.f,0.f))
 	{
-		target_box = &v_building.boxes[0];
-		cur_angle = (v_is_inverse_order ? 0 : 0);
+		start_flag = true;
+		int i = -1;
+		const Eigen::AlignedBox3f* closest_box;
+		while(closest_box != target_box|| target_box==nullptr)
+		{
+			i += 1;
+			target_box = &v_building.boxes[i];
+			Eigen::Vector3f next_position(v_cur_pos);
+			float radius = std::max(target_box->sizes().x(), target_box->sizes().y()) / 2 + v_params.view_distance;
+			next_position.x() = radius * std::cos(cur_angle) + target_box->center().x();
+			next_position.y() = radius * std::sin(cur_angle) + target_box->center().y();
+			closest_box = &*std::min_element(v_building.boxes.begin(), v_building.boxes.end(),
+				[&next_position](const Eigen::AlignedBox3f& item1, const Eigen::AlignedBox3f& item2) {return (next_position - item1.center()).norm() < (next_position - item2.center()).norm(); });;
+		}
+		v_building.start_box = i;
+		cur_angle = (v_is_inverse_order ? v_params.xy_angle / 180.f * M_PI : v_params.xy_angle / 180.f * M_PI);
 	}
 	else
 	{
@@ -228,13 +291,14 @@ std::pair<Eigen::Vector3f, Eigen::Vector3f> generate_next_view(const Trajectory_
 	
 	float radius = std::max(target_box->sizes().x(), target_box->sizes().y()) / 2 + v_params.view_distance;
 	cur_angle-= v_params.xy_angle / 180.f * M_PI;
-	if(target_box == &v_building.boxes[0])
-		if(!v_is_inverse_order&& std::abs(cur_angle) < v_params.xy_angle / 180.f * M_PI - 1e-6)
+	// TODO: UGLY
+	//if(target_box == &v_building.boxes[0])
+		if(!start_flag&& v_building.start_box == target_box - &v_building.boxes[0] &&!v_is_inverse_order&& std::abs(cur_angle) < v_params.xy_angle / 180.f * M_PI - 1e-6)
 			return std::make_pair(Eigen::Vector3f(0.f, 0.f, 0.f), Eigen::Vector3f(0.f, 0.f, 0.f));
-		else if(v_is_inverse_order&& std::abs(cur_angle)< v_params.xy_angle / 180.f * M_PI - 1e-6)
+		else if(!start_flag && v_building.start_box == target_box - &v_building.boxes[0] && v_is_inverse_order&& std::abs(cur_angle)< v_params.xy_angle / 180.f * M_PI - 1e-6)
 			return std::make_pair(Eigen::Vector3f(0.f, 0.f, 0.f), Eigen::Vector3f(0.f, 0.f, 0.f));
 
-	//std::cout << target_box - &v_building.boxes[0] << ", " << cur_angle << std::endl;
+	std::cout << target_box - &v_building.boxes[0] << ", " << cur_angle << std::endl;
 	Eigen::Vector3f next_position(v_cur_pos);
 	Eigen::Vector3f camera_focus=target_box->center();
 	

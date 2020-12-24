@@ -9,6 +9,9 @@ struct Building {
 	cv::Vec3b segmentation_color;
 	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> passed_trajectory;
 	std::vector<Eigen::AlignedBox3f> boxes;
+
+	//Used for trajectory generation
+	int start_box = -1;
 };
 
 class Building_Set {
