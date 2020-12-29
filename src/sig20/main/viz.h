@@ -24,7 +24,9 @@ public:
     std::thread* m_thread;
     std::mutex m_mutex;
     std::vector<Building> m_buildings;
+    std::vector<Eigen::AlignedBox3f> m_boxes;
     std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> m_trajectories;
+    std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> m_trajectories_spline;
     Eigen::Vector3f m_pos;
     Eigen::Vector3f m_direction;
     Point_set m_points;
@@ -101,16 +103,31 @@ public:
                 Eigen::Vector4f(1.f, 0.f, 0.f, 1.f));
             Eigen::Vector3f look_at = m_pos + m_direction*10;
         	pangolin::glDrawLine(m_pos[0], m_pos[1], m_pos[2], look_at[0], look_at[1], look_at[2]);
-            for (const auto& item_building : m_buildings)
+
+        	//Building
+        	for (const auto& item_building : m_buildings)
             {
                 draw_cube(item_building.bounding_box_3d,
                     Eigen::Vector4f(1.f, 1.f, 1.f, 0.75f));
             }
+        	//View points
             for (const auto& item_trajectory : m_trajectories) {
                 draw_cube(Eigen::AlignedBox3f(item_trajectory.first - Eigen::Vector3f(1.f, 1.f, 1.f), item_trajectory.first + Eigen::Vector3f(1.f, 1.f, 1.f)),
                     Eigen::Vector4f(0.f, 1.f, 0.f, 1.f));
                 Eigen::Vector3f look_at = item_trajectory.first + item_trajectory.second * 10;
                 pangolin::glDrawLine(item_trajectory.first[0], item_trajectory.first[1], item_trajectory.first[2], look_at[0], look_at[1], look_at[2]);
+            }
+        	//View spline
+            int i_iter = 0;
+            for (const auto& item_trajectory : m_trajectories_spline) {
+                draw_cube(Eigen::AlignedBox3f(item_trajectory.first - Eigen::Vector3f(1.f, 1.f, 1.f), item_trajectory.first + Eigen::Vector3f(1.f, 1.f, 1.f)),
+                    Eigen::Vector4f(0.f, 1.f, 0.f, 1.f));
+                Eigen::Vector3f look_at = item_trajectory.first + item_trajectory.second * 10;
+                //pangolin::glDrawLine(item_trajectory.first[0], item_trajectory.first[1], item_trajectory.first[2], look_at[0], look_at[1], look_at[2]);
+            	if(i_iter>=1)
+                    pangolin::glDrawLine(item_trajectory.first[0], item_trajectory.first[1], item_trajectory.first[2], 
+                        m_trajectories_spline[i_iter-1].first[0], m_trajectories_spline[i_iter - 1].first[1], m_trajectories_spline[i_iter - 1].first[2]);
+                i_iter += 1;
             }
         	if(m_points.size()>0)
         	{
@@ -125,6 +142,12 @@ public:
                         Eigen::Vector3f(p.x() + radius, p.y() + radius, p.z() + radius)), color);
                 }
         	}
+            if (m_boxes.size() > 0) {
+                for (const auto& item_box : m_boxes) {
+                    Eigen::Vector4f color(1.f, 0.f, 0.f, 0.f);
+                    draw_cube(item_box,color);
+                }
+            }
             unlock();
 
             // Swap frames and Process Events

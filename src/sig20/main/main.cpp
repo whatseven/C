@@ -283,7 +283,7 @@ int main(int argc, char** argv){
 			params.view_distance = BOUNDS_MIN;
 			params.z_down_bounds = Z_DOWN_BOUND;
 			params.z_up_bounds = Z_UP_BOUNDS;
-			generate_trajectory(params,box, current_trajectory,height_map);
+			//generate_trajectory(params,box, current_trajectory,height_map);
 			LOG(INFO) << "New trajectory GENERATED!";
 		}
 

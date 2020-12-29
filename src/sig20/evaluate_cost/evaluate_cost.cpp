@@ -29,24 +29,10 @@ const bool DOUBLE_FLAG = true;
 //
 //const std::string trajectory_path = "C:\\repo\\C\\temp\\adjacent\\10_single_upper.log";
 //const std::string trajectory_path = "D:\\datasets\\uav_path\\SyntheticProxyAndTrajectory\\NY-1\\Trajectory\\oblique-opti-ny-spline.utj";
-const std::string trajectory_path = "D:\\SIG21\\ablation\\2_2\\ny\\288_5_20_10_10_-1.log";
+const std::string trajectory_path = "D:\\SIG21\\ablation\\2_2\\ny\\436_3.3_20_10_10_-1.log";
 const std::string sample_points_path = "D:\\SIG21\\ablation\\2_2\\ny\\ny_points.ply";
 //
 
-
-float evaluate_length(const std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> v_trajectory)
-{
-	float total_length=0;
-	if (v_trajectory.size() < 2)
-		return 0;
-	for(int idx=0;idx< v_trajectory.size()-1;++idx)
-	{
-		total_length += (v_trajectory[idx+1].first - v_trajectory[idx].first).norm();
-		idx++;
-	}
-
-	return total_length;
-}
 
 int main(int argc, char** argv){
 	// Read arguments
