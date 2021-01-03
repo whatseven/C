@@ -203,67 +203,22 @@ int main(int argc, char** argv){
 		}
 		else
 		{
-			for (int id_building = 0; id_building < buildings.size(); ++id_building) {
-				float xmin = buildings[id_building].bounding_box_3d.min().x();
-				float ymin = buildings[id_building].bounding_box_3d.min().y();
-				float zmin = buildings[id_building].bounding_box_3d.min().z();
-				float xmax = buildings[id_building].bounding_box_3d.max().x();
-				float ymax = buildings[id_building].bounding_box_3d.max().y();
-				float zmax = buildings[id_building].bounding_box_3d.max().z();
-				for(int i_pass=0;i_pass<2;++i_pass)
-				{
-					Eigen::Vector3f cur_pos(xmin - params.view_distance, ymin - params.view_distance, zmax + Z_UP_BOUNDS);
-					Eigen::Vector3f focus_point;
-					if (i_pass == 0)
-					{
-						focus_point= Eigen::Vector3f(
-							(xmin + xmax) / 2,
-							(ymin + ymax) / 2,
-							(zmin + zmax) / 2
-						);
-					}
-					else if (i_pass == 1)
-					{
-						cur_pos.z() /= 2;
-						focus_point=Eigen::Vector3f(
-							(xmin + xmax) / 2,
-							(ymin + ymax) / 2,
-							(zmin + zmax) / 5
-						);
-					}
-					while (cur_pos.x() <= xmax + params.view_distance) {
-						trajectory.push_back(std::make_pair(
-							cur_pos, focus_point
-						));
-						cur_pos[0] += params.step;
-					}
-					while (cur_pos.y() <= ymax + params.view_distance) {
-						trajectory.push_back(std::make_pair(
-							cur_pos, focus_point
-						));
-						cur_pos[1] += params.step;
-					}
-					while (cur_pos.x() >= xmin - params.view_distance) {
-						trajectory.push_back(std::make_pair(
-							cur_pos, focus_point
-						));
-						cur_pos[0] -= params.step;
-					}
-					while (cur_pos.y() >= ymin - params.view_distance) {
-						trajectory.push_back(std::make_pair(
-							cur_pos, focus_point
-						));
-						cur_pos[1] -= params.step;
-					}
-					if (!double_flag)
-						break;
-				}
-			}
+			trajectory = generate_trajectory(params, buildings);
 		}
 	}
 	LOG(INFO) << "New trajectory ( "<< trajectory .size()<<" view) GENERATED!";
 	LOG(INFO) << "Length: "<< evaluate_length(trajectory);
 	LOG(INFO) << "Total building: "<< buildings.size();
+
+	// Connect trajectories
+	// 
+	{
+		bool is_shortest = true;
+		if(is_shortest)
+		{
+			
+		}
+	}
 
 	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> safe_trajectory = ensure_safe_trajectory(trajectory, height_map, HEIGHT_COMPENSATE, Z_UP_BOUNDS);
 	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> interpolated_trajectory = interpolate_path(trajectory);

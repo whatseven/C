@@ -99,11 +99,7 @@ public:
             pangolin::glDrawAxis(1000);
             // Render
             lock();
-            draw_cube(Eigen::AlignedBox3f(m_pos - Eigen::Vector3f(2.f, 2.f, 2.f), m_pos + Eigen::Vector3f(2.f, 2.f, 2.f)),
-                Eigen::Vector4f(1.f, 0.f, 0.f, 1.f));
-            Eigen::Vector3f look_at = m_pos + m_direction*10;
-        	pangolin::glDrawLine(m_pos[0], m_pos[1], m_pos[2], look_at[0], look_at[1], look_at[2]);
-
+    
         	//Building
         	for (const auto& item_building : m_buildings)
             {
@@ -129,25 +125,24 @@ public:
                         m_trajectories_spline[i_iter-1].first[0], m_trajectories_spline[i_iter - 1].first[1], m_trajectories_spline[i_iter - 1].first[2]);
                 i_iter += 1;
             }
-        	if(m_points.size()>0)
-        	{
-                for (const auto& id_point : m_points)
-                {
-                    Eigen::Vector4f color(1.f, 1.f, 1.f, 1.f);
-                    if (m_points_color.size() > 0)
-                        color = m_points_color[&id_point - &*m_points.begin()];
-                    Point_3& p = m_points.point(id_point);
-                    float radius = 0.1f;
-                    draw_cube(Eigen::AlignedBox3f(Eigen::Vector3f(p.x()- radius, p.y()- radius, p.z()- radius), 
-                        Eigen::Vector3f(p.x() + radius, p.y() + radius, p.z() + radius)), color);
-                }
-        	}
-            if (m_boxes.size() > 0) {
-                for (const auto& item_box : m_boxes) {
-                    Eigen::Vector4f color(1.f, 0.f, 0.f, 0.f);
-                    draw_cube(item_box,color);
-                }
+            for (const auto& id_point : m_points)
+            {
+                Eigen::Vector4f color(1.f, 1.f, 1.f, 1.f);
+                if (m_points_color.size() > 0)
+                    color = m_points_color[&id_point - &*m_points.begin()];
+                Point_3& p = m_points.point(id_point);
+                float radius = 0.1f;
+                draw_cube(Eigen::AlignedBox3f(Eigen::Vector3f(p.x()- radius, p.y()- radius, p.z()- radius), 
+                    Eigen::Vector3f(p.x() + radius, p.y() + radius, p.z() + radius)), color);
             }
+            for (const auto& item_box : m_boxes) {
+                Eigen::Vector4f color(1.f, 0.f, 0.f, 0.f);
+                draw_cube(item_box,color);
+            }
+            draw_cube(Eigen::AlignedBox3f(m_pos - Eigen::Vector3f(2.f, 2.f, 2.f), m_pos + Eigen::Vector3f(2.f, 2.f, 2.f)),
+                Eigen::Vector4f(1.f, 0.f, 0.f, 1.f));
+            Eigen::Vector3f look_at = m_pos + m_direction * 10;
+            pangolin::glDrawLine(m_pos[0], m_pos[1], m_pos[2], look_at[0], look_at[1], look_at[2]);
             unlock();
 
             // Swap frames and Process Events

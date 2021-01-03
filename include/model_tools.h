@@ -66,6 +66,7 @@ void split_obj(const std::string& file_dir, const std::string& file_name, const 
 void rename_material(const std::string& file_dir, const std::string& file_name, const std::string& v_output_dir);
 
 class Height_map {
+	
 public:
     Height_map(const Point_set& v_point_cloud, const float v_resolution) :m_resolution(v_resolution) {
         Eigen::AlignedBox3f bounds = get_bounding_box(v_point_cloud);
@@ -83,7 +84,7 @@ public:
             if (cur_height < point.z())
                 m_map.at<float>((int)((point.y() - m_start[1]) / m_resolution), (int)((point.x() - m_start[0]) / m_resolution)) = point.z();
         }
-        cv::dilate(m_map, m_map_dilated, cv::getStructuringElement(CV_SHAPE_RECT, cv::Size(3, 3)), cv::Point(-1, -1), 3);
+        cv::dilate(m_map, m_map_dilated, cv::getStructuringElement(CV_SHAPE_RECT, cv::Size(5, 5)), cv::Point(-1, -1), 3);
     }
 
     Height_map(const Eigen::Vector3f& v_min, const Eigen::Vector3f& v_max, const float v_resolution)
@@ -122,6 +123,7 @@ public:
     {
         //std::cout << m_map.rows() << "," << m_map.cols() << std::endl;
         cv::Mat map(m_map.rows, m_map.cols, CV_8UC3);
+        map.setTo(cv::Scalar(0, 0, 0));
         for (int y = 0; y < m_map.rows; ++y)
             for (int x = 0; x < m_map.cols; ++x)
                 if (m_map.at<float>(y, x) > v_threshold)

@@ -28,8 +28,10 @@ const bool DOUBLE_FLAG = true;
 
 //
 //const std::string trajectory_path = "C:\\repo\\C\\temp\\adjacent\\10_single_upper.log";
-//const std::string trajectory_path = "D:\\datasets\\uav_path\\SyntheticProxyAndTrajectory\\NY-1\\Trajectory\\oblique-opti-ny-spline.utj";
-const std::string trajectory_path = "D:\\SIG21\\ablation\\2_2\\ny\\436_3.3_20_10_10_-1.log";
+//const std::string trajectory_path = "D:\\datasets\\uav_path\\SyntheticProxyAndTrajectory\\UK-1\\Trajectory\\oblique-opti-uk-spline.utj";
+//const std::string trajectory_path = "D:\\SIG21\\ablation\\2_2\\ny\\ny_box_distance_5_up_5_nonsplit_nondialate_x2_400\\camera_normal.log";
+const std::string trajectory_path = "D:\\SIG21\\ablation\\2_2\\uk\\uk_box_distance_10_nonsplit_x2_494\\camera_normal.log";
+//const std::string trajectory_path = "D:\\SIG21\\ablation\\2_2\\ny\\436_3.3_20_10_10_-1.log";
 const std::string sample_points_path = "D:\\SIG21\\ablation\\2_2\\ny\\ny_points.ply";
 //
 
