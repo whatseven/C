@@ -42,7 +42,8 @@ Get split mesh with a big whole mesh
 */
 void merge_obj(const std::string& v_file,
     const std::vector<tinyobj::attrib_t>& v_attribs, const std::vector<tinyobj::shape_t>& saved_shapes,
-    const std::vector<tinyobj::_material_t>& materials);
+    const std::vector<tinyobj::_material_t>& materials,
+    const int start_id = 0);
 
 // @brief: Split the whole obj into small object and store them separatly. 
 //         Each Object is store separatly and normalize near origin. The transformation is also stored in the txt
@@ -53,7 +54,7 @@ void merge_obj(const std::string& v_file,
 //          OBJ file name
 //          Resolution indicates the resolution of the height map. (How far will the two building is considered to be one component)
 // @ret:
-void split_obj(const std::string& file_dir, const std::string& file_name, const float resolution, const float v_filter_height=-99999);
+void split_obj(const std::string& file_dir, const std::string& file_name, const float resolution, const float v_filter_height=-99999, const int obj_max_builidng_num = -1);
 
 // @brief: Rename the material and image name
 //         Unreal can not cope with complicate image name
@@ -64,6 +65,14 @@ void split_obj(const std::string& file_dir, const std::string& file_name, const 
 //          Output directory
 // @ret:
 void rename_material(const std::string& file_dir, const std::string& file_name, const std::string& v_output_dir);
+
+// @brief: Get mesh bounds to determine drone position
+// @notice: 
+// @param: 
+//          Model path 
+//          Safe bounds to determine z range
+// @ret:
+std::vector<float> get_bounds(std::string path, float v_bounds);
 
 class Height_map {
 	
