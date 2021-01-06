@@ -1,6 +1,6 @@
 build
 temp
-CMakeLists.txt
+./CMakeLists.txt
 
 # Prerequisites
 *.d

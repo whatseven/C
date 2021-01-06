@@ -326,16 +326,15 @@ float evaluate_length(const std::vector<std::pair<Eigen::Vector3f, Eigen::Vector
 	return total_length;
 }
 
-std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> ensure_safe_trajectory(
+std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> ensure_safe_trajectory_and_calculate_direction(
 	const std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>>& v_trajectory,
-	const Height_map& v_height_map,const float HEIGHT_COMPENSATE,const float Z_UP_BOUNDS)
+	const Height_map& v_height_map,const float Z_UP_BOUNDS)
 {
 	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> safe_trajectory;
 	for (auto item : v_trajectory) {
 		while (v_height_map.get_height(item.first.x(), item.first.y()) + Z_UP_BOUNDS > item.first.z()) {
 			item.first[2] += 5;
 		}
-		item.second.z() -= HEIGHT_COMPENSATE;
 		item.second = (item.second - item.first);
 		if (item.second.z() > 0)
 			item.second.z() = 0;
@@ -420,7 +419,7 @@ bool generate_next_view_curvature(const Trajectory_params& v_params,
 }
 
 std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(const Trajectory_params& v_params,
-	std::vector<Building>& v_buildings)
+	std::vector<Building>& v_buildings, const Height_map& v_height_map,const float v_z_up_bound)
 {
 	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> total_trajectory;
 
@@ -478,73 +477,9 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 			if (!v_params.double_flag)
 				break;
 		}
+		item_trajectory = ensure_safe_trajectory_and_calculate_direction(item_trajectory, v_height_map, v_z_up_bound);
 		v_buildings[id_building].trajectory = item_trajectory;
 		total_trajectory.insert(total_trajectory.end(), item_trajectory.begin(), item_trajectory.end());
 	}
 	return total_trajectory;
-}
-
-Next_target find_next_target(const Pos_Pack& v_cur_pos,const std::vector<Building>& v_buildings, Connect_information& v_connect_information)
-{
-	// Find next target (building or place) with higher confidence
-	std::vector<Next_target> untraveled_buildings;
-	{
-		// Find with distance
-		for (int i_building = 0; i_building < v_buildings.size(); ++i_building){
-			if (v_buildings[i_building].passed_trajectory.size() == 0)
-				untraveled_buildings.emplace_back(i_building,-1);
-		}
-		for (int i_point=0;i_point<v_connect_information.sample_points.size();++i_point)
-			if (!v_connect_information.is_point_traveled[i_point])
-				untraveled_buildings.emplace_back(-1, i_point);
-		
-		std::nth_element(untraveled_buildings.begin(), 
-			untraveled_buildings.begin() + std::min(5, (int)untraveled_buildings.size()),
-			untraveled_buildings.end(),
-			[&v_cur_pos,&v_buildings,&v_connect_information](const Next_target& b1, const Next_target& b2)
-			{
-			float distance1, distance2;
-			if (b1.origin_index_in_building_vector != -1)
-				distance1 = (v_buildings[b1.origin_index_in_building_vector].bounding_box_3d.center() - v_cur_pos.pos_mesh).norm();
-			else
-				distance1 = (Eigen::Vector2f(v_cur_pos.pos_mesh.x(), v_cur_pos.pos_mesh.y()) - Eigen::Vector2f(v_connect_information.sample_points[b1.origin_index_in_untraveled_pointset].x(), v_connect_information.sample_points[b1.origin_index_in_untraveled_pointset].y())).norm();
-			if (b2.origin_index_in_building_vector != -1)
-				distance2 = (v_buildings[b2.origin_index_in_building_vector].bounding_box_3d.center() - v_cur_pos.pos_mesh).norm();
-			else
-				distance2 = (Eigen::Vector2f(v_cur_pos.pos_mesh.x(), v_cur_pos.pos_mesh.y()) - Eigen::Vector2f(v_connect_information.sample_points[b2.origin_index_in_untraveled_pointset].x(), v_connect_information.sample_points[b2.origin_index_in_untraveled_pointset].y())).norm();
-
-			return  distance1 < distance2;
-			});
-	}
-	if (untraveled_buildings.size() == 0)
-		return Next_target(-1, -1);
-	// Find next building with higher information gain
-	std::vector<float> information_gain(untraveled_buildings.size(), 0.f);
-	{
-		for(int i_building=0;i_building < untraveled_buildings.size();++i_building)
-		{
-			if (untraveled_buildings[i_building].origin_index_in_building_vector == -1)
-			{
-				information_gain[i_building] = 1;
-				continue;
-			}
-			for(int i_point=0;i_point < v_connect_information.is_point_traveled.size();i_point++)
-			{
-				if (v_connect_information.is_point_traveled[i_point])
-					continue;
-				const auto& original_bounding_box_3d = v_buildings[untraveled_buildings[i_building].origin_index_in_building_vector].bounding_box_3d;
-				const CGAL::Bbox_2 box(
-					original_bounding_box_3d.min().x() - v_connect_information.DISTANCE_THRESHOLD, original_bounding_box_3d.min().y() - v_connect_information.DISTANCE_THRESHOLD,
-					original_bounding_box_3d.max().x() + v_connect_information.DISTANCE_THRESHOLD, original_bounding_box_3d.max().y() + v_connect_information.DISTANCE_THRESHOLD
-				);
-				{
-					const CGAL::Point_2<K>& p = v_connect_information.sample_points[i_point];
-					if (p.x() > box.xmin() && p.x() < box.xmax() && p.y() > box.ymin() && p.y() > box.ymin())
-						information_gain[i_building] += 1;
-				}
-				
-			}
-		}
-	}
-	return untraveled_buildings[std::max_element(information_gain.begin(), information_gain.end()) - information_gain.begin()];
 }

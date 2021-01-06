@@ -7,7 +7,13 @@
 #include <eigen3/Eigen/Core>
 
 #include "cgal_tools.h"
+#include "CGAL/Polygon_2.h"
 
+struct Proxy
+{
+    float height;
+    CGAL::Polygon_2<K> polygon;
+};
 
 /*
 Some useful function
@@ -18,6 +24,14 @@ Some useful function
 // @param: File path; mtl file directory
 // @ret: `attrib_t, shape_t, material_t`
 std::tuple<tinyobj::attrib_t, std::vector<tinyobj::shape_t>, std::vector<tinyobj::material_t>> load_obj(const std::string& v_mesh_name,bool v_log=true, const std::string& v_mtl_dir = "./");
+
+// @brief: Get polygon represented by footprint
+// @notice: Footprint format:
+// height
+// "1th vertex x" "1th vertex y" "2th vertex x" "2th vertex y" ...
+// @param: File path
+// @ret: Proxy
+Proxy load_footprint(const std::string& v_footprint_path);
 
 // @brief: Store mesh into obj file
 // @notice: Every shape in the vector will have a group name
@@ -55,6 +69,8 @@ void merge_obj(const std::string& v_file,
 //          Resolution indicates the resolution of the height map. (How far will the two building is considered to be one component)
 // @ret:
 void split_obj(const std::string& file_dir, const std::string& file_name, const float resolution, const float v_filter_height=-99999, const int obj_max_builidng_num = -1);
+
+std::vector<tinyobj::shape_t> split_obj_according_to_footprint(const tinyobj::attrib_t& v_attribs, const std::vector<tinyobj::shape_t>& v_shapes, const std::vector<Proxy>& v_proxys, const float v_squared_threshold);
 
 // @brief: Rename the material and image name
 //         Unreal can not cope with complicate image name

@@ -1,15 +1,12 @@
 #include "model_tools.h"
 #include <boost/format.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/algorithm/string.hpp>
 
 /*
 Some useful function
 */
 
-// @brief: Get vertex, faces, normals, texcoords, textures from obj file. TinyobjLoader store the vertex, normals, texcoords in the `attrib_t`. Index to vertex for every face is stored in `shapt_t`.
-// @notice:
-// @param: File path; mtl file directory
-// @ret: `attrib_t, shape_t, material_t`
 std::tuple<tinyobj::attrib_t, std::vector<tinyobj::shape_t>, std::vector<tinyobj::material_t>> load_obj(
 	const std::string& v_mesh_name, bool v_log, const std::string& v_mtl_dir)
 {
@@ -43,10 +40,40 @@ std::tuple<tinyobj::attrib_t, std::vector<tinyobj::shape_t>, std::vector<tinyobj
 		int num_face = 0;
 		for (const auto& shape : shapes)
 			num_face += shape.mesh.indices.size() / 3;
-		std::cout << "Read with " << attrib.vertices.size() << " vertices," << attrib.normals.size() << " normals," <<
+		std::cout << "Read with " << attrib.vertices.size() / 3 << " vertices," << attrib.normals.size() / 3 << " normals," <<
 			num_face << " faces" << std::endl;
 	}
 	return {attrib, shapes, materials};
+}
+
+Proxy load_footprint(const std::string& v_footprint_path)
+{
+	std::ifstream file_in(v_footprint_path);
+	if (!file_in.is_open()) {
+		std::cout << "No such file " << v_footprint_path << std::endl;
+		return Proxy();
+	}
+	Proxy proxy;
+	std::string line;
+	std::getline(file_in, line);
+	std::vector<std::string> tokens;
+	boost::split(tokens, line, boost::is_any_of(" "));
+	proxy.height = std::atof(tokens[1].c_str());
+	std::getline(file_in, line);
+
+	tokens.clear();
+	boost::split(tokens, line, boost::is_any_of(" "));
+	for (int i = 0; i < tokens.size(); i += 2)
+	{
+		if(tokens[i]=="")
+			break;
+		float x = std::atof(tokens[i].c_str());
+		float y = std::atof(tokens[i+1].c_str());
+		proxy.polygon.push_back(CGAL::Point_2<K>(x, y));
+	}
+	
+	file_in.close();
+	return proxy;
 }
 
 bool WriteMat(const std::string& filename, const std::vector<tinyobj::material_t>& materials)
@@ -86,10 +113,6 @@ bool WriteMat(const std::string& filename, const std::vector<tinyobj::material_t
 	return true;
 }
 
-// @brief: Store mesh into obj file
-// @notice: Every shape in the vector will have a group name
-// @param: File path; attrib_t; shape_t; material_t;
-// @ret: 
 bool write_obj(const std::string& filename, const tinyobj::attrib_t& attributes,
                const std::vector<tinyobj::shape_t>& shapes, const std::vector<tinyobj::material_t>& materials)
 {
@@ -212,13 +235,14 @@ bool write_obj(const std::string& filename, const tinyobj::attrib_t& attributes,
 	bool ret = WriteMat(material_filename, materials);
 
 	fclose(fp);
+	int num_face = 0;
+	for (const auto& shape : shapes)
+		num_face += shape.mesh.indices.size() / 3;
+	std::cout << "Write with " << attributes.vertices.size() / 3 << " vertices," << attributes.normals.size() / 3 << " normals," <<
+		num_face << " faces" << std::endl;
 	return 1;
 }
 
-// @brief: Meshlab save obj file with an overiding material name. e.g. material_0, material_1... This function change the original mtl file into the meshlab style material name
-// @notice: 
-// @param: mtl file path
-// @ret: 
 void fix_mtl_from_unreal(const std::string& filename)
 {
 	std::ifstream f_in(filename);
@@ -254,11 +278,6 @@ void fix_mtl_from_unreal(const std::string& filename)
 	f_out.close();
 }
 
-
-// @brief: Clean duplicated face and vertex
-// @notice: Currently implementation is only support shape with normals and texcoods!
-// @param: attrib_t, shape_t
-// @ret: 
 void clean_vertex(tinyobj::attrib_t& attrib, tinyobj::shape_t& shape)
 {
 	// Find out used vertex, mark true
@@ -487,15 +506,6 @@ void merge_obj(const std::string& v_file,
 	bool ret = WriteMat(material_filename, materials);
 }
 
-// @brief: Split the whole obj into small object and store them separatly. 
-//         Each Object is store separatly and normalize near origin. The transformation is also stored in the txt
-//         We also get a whole obj with "g" attribute to indicate each component. This obj can be imported into unreal with separate actor
-// @notice: Be careful about the material file, you may adjust them manually
-// @param: 
-//          Directory that contains the obj file. The splited obj will also be stored in this directory
-//          OBJ file name
-//          Resolution indicates the resolution of the height map. (How far will the two building is considered to be one component)
-// @ret: 
 void split_obj(const std::string& file_dir, const std::string& file_name, const float resolution,const float v_filter_height, const int obj_max_builidng_num)
 {
 	std::cout << "----------Start split obj----------" << std::endl;
@@ -797,6 +807,68 @@ void rename_material(const std::string& file_dir, const std::string& file_name, 
 	std::cout << "----------Rename material done----------" << std::endl << std::endl;
 
 	return;
+}
+
+std::vector<tinyobj::shape_t> split_obj_according_to_footprint(const tinyobj::attrib_t& v_attribs, const std::vector<tinyobj::shape_t>& v_shapes, const std::vector<Proxy>& v_proxys,const float v_squared_threshold)
+{
+	std::vector<tinyobj::shape_t> out_shapes(v_proxys.size());
+	tinyobj::shape_t ground_shape;
+
+	for (int i_shape = 0; i_shape < v_shapes.size(); ++i_shape)
+	{
+		const tinyobj::mesh_t& shape = v_shapes[i_shape].mesh;
+		size_t num_faces = shape.num_face_vertices.size();
+		for (size_t face_id = 0; face_id < num_faces; face_id++) {
+			size_t index_offset = 3 * face_id;
+
+			tinyobj::index_t idx0 = shape.indices[index_offset + 0];
+			tinyobj::index_t idx1 = shape.indices[index_offset + 1];
+			tinyobj::index_t idx2 = shape.indices[index_offset + 2];
+			CGAL::Point_2<K> point1(v_attribs.vertices[3 * idx0.vertex_index + 0], v_attribs.vertices[3 * idx0.vertex_index + 1]);
+			CGAL::Point_2<K> point2(v_attribs.vertices[3 * idx1.vertex_index + 0], v_attribs.vertices[3 * idx1.vertex_index + 1]);
+			CGAL::Point_2<K> point3(v_attribs.vertices[3 * idx2.vertex_index + 0], v_attribs.vertices[3 * idx2.vertex_index + 1]);
+
+			int preserved = -1;
+			bool close_to_boundary = -1;
+			for (int i_proxy = 0; i_proxy < v_proxys.size(); i_proxy++) {
+				const Proxy& proxy = v_proxys[i_proxy];
+				for (auto iter_edge = proxy.polygon.edges_begin(); iter_edge != proxy.polygon.edges_end(); ++iter_edge)
+				{
+					if (CGAL::squared_distance(point1, (*iter_edge)) < v_squared_threshold ||
+						CGAL::squared_distance(point2, (*iter_edge)) < v_squared_threshold ||
+						CGAL::squared_distance(point3, (*iter_edge)) < v_squared_threshold) {
+						close_to_boundary = i_proxy;
+						break;
+					}
+				}
+				
+				if(proxy.polygon.bounded_side(point1) == CGAL::Bounded_side::ON_BOUNDED_SIDE||
+					proxy.polygon.bounded_side(point2) == CGAL::Bounded_side::ON_BOUNDED_SIDE||
+					proxy.polygon.bounded_side(point3) == CGAL::Bounded_side::ON_BOUNDED_SIDE)
+				{
+					preserved = i_proxy;
+					break;
+				}
+			}
+
+			tinyobj::mesh_t* mesh;
+
+			if (preserved!=-1) 
+				mesh = &out_shapes[preserved].mesh;
+			//else if(close_to_boundary!=-1)
+			//	mesh = &out_shapes[close_to_boundary].mesh;
+			else
+				mesh = &ground_shape.mesh;
+			mesh->material_ids.push_back(shape.material_ids[face_id]);
+			mesh->num_face_vertices.push_back(shape.num_face_vertices[face_id]);
+			mesh->indices.push_back(shape.indices[3 * face_id + 0]);
+			mesh->indices.push_back(shape.indices[3 * face_id + 1]);
+			mesh->indices.push_back(shape.indices[3 * face_id + 2]);
+		}
+	}
+	out_shapes.push_back(ground_shape);
+
+	return out_shapes;
 }
 
 /*

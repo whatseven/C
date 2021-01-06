@@ -24,7 +24,7 @@ public:
     std::thread* m_thread;
     std::mutex m_mutex;
     std::vector<Building> m_buildings;
-    std::vector<Eigen::AlignedBox3f> m_boxes;
+    Eigen::AlignedBox3f m_current_boxes;
     std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> m_trajectories;
     std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> m_trajectories_spline;
     Eigen::Vector3f m_pos;
@@ -40,6 +40,13 @@ public:
         return;
 	}
 
+    void draw_line(const Eigen::Vector3f& v_min, const Eigen::Vector3f& v_max, int sickness=1,const Eigen::Vector4f& v_color = Eigen::Vector4f(1.f, 0.f, 0.f, 1.f))
+	{
+        glLineWidth(sickness);
+        glColor3f(v_color.x(), v_color.y(), v_color.z());
+        pangolin::glDrawLine(v_min.x(), v_min.y(), v_min.z(), v_max.x(), v_max.y(), v_max.z());
+	}
+	
 	void draw_cube(const Eigen::AlignedBox<float, 3>& box,const Eigen::Vector4f& v_color=Eigen::Vector4f(1.f,0.f,0.f,1.f))
 	{
         const Eigen::Matrix<float, 3, 1> l = box.min().template cast<float>();
@@ -69,16 +76,24 @@ public:
         glDrawArrays(GL_TRIANGLE_STRIP, 20, 4);
 
         glDisableClientState(GL_VERTEX_ARRAY);
-	}
+
+        draw_line(Eigen::Vector3f(l[0], l[1], l[2]), Eigen::Vector3f(l[0],l[1],h[2]),2,Eigen::Vector4f(0,0,0,1));
+        draw_line(Eigen::Vector3f(l[0], l[1], l[2]), Eigen::Vector3f(l[0],h[1],l[2]), 2, Eigen::Vector4f(0, 0, 0, 1));
+        draw_line(Eigen::Vector3f(l[0], l[1], l[2]), Eigen::Vector3f(h[0],l[1],l[2]), 2, Eigen::Vector4f(0, 0, 0, 1));
+        draw_line(Eigen::Vector3f(l[0], h[1], l[2]), Eigen::Vector3f(h[0],h[1],l[2]), 2, Eigen::Vector4f(0, 0, 0, 1));
+        draw_line(Eigen::Vector3f(l[0], h[1], l[2]), Eigen::Vector3f(l[0],h[1],h[2]), 2, Eigen::Vector4f(0, 0, 0, 1));
+        draw_line(Eigen::Vector3f(l[0], h[1], h[2]), Eigen::Vector3f(h[0],h[1],h[2]), 2, Eigen::Vector4f(0, 0, 0, 1));
+        draw_line(Eigen::Vector3f(l[0], h[1], h[2]), Eigen::Vector3f(l[0],l[1],h[2]), 2, Eigen::Vector4f(0, 0, 0, 1));
+        draw_line(Eigen::Vector3f(h[0], l[1], l[2]), Eigen::Vector3f(h[0], h[1], l[2]), 2, Eigen::Vector4f(0, 0, 0, 1));
+        draw_line(Eigen::Vector3f(h[0], l[1], l[2]), Eigen::Vector3f(h[0], l[1], h[2]), 2, Eigen::Vector4f(0, 0, 0, 1));
+        draw_line(Eigen::Vector3f(h[0], h[1], h[2]), Eigen::Vector3f(h[0], l[1], h[2]), 2, Eigen::Vector4f(0, 0, 0, 1));
+        draw_line(Eigen::Vector3f(h[0], h[1], h[2]), Eigen::Vector3f(h[0], h[1], l[2]), 2, Eigen::Vector4f(0, 0, 0, 1));
+        draw_line(Eigen::Vector3f(l[0], l[1], h[2]), Eigen::Vector3f(h[0], l[1], h[2]), 2, Eigen::Vector4f(0, 0, 0, 1));
+    }
 
     void run() {
-        // fetch the context and bind it to this thread
         pangolin::CreateWindowAndBind("Main", 1000, 800);
-
-        // we manually need to restore the properties of the context
         glEnable(GL_DEPTH_TEST);
-
-        // Define Projection and initial ModelView matrix
         pangolin::OpenGlRenderState s_cam(
             pangolin::ProjectionMatrix(640, 480, 420, 420, 320, 240, 0.1, 99999),
             pangolin::ModelViewLookAt(40, 40, 40, 0, 0, 0, pangolin::AxisZ)
@@ -91,7 +106,6 @@ public:
             .SetHandler(&handler);
 
         while (!pangolin::ShouldQuit()) {
-            // Clear screen and activate view to render into
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
             glClearColor(0.75f, 0.75f, 0.75f, 1);
             d_cam.Activate(s_cam);
@@ -111,7 +125,7 @@ public:
                 draw_cube(Eigen::AlignedBox3f(item_trajectory.first - Eigen::Vector3f(1.f, 1.f, 1.f), item_trajectory.first + Eigen::Vector3f(1.f, 1.f, 1.f)),
                     Eigen::Vector4f(0.f, 1.f, 0.f, 1.f));
                 Eigen::Vector3f look_at = item_trajectory.first + item_trajectory.second * 10;
-                pangolin::glDrawLine(item_trajectory.first[0], item_trajectory.first[1], item_trajectory.first[2], look_at[0], look_at[1], look_at[2]);
+                draw_line(item_trajectory.first, look_at,2,Eigen::Vector4f(0,1,0,1));
             }
         	//View spline
             int i_iter = 0;
@@ -125,6 +139,7 @@ public:
                         m_trajectories_spline[i_iter-1].first[0], m_trajectories_spline[i_iter - 1].first[1], m_trajectories_spline[i_iter - 1].first[2]);
                 i_iter += 1;
             }
+        	// View points
             for (const auto& id_point : m_points)
             {
                 Eigen::Vector4f color(1.f, 1.f, 1.f, 1.f);
@@ -135,14 +150,14 @@ public:
                 draw_cube(Eigen::AlignedBox3f(Eigen::Vector3f(p.x()- radius, p.y()- radius, p.z()- radius), 
                     Eigen::Vector3f(p.x() + radius, p.y() + radius, p.z() + radius)), color);
             }
-            for (const auto& item_box : m_boxes) {
-                Eigen::Vector4f color(1.f, 0.f, 0.f, 0.f);
-                draw_cube(item_box,color);
-            }
+            // Current building
+        	draw_cube(m_current_boxes, Eigen::Vector4f(1.f, 0.f, 0.f, 0.f));
+        	// Current Position and orientation
             draw_cube(Eigen::AlignedBox3f(m_pos - Eigen::Vector3f(2.f, 2.f, 2.f), m_pos + Eigen::Vector3f(2.f, 2.f, 2.f)),
                 Eigen::Vector4f(1.f, 0.f, 0.f, 1.f));
             Eigen::Vector3f look_at = m_pos + m_direction * 10;
-            pangolin::glDrawLine(m_pos[0], m_pos[1], m_pos[2], look_at[0], look_at[1], look_at[2]);
+            draw_line(m_pos, look_at, 2, Eigen::Vector4f(0, 1, 0, 1));
+
             unlock();
 
             // Swap frames and Process Events

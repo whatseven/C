@@ -10,6 +10,7 @@ struct Pos_Pack
 {
 	Eigen::Vector3f pos_mesh;
 	Eigen::Vector3f pos_airsim;
+	Eigen::Vector3f direction;
 	Eigen::Isometry3f camera_matrix;
 
 	float yaw, pitch;
@@ -42,4 +43,6 @@ public:
     Eigen::Vector3f convert_yaw_pitch_to_direction_vector(const float yaw, const float pitch);
 
     Pos_Pack get_pos_pack_from_unreal(const Eigen::Vector3f& v_pos_unreal, float yaw, float pitch);
+    Pos_Pack get_pos_pack_from_mesh(const Eigen::Vector3f& v_pos_mesh, float v_mesh_yaw, float v_mesh_pitch);
+
 };
