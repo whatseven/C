@@ -1,5 +1,5 @@
 cmake_minimum_required (VERSION 3.10)
-PROJECT(generate_trajectory_with_prior)
+PROJECT(convert_trajetory_format)
 
 FILE(GLOB SOURCE_FILE *.cpp *.h)
 find_package(Pangolin CONFIG REQUIRED)

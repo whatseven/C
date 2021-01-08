@@ -59,8 +59,8 @@ void write_smith_path(const std::vector<std::pair<Eigen::Vector3f, Eigen::Vector
 		float pitch = std::atan2f(direction[2], std::sqrtf(direction[0] * direction[0] + direction[1] * direction[1])) *
 			180. / M_PI;
 		float yaw = std::atan2f(direction[1], direction[0]) * 180. / M_PI;
-		yaw = -yaw + 90;
-		pose << (fmt % i % -position[0] % position[1] % position[2] % -pitch % yaw).str();
+		yaw = -yaw;
+		pose << (fmt % i % position[0] % -position[1] % position[2] % -pitch % yaw).str();
 	}
 
 	pose.close();
@@ -133,7 +133,7 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> simplify_path_reduce_wa
 			i1 += 1;
 		}
 	}
-	simplified_trajectory.push_back(v_trajectories.back());
+	//simplified_trajectory.push_back(v_trajectories.back());
 	return simplified_trajectory;
 }
 
@@ -352,6 +352,8 @@ struct Trajectory_params
 	float xy_angle;
 	bool double_flag;
 	float step;
+	bool with_continuous_height;
+	bool with_ray_test;
 };
 
 bool generate_next_view_curvature(const Trajectory_params& v_params,
@@ -418,6 +420,47 @@ bool generate_next_view_curvature(const Trajectory_params& v_params,
 	return true;
 }
 
+
+std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> find_short_cut(
+	const std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>>& v_trajectory,
+	const Height_map& v_height_map, const float Z_UP_BOUNDS)
+{
+	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> safe_trajectory;
+	for (auto item : v_trajectory) {
+		size_t id_item = &item-&v_trajectory[0];
+		Eigen::Vector3f safe_position = item.first;
+		while (v_height_map.get_height(item.first.x(), item.first.y()) + Z_UP_BOUNDS > safe_position.z()) {
+			safe_position.z() += 5;
+		}
+
+		if(safe_position.z() > 1 * item.first.z())
+		{
+			safe_position = item.first;
+			Eigen::Vector3f direction;
+			if(id_item < v_trajectory.size()-2)
+				direction= Eigen::Vector3f(v_trajectory[id_item + 1].first - v_trajectory[id_item].first).normalized();
+			else
+				direction = Eigen::Vector3f(v_trajectory[id_item ].first - v_trajectory[id_item-1].first).normalized();
+
+			if (std::abs(direction.dot(Eigen::Vector3f(1, 0, 0))) < std::abs(direction.dot(Eigen::Vector3f(0, 1, 0))))
+				direction = Eigen::Vector3f(0, 1, 0);
+			else
+				direction = Eigen::Vector3f(1, 0, 0);
+			while (v_height_map.get_height(safe_position.x(), safe_position.y()) + Z_UP_BOUNDS > safe_position.z()) {
+				safe_position += direction * 1;
+			}
+		}
+
+		item.first = safe_position;
+		item.second = (item.second - item.first);
+		if (item.second.z() > 0)
+			item.second.z() = 0;
+		item.second = item.second.normalized();
+		safe_trajectory.push_back(item);
+	}
+	return safe_trajectory;
+}
+
 std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(const Trajectory_params& v_params,
 	std::vector<Building>& v_buildings, const Height_map& v_height_map,const float v_z_up_bound)
 {
@@ -477,9 +520,32 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 			if (!v_params.double_flag)
 				break;
 		}
-		item_trajectory = ensure_safe_trajectory_and_calculate_direction(item_trajectory, v_height_map, v_z_up_bound);
+
+		if(v_params.with_continuous_height&& v_params.double_flag)
+		{
+			int num_one_pass = item_trajectory.size();
+			float height_delta = (zmax + v_params.z_up_bounds) / 2;
+			float height_step = height_delta / num_one_pass;
+			float height_max = zmax + v_params.z_up_bounds;
+
+			int id = 0;
+			for (auto& item : item_trajectory)
+				item.first.z() = height_max - id++ * height_step;
+		}
+
+		if(v_params.with_ray_test)
+			item_trajectory = find_short_cut(item_trajectory, v_height_map, v_z_up_bound);
+		else
+			item_trajectory = ensure_safe_trajectory_and_calculate_direction(item_trajectory, v_height_map, v_z_up_bound);
+
 		v_buildings[id_building].trajectory = item_trajectory;
 		total_trajectory.insert(total_trajectory.end(), item_trajectory.begin(), item_trajectory.end());
 	}
 	return total_trajectory;
+}
+
+std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> perform_ccpp(const cv::Mat& v_map, const Eigen::Vector3f& v_pos_mesh, const Eigen::Vector3f& v_target_center)
+{
+	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> trajectory;
+	return trajectory;
 }

@@ -24,9 +24,10 @@ public:
     std::thread* m_thread;
     std::mutex m_mutex;
     std::vector<Building> m_buildings;
-    Eigen::AlignedBox3f m_current_boxes;
+    int m_current_building;
     std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> m_trajectories;
     std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> m_trajectories_spline;
+    std::vector<std::pair<Eigen::Vector2f, Region_status>> m_uncertainty_map;
     Eigen::Vector3f m_pos;
     Eigen::Vector3f m_direction;
     Point_set m_points;
@@ -117,8 +118,13 @@ public:
         	//Building
         	for (const auto& item_building : m_buildings)
             {
-                draw_cube(item_building.bounding_box_3d,
-                    Eigen::Vector4f(1.f, 1.f, 1.f, 0.75f));
+                int index = &item_building - &m_buildings[0];
+                if(m_current_building== index)
+	                draw_cube(item_building.bounding_box_3d,
+	                    Eigen::Vector4f(1.f, 0.f, 0.f, 1.f));
+                else
+                    draw_cube(item_building.bounding_box_3d,
+                        Eigen::Vector4f(1.f, 1.f, 1.f, 1.f));
             }
         	//View points
             for (const auto& item_trajectory : m_trajectories) {
@@ -150,14 +156,29 @@ public:
                 draw_cube(Eigen::AlignedBox3f(Eigen::Vector3f(p.x()- radius, p.y()- radius, p.z()- radius), 
                     Eigen::Vector3f(p.x() + radius, p.y() + radius, p.z() + radius)), color);
             }
-            // Current building
-        	draw_cube(m_current_boxes, Eigen::Vector4f(1.f, 0.f, 0.f, 0.f));
         	// Current Position and orientation
             draw_cube(Eigen::AlignedBox3f(m_pos - Eigen::Vector3f(2.f, 2.f, 2.f), m_pos + Eigen::Vector3f(2.f, 2.f, 2.f)),
                 Eigen::Vector4f(1.f, 0.f, 0.f, 1.f));
             Eigen::Vector3f look_at = m_pos + m_direction * 10;
             draw_line(m_pos, look_at, 2, Eigen::Vector4f(0, 1, 0, 1));
+        	
+            // Uncertainty
+            for (const auto& item_tile : m_uncertainty_map) {
+                const Eigen::Vector2f& position= item_tile.first;
+                const Region_status& status = item_tile.second;
+                Eigen::Vector4f color;
+                if (status == Region_status::Occupied)
+                    color = Eigen::Vector4f(1, 0, 0, 1);
+            	else if (status == Region_status::Free)
+                    color = Eigen::Vector4f(0, 1, 0, 1);
+                else
+                    color = Eigen::Vector4f(0, 0, 0, 1);
 
+                draw_cube(Eigen::AlignedBox3f(Eigen::Vector3f(position.x() - 10, position.y() - 10, -1),
+                    Eigen::Vector3f(position.x() + 10, position.y() + 10, 1)), color);
+            }
+
+            
             unlock();
 
             // Swap frames and Process Events
