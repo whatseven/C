@@ -34,9 +34,9 @@ const bool DOUBLE_FLAG = true;
 
 //
 //const std::string trajectory_path = "C:\\repo\\C\\temp\\adjacent\\10_single_upper.log";
-const std::string trajectory_path = "D:\\SIG21\\Model\\1017_box\\camera_normal.log";
-const std::string sample_points_path = "D:\\SIG21\\Model\\yingrenshi_points_s.ply";
-const std::string mesh_path = "C:\\repo\\C\\temp\\adjacent\\5\\5_double.obj";
+const std::string trajectory_path = "D:\\SIG21_Local\\2_2_error_map\\asia18_bridge_565.txt";
+const std::string sample_points_path = "D:\\SIG21_Local\\2_2_error_map\\bridge_points.ply";
+const std::string mesh_path = "D:\\SIG21_Local\\2_2_error_map\\bridge_mesh.obj";
 //
 
 float evaluate_reconstructability(const std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> v_trajectory,
@@ -44,7 +44,8 @@ float evaluate_reconstructability(const std::vector<std::pair<Eigen::Vector3f, E
 	Point_set point_set;
 	Surface_mesh mesh=convert_obj_from_tinyobjloader_to_surface_mesh(load_obj(v_mesh_path));
 	CGAL::read_ply_point_set(std::ifstream(v_points_path), point_set);
-	//auto reconstructability = reconstructability_hueristic(v_trajectory, point_set, mesh);
+	std::vector<std::vector<bool>> point_view_visibility;
+	auto reconstructability = reconstructability_hueristic(v_trajectory, point_set, mesh, point_view_visibility);
 	//std::cout << "Max: " << *std::max_element(reconstructability.begin(), reconstructability.end()) << std::endl;
 	//std::cout << "Min: " << *std::min_element(reconstructability.begin(), reconstructability.end()) << std::endl;
 	return 0;
@@ -68,7 +69,7 @@ int main(int argc, char** argv){
 	CGAL::read_ply_point_set(std::ifstream(sample_points_path), points);
 
 	std::cout << "Total length: " << evaluate_length(trajectory) << std::endl;
-	//evaluate_reconstructability(trajectory, sample_points_path, mesh_path);
+	evaluate_reconstructability(trajectory, sample_points_path, mesh_path);
 
 	//Point_set point_set;
 	//Surface_mesh mesh = convert_obj_from_tinyobjloader_to_surface_mesh(load_obj(mesh_path));
@@ -106,7 +107,7 @@ int main(int argc, char** argv){
 		//		colors[i_point] = Eigen::Vector4f(1.f, 0.f, 0.f, 1.f);
 		
 		vizer.lock();
-		vizer.m_trajectories_spline = trajectory;
+		vizer.m_trajectories = trajectory;
 		vizer.m_points = points;
 		//vizer.m_points_color = colors;
 		vizer.m_pos = trajectory[0].first;

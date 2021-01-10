@@ -32,6 +32,7 @@ public:
     Eigen::Vector3f m_direction;
     Point_set m_points;
     std::vector<Eigen::Vector4f> m_points_color;
+    //CGAL::General_polygon_2<K> m_polygon;
 	
 	Visualizer()
 	{
@@ -95,22 +96,41 @@ public:
     void run() {
         pangolin::CreateWindowAndBind("Main", 1000, 800);
         glEnable(GL_DEPTH_TEST);
-        pangolin::OpenGlRenderState s_cam(
+        pangolin::OpenGlRenderState s_cam1(
             pangolin::ProjectionMatrix(640, 480, 420, 420, 320, 240, 0.1, 99999),
             pangolin::ModelViewLookAt(40, 40, 40, 0, 0, 0, pangolin::AxisZ)
         );
+		pangolin::OpenGlRenderState s_cam2(
+            pangolin::ProjectionMatrixOrthographic(-1000, 1000, -1000, 1000, 0.1, 99999),
+            pangolin::ModelViewLookAt(40, 40, 40, 0, 0, 0, pangolin::AxisZ)
+        );
+		
 
         // Create Interactive View in window
-        MyHandler handler(s_cam,pangolin::AxisZ);
-        pangolin::View& d_cam = pangolin::CreateDisplay()
+        MyHandler handler(s_cam1,pangolin::AxisZ);
+        pangolin::View& d_cam1 = pangolin::CreateDisplay()
             .SetBounds(0.0, 1.0, 0.0, 1.0, -640.0f / 480.0f)
             .SetHandler(&handler);
+        pangolin::View& d_cam2 = pangolin::CreateDisplay()
+            .SetBounds(0.0, 1.0, 0.0, 1.0, -640.0f / 480.0f);
 
+
+        pangolin::Display("multi")
+            .SetBounds(0.0, 1.0, 0.0, 1.0)
+            .SetLayout(pangolin::LayoutEqual)
+            .AddDisplay(d_cam1)
+            //.AddDisplay(d_cam2)
+		;
+
+		
         while (!pangolin::ShouldQuit()) {
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
             glClearColor(0.75f, 0.75f, 0.75f, 1);
-            d_cam.Activate(s_cam);
 
+            d_cam2.Activate(s_cam2);
+
+        	
+            d_cam1.Activate(s_cam1);
             pangolin::glDrawAxis(1000);
             // Render
             lock();

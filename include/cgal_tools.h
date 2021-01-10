@@ -7,6 +7,8 @@
 #include <CGAL/Triangle_3.h>
 #include <CGAL/Surface_mesh.h>
 #include <CGAL/Point_set_3.h>
+#include <CGAL/Polygon_2.h>
+
 
 #include <eigen3/Eigen/Dense>
 #include <eigen3/Eigen/Geometry>
@@ -14,10 +16,12 @@
 
 typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
 typedef CGAL::Triangle_3<K> Triangle_3;
+typedef CGAL::Point_2<K> Point_2;
 typedef CGAL::Point_3<K> Point_3;
 typedef CGAL::Direction_3<K> Direction_3;
 typedef CGAL::Vector_3<K> Vector_3;
 typedef CGAL::Surface_mesh<K::Point_3> Surface_mesh;
+typedef CGAL::Polygon_2<K> Polygon_2;
 typedef CGAL::Point_set_3<K::Point_3> Point_cloud;
 typedef CGAL::Point_set_3<Point_3> Point_set;
 

@@ -914,5 +914,19 @@ std::vector<float> get_bounds(std::string path, float v_bounds)
 	return output;
 }
 
+float point_box_distance_eigen(const Eigen::Vector2f& v_pos, const Eigen::AlignedBox2f& v_box) {
+	float sqDist = 0.0f;
+	float x = v_pos.x();
+	if (x < v_box.min().x()) sqDist += (v_box.min().x() - x) * (v_box.min().x() - x);
+	if (x > v_box.max().x()) sqDist += (x - v_box.max().x()) * (x - v_box.max().x());
 
+	float y = v_pos.y();
+	if (y < v_box.min().y()) sqDist += (v_box.min().y() - y) * (v_box.min().y() - y);
+	if (y > v_box.max().y()) sqDist += (y - v_box.max().y()) * (y - v_box.max().y());
+	return sqDist;
+}
+
+bool inside_box(const Eigen::Vector2f& v_pos, const Eigen::AlignedBox2f& v_box) {
+	return v_pos.x() >= v_box.min().x() && v_pos.x() <= v_box.max().x() && v_pos.y() >= v_box.min().y() && v_pos.y() <= v_box.max().y();
+}
 
