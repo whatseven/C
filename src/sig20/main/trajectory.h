@@ -59,8 +59,8 @@ void write_smith_path(const std::vector<std::pair<Eigen::Vector3f, Eigen::Vector
 		float pitch = std::atan2f(direction[2], std::sqrtf(direction[0] * direction[0] + direction[1] * direction[1])) *
 			180. / M_PI;
 		float yaw = std::atan2f(direction[1], direction[0]) * 180. / M_PI;
-		yaw = -yaw;
-		pose << (fmt % i % position[0] % -position[1] % position[2] % -pitch % yaw).str();
+		yaw = 90-yaw;
+		pose << (fmt % i % -position[0] % position[1] % position[2] % -pitch % yaw).str();
 	}
 
 	pose.close();
@@ -235,6 +235,42 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> read_normal_trajectory(
 	pose.close();
 	return o_trajectories;
 }
+
+std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> read_smith_trajectory(const std::string& v_path) {
+	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> o_trajectories;
+	std::ifstream pose(v_path);
+	if (!pose.is_open()) throw "File not opened";
+
+	std::string line;
+	do {
+		std::getline(pose, line);
+		if (line.size() < 3) {
+			std::getline(pose, line);
+			continue;
+		}
+		std::vector<std::string> tokens;
+		boost::split(tokens, line, boost::is_any_of(","));
+
+		float pitch = -std::atof(tokens[4].c_str());
+		float yaw = 90-std::atof(tokens[6].c_str());
+
+		float dz = std::sin(pitch / 180.f * M_PI);
+		float dxdy = std::cos(pitch / 180.f * M_PI);
+		float dy = std::sin(yaw / 180.f * M_PI) * dxdy;
+		float dx = std::cos(yaw / 180.f * M_PI) * dxdy;
+
+		Eigen::Vector3f direction(dx, dy, dz);
+
+		o_trajectories.push_back(std::make_pair(
+			Eigen::Vector3f(-std::atof(tokens[1].c_str())/100, std::atof(tokens[2].c_str()) / 100, std::atof(tokens[3].c_str()) / 100) ,
+			direction.normalized()
+		));
+	} while (!pose.eof());
+
+	pose.close();
+	return o_trajectories;
+}
+
 
 std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> read_wgs84_trajectory(const std::string& v_path)
 {
@@ -423,29 +459,26 @@ bool generate_next_view_curvature(const Trajectory_params& v_params,
 
 std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> find_short_cut(
 	const std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>>& v_trajectory,
-	const Height_map& v_height_map, const float Z_UP_BOUNDS)
+	const Height_map& v_height_map, const float Z_UP_BOUNDS,const Eigen::Vector3f& v_center)
 {
 	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> safe_trajectory;
+
 	for (auto item : v_trajectory) {
 		size_t id_item = &item-&v_trajectory[0];
 		Eigen::Vector3f safe_position = item.first;
 		while (v_height_map.get_height(item.first.x(), item.first.y()) + Z_UP_BOUNDS > safe_position.z()) {
 			safe_position.z() += 5;
 		}
-
+		
+		
 		if(safe_position.z() > 1 * item.first.z())
 		{
 			safe_position = item.first;
-			Eigen::Vector3f direction;
-			if(id_item < v_trajectory.size()-2)
-				direction= Eigen::Vector3f(v_trajectory[id_item + 1].first - v_trajectory[id_item].first).normalized();
-			else
-				direction = Eigen::Vector3f(v_trajectory[id_item ].first - v_trajectory[id_item-1].first).normalized();
+			Eigen::Vector3f direction = v_center - safe_position;
+			direction.z() = 0;
+			direction.normalize();
+			direction.z() = 1;
 
-			if (std::abs(direction.dot(Eigen::Vector3f(1, 0, 0))) < std::abs(direction.dot(Eigen::Vector3f(0, 1, 0))))
-				direction = Eigen::Vector3f(0, 1, 0);
-			else
-				direction = Eigen::Vector3f(1, 0, 0);
 			while (v_height_map.get_height(safe_position.x(), safe_position.y()) + Z_UP_BOUNDS > safe_position.z()) {
 				safe_position += direction * 1;
 			}
@@ -534,7 +567,7 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 		}
 
 		if(v_params.with_ray_test)
-			item_trajectory = find_short_cut(item_trajectory, v_height_map, v_z_up_bound);
+			item_trajectory = find_short_cut(item_trajectory, v_height_map, v_z_up_bound, v_buildings[id_building].bounding_box_3d.center());
 		else
 			item_trajectory = ensure_safe_trajectory_and_calculate_direction(item_trajectory, v_height_map, v_z_up_bound);
 
