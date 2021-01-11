@@ -1,4 +1,3 @@
-#include <tuple>
 #include <argparse/argparse.hpp>
 
 #include <CGAL/Point_set_3.h>
@@ -7,6 +6,7 @@
 #include <CGAL/Random.h>
 #include <CGAL/IO/OBJ_reader.h>
 #include <CGAL/Surface_mesh/IO.h>
+#include <CGAL/point_generators_3.h>
 
 #include <boost/format.hpp>
 
@@ -35,9 +35,12 @@ const bool DOUBLE_FLAG = true;
 //
 //const std::string trajectory_path = "C:\\repo\\C\\temp\\adjacent\\10_single_upper.log";
 const std::string trajectory_path = "D:\\SIG21_Local\\2_2_error_map\\asia18_bridge_565.txt";
-const std::string sample_points_path = "D:\\SIG21_Local\\2_2_error_map\\bridge_points.ply";
-const std::string recon_mesh_path = "D:\\SIG21_Local\\2_2_error_map\\asia18_bridge_565.obj";
-const std::string gt_mesh_path = "D:\\SIG21_Local\\2_2_error_map\\bridge_mesh.obj";
+const std::string recon_sample_points_path = "D:\\SIG21_Local\\2_2_error_map\\asia18_bridge_565_align_points.ply";
+const std::string gt_sample_points_path = "D:\\SIG21_Local\\2_2_error_map\\bridge_points_wo_building.ply";
+const std::string recon_mesh_path = "D:\\SIG21_Local\\2_2_error_map\\asia18_bridge_565_align.ply";
+const std::string gt_mesh_path = "D:\\SIG21_Local\\2_2_error_map\\bridge_mesh.ply";
+
+const std::string output_data_path = "D:\\SIG21_Local\\2_2_error_map\\asia18.txt";
 
 
 int main(int argc, char** argv){
@@ -54,10 +57,15 @@ int main(int argc, char** argv){
 
 	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> trajectory = read_normal_trajectory(trajectory_path);
 	std::cout << "Total length: " << evaluate_length(trajectory) << std::endl;
-	Point_set sample_points;
-	CGAL::read_ply_point_set(std::ifstream(sample_points_path), sample_points);
-	Surface_mesh gt_mesh = convert_obj_from_tinyobjloader_to_surface_mesh(load_obj(gt_mesh_path));
-	Surface_mesh recon_mesh = convert_obj_from_tinyobjloader_to_surface_mesh(load_obj(recon_mesh_path));
+	Surface_mesh gt_mesh;
+	Surface_mesh recon_mesh;
+	CGAL::read_ply(std::ifstream(recon_mesh_path,std::ios_base::binary), recon_mesh);
+	CGAL::read_ply(std::ifstream(gt_mesh_path, std::ios_base::binary), gt_mesh);
+	std::cout << recon_mesh.faces().size();
+	Point_set sample_recon_points, sample_gt_points;
+	CGAL::read_ply_point_set(std::ifstream(recon_sample_points_path, std::ios_base::binary), sample_recon_points);
+	CGAL::read_ply_point_set(std::ifstream(gt_sample_points_path, std::ios_base::binary), sample_gt_points);
+	
 	Tree gt_tree,recon_tree;
 	gt_tree.insert(CGAL::faces(gt_mesh).first, CGAL::faces(gt_mesh).second, gt_mesh);
 	gt_tree.build();
@@ -67,27 +75,51 @@ int main(int argc, char** argv){
 	std::cout << "Build done!" << std::endl;
 
 	std::vector<std::vector<bool>> point_view_visibility;
-	std::vector<std::array<float,5>> reconstructability = reconstructability_hueristic(trajectory, sample_points, gt_mesh, point_view_visibility);
-
-	std::vector<float> gt_nearest_error;
-	for(const Point_3& p:sample_points.points())
+	std::vector<std::array<float,5>> reconstructability_recon_split = reconstructability_hueristic(trajectory, sample_recon_points, gt_mesh, point_view_visibility);
+	std::vector<std::array<float,5>> reconstructability_gt_split = reconstructability_hueristic(trajectory, sample_gt_points, gt_mesh, point_view_visibility);
+	std::vector<float> reconstructability_recon, reconstructability_gt;
+	for (const auto& item : reconstructability_recon_split)
+		reconstructability_recon.push_back(item[4]);
+	for (const auto& item : reconstructability_gt_split)
+		reconstructability_gt.push_back(item[4]);
+	
+	
+	std::vector<float> recon_nearest_error;
+	for(const Point_3& p: sample_recon_points.points())
 	{
-		Point_3 closest_gt_point=gt_tree.closest_point(p);
+		Point_3 closest_recon_point= recon_tree.closest_point(p);
+		Point_3 closest_gt_point= gt_tree.closest_point(closest_recon_point);
+		float error = std::sqrt((closest_recon_point - closest_gt_point).squared_length());
+		recon_nearest_error.push_back(error);
+	}
+	std::vector<float> gt_nearest_error;
+	for(const Point_3& p: sample_gt_points.points())
+	{
+		Point_3 closest_gt_point= gt_tree.closest_point(p);
 		Point_3 closest_recon_point= recon_tree.closest_point(closest_gt_point);
 		float error = std::sqrt((closest_recon_point - closest_gt_point).squared_length());
 		gt_nearest_error.push_back(error);
 	}
-	std::vector<float> recon_nearest_error;
-	for(const Point_3& p:sample_points.points())
-	{
-		Point_3 closest_recon_point= recon_tree.closest_point(p);
-		Point_3 closest_gt_point= gt_tree.closest_point(closest_gt_point);
-		float error = std::sqrt((closest_recon_point - closest_gt_point).squared_length());
-		recon_nearest_error.push_back(error);
-	}
+	
 	std::cout << "Error done!" << std::endl;
 
-	
+	std::string reconstructability_recon_string = "";
+	std::string reconstructability_gt_string = "";
+	std::string accuracy_string = "";
+	std::string completeness_string = "";
+	for(int i=0;i< sample_recon_points.size();++i)
+	{
+		reconstructability_recon_string += std::to_string(reconstructability_recon[i]) + ",";
+		accuracy_string += std::to_string(recon_nearest_error[i]) + ",";
+		reconstructability_gt_string += std::to_string(reconstructability_gt[i]) + ",";
+		completeness_string += std::to_string(gt_nearest_error[i]) + ",";
+	}
+	std::ofstream f_out(output_data_path);
+	f_out << reconstructability_recon_string << std::endl;
+	f_out << accuracy_string << std::endl;
+	f_out << reconstructability_gt_string << std::endl;
+	f_out << completeness_string << std::endl;
+	f_out.close();
 	
 	//Point_set point_set;
 	//Surface_mesh mesh = convert_obj_from_tinyobjloader_to_surface_mesh(load_obj(mesh_path));
@@ -126,7 +158,7 @@ int main(int argc, char** argv){
 		
 		vizer.lock();
 		vizer.m_trajectories = trajectory;
-		vizer.m_points = sample_points;
+		vizer.m_points = sample_recon_points;
 		//vizer.m_points_color = colors;
 		vizer.m_pos = trajectory[0].first;
 		vizer.unlock();
