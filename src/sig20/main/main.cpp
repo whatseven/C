@@ -428,6 +428,7 @@ public:
 
 
 			std::vector<Eigen::Vector2i> map_trajectory = perform_ccpp(ccpp_map, start_pos_on_map, end_pos_on_map);
+			std::cout << "  " << std::endl;
 			for(const Eigen::Vector2i& item: map_trajectory)
 			{
 				// todo: invert x,y!!!!!!!!!!!!!
