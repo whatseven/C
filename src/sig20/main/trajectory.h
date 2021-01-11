@@ -577,8 +577,158 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 	return total_trajectory;
 }
 
-std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> perform_ccpp(const cv::Mat& v_map, const Eigen::Vector3f& v_pos_mesh, const Eigen::Vector3f& v_target_center)
+void generate_distance_map(const cv::Mat& v_map, cv::Mat& distance_map, const Eigen::Vector2i goal, Eigen::Vector2i now_point, int distance)
 {
-	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> trajectory;
+	if (now_point != goal)
+	{
+		if (now_point.x() < 0 || now_point.x() > v_map.rows - 1 || now_point.y() < 0 || now_point.y() > v_map.cols - 1)
+			return;
+		if (v_map.at<cv::uint8_t>(now_point.x(), now_point.y()) == 0)
+			return;
+		if (distance_map.at<cv::uint8_t>(now_point.x(), now_point.y()) != 0)
+		{
+			if (distance < distance_map.at<cv::uint8_t>(now_point.x(), now_point.y()))
+				distance_map.at<cv::uint8_t>(now_point.x(), now_point.y()) = distance;
+			else
+				return;
+		}
+		else
+			distance_map.at<cv::uint8_t>(now_point.x(), now_point.y()) = distance;
+	}
+	else
+		distance_map.at<cv::uint8_t>(now_point.x(), now_point.y()) = 0;
+	
+	distance++;
+	generate_distance_map(v_map, distance_map, goal, Eigen::Vector2i(now_point.x() + 1, now_point.y()), distance);
+	generate_distance_map(v_map, distance_map, goal, Eigen::Vector2i(now_point.x(), now_point.y() + 1), distance);
+	generate_distance_map(v_map, distance_map, goal, Eigen::Vector2i(now_point.x() - 1, now_point.y()), distance);
+	generate_distance_map(v_map, distance_map, goal, Eigen::Vector2i(now_point.x(), now_point.y() - 1), distance);
+}
+
+void update_obstacle_map(const cv::Mat& v_map, cv::Mat& distance_map, const Eigen::Vector2i goal, Eigen::Vector2i now_point, int distance)
+{
+	distance++;
+	generate_distance_map(v_map, distance_map, goal, Eigen::Vector2i(now_point.x() + 1, now_point.y()), distance);
+	generate_distance_map(v_map, distance_map, goal, Eigen::Vector2i(now_point.x(), now_point.y() + 1), distance);
+	generate_distance_map(v_map, distance_map, goal, Eigen::Vector2i(now_point.x() - 1, now_point.y()), distance);
+	generate_distance_map(v_map, distance_map, goal, Eigen::Vector2i(now_point.x(), now_point.y() - 1), distance);
+}
+
+void print_map(const cv::Mat& v_map)
+{
+	for (int i = 0; i < v_map.rows; i++)
+	{
+		for (int j = 0; j < v_map.cols; j++)
+		{
+			std::cout << int(v_map.at<cv::uint8_t>(i, j)) << " ";
+		}
+		std::cout << std::endl;
+	}
+	return;
+}
+
+void explore(const cv::Mat& v_map, const cv::Mat& distance_map, const cv::Mat& obstacle_map, std::vector<Eigen::Vector2i>& trajectory, Eigen::Vector2i now_point, const Eigen::Vector2i& goal, cv::Mat& visited_map, bool& isFinished)
+{
+	trajectory.push_back(now_point);
+	visited_map.at<cv::uint8_t>(now_point.x(), now_point.y()) += 1;
+	if (now_point == goal)
+	{
+		isFinished = true;
+		return;
+	}
+	std::vector<Eigen::Vector2i> neighbors;
+	neighbors.push_back(Eigen::Vector2i(now_point.x() + 1, now_point.y()));
+	neighbors.push_back(Eigen::Vector2i(now_point.x(), now_point.y() + 1));
+	neighbors.push_back(Eigen::Vector2i(now_point.x() - 1, now_point.y()));
+	neighbors.push_back(Eigen::Vector2i(now_point.x(), now_point.y() - 1));
+	// down right up left
+	for (int i = 0; i < 4; i++)
+	{
+		int max_num = -1;
+		int max_id = -1;
+		int now_id = 0;
+		int temp_num;
+		for (auto neighbor_point : neighbors)
+		{
+			if (!(neighbor_point.x() < 0 || neighbor_point.x() > v_map.rows - 1 || neighbor_point.y() < 0 || neighbor_point.y() > v_map.cols - 1))
+			{
+				temp_num = int(v_map.at<cv::uint8_t>(neighbor_point.x(), neighbor_point.y()));
+				if (temp_num != 0)
+				{
+					temp_num = int(visited_map.at<cv::uint8_t>(neighbor_point.x(), neighbor_point.y()));
+					if (temp_num == 0)
+					{
+						int distance = int(distance_map.at<cv::uint8_t>(neighbor_point.x(), neighbor_point.y())) + int(obstacle_map.at<cv::uint8_t>(neighbor_point.x(), neighbor_point.y()));
+						if (distance > max_num)
+						{
+							max_num = distance;
+							max_id = now_id;
+						}
+					}
+				}
+			}
+			now_id++;
+		}
+		if (max_id >= 0)
+		{
+			if (i != 0)
+			{
+				trajectory.push_back(now_point);
+			}
+			explore(v_map, distance_map, obstacle_map, trajectory, neighbors[max_id], goal, visited_map, isFinished);
+		}
+		else
+		{
+			if (isFinished)
+				return;
+			else
+			{
+				if (trajectory[trajectory.size() - 1] != now_point)
+				{
+					trajectory.push_back(now_point);
+					break;
+				}
+				else
+				{
+					std::cout << now_point.x() << " " << now_point.y() << std::endl;
+					std::cout << (*trajectory.end()).x() << " " << (*trajectory.end()).y() << std::endl;
+					break;
+				}
+					
+			}
+		}
+	}
+}
+
+std::vector<Eigen::Vector2i> perform_ccpp(const cv::Mat& v_map, const Eigen::Vector2i& start_point, const Eigen::Vector2i& goal)
+{
+	cv::Mat distance_map(v_map.rows, v_map.cols, CV_8UC1, cv::Scalar(0));
+	generate_distance_map(v_map, distance_map, goal, goal, 0);
+	print_map(distance_map);
+	cv::Mat obstacle_map(v_map.rows, v_map.cols, CV_8UC1, cv::Scalar(0));
+	for (int i = 0; i < v_map.rows; i++)
+	{
+		for (int j = 0; j < v_map.cols; j++)
+		{
+			if (v_map.at<cv::uint8_t>(i, j) == 0)
+			{
+				update_obstacle_map(v_map, obstacle_map, Eigen::Vector2i(i, j), Eigen::Vector2i(i, j), 0);
+			}
+		}
+	}
+	print_map(obstacle_map);
+
+	Eigen::Vector2i now_point(start_point);
+	std::vector<Eigen::Vector2i> trajectory;
+	cv::Mat visited_map(v_map.rows, v_map.cols, CV_8UC1, cv::Scalar(0));
+	bool isFinished = false;
+	explore(v_map, distance_map, obstacle_map, trajectory, start_point, goal, visited_map, isFinished);
+
+	cv::Mat sequence_map(v_map.rows, v_map.cols, CV_8UC1, cv::Scalar(0));
+	for (int i = 0; i < trajectory.size(); i++)
+	{
+		sequence_map.at<cv::uint8_t>(trajectory[i].x(), trajectory[i].y()) = i;
+	}
+	print_map(sequence_map);
 	return trajectory;
 }

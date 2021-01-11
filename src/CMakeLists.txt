@@ -4,4 +4,6 @@ add_subdirectory(remove_points_inside)
 add_subdirectory(sig20)
 add_subdirectory(rename_material)
 add_subdirectory(generate_data_1216)
+add_subdirectory(process_cad)
 add_subdirectory(split_obj_according_to_footprint)
+

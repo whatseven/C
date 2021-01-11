@@ -24,40 +24,41 @@ int fieldRange = 600;
 MapConverter mapConverter;
 
 const string color_map_path = "F:\\Unreal\\sndd\\Env\\Plugins\\AirSim\\Content\\HUDAssets\\seg_color_palette.png";
-const string model_path = "D:\\Siggraph\\data\\RAW\\zhijiage\\zhijiage\\Chicago_without_ground.obj";
-const string point_set_path = "D:\\Siggraph\\data\\RAW\\zhijiage\\zhijiage\\sample.ply";
+const string model_path = "D:\\Siggraph\\data\\RAW\\Suzhou\\total_split.obj";
+const string point_set_path = "D:\\Siggraph\\data\\RAW\\Suzhou\\sample.ply";
 const string output_root_path = "D:\\Siggraph\\data\\Object_detection_data\\";
 const string host = "127.0.0.1";
-const int sample_num = 8000;
-float safe_bounds = 10;
+const int sample_num = 27441;
+float safe_bounds = 0;
 const float max_pitch = 60;
 const bool time_profile = true;
 const int model_num = 760;
 const int img_width = 800;
 const int img_height = 800;
-const int start_id = 8441;
+const int start_id = 0;
 
 int main(int argc, char* argv[]) {
 	mapConverter.initDroneStart(Eigen::Vector3f(-68000.0, 8000.0, 1000.0));
 	srand((unsigned int)(time(NULL)));
 
 	Airsim_tools airsim_client(Eigen::Vector3f(-68000.0, 8000.0, 1000.0));
+
 	// Init segmentation color
 	//{
 	//	std::map<std::string, int> color_map;
 	//	std::map<std::string, int> background_color_map;
 	//	for (const auto& name : airsim_client.m_agent->simListSceneObjects()) {
-	//		if (name.size() <= 4)
+	//		if (name[0] == 's')
 	//			color_map.insert(std::make_pair(name, rand() % 255 + 1));
 	//		else
 	//			background_color_map.insert(std::make_pair(name, 0));
 	//		background_color_map.insert(std::make_pair(name, 0));
 
 	//	}
-	//	airsim_client.m_agent->simSetSegmentationObjectIDMultiple(background_color_map);
-	//	airsim_client.m_agent->simSetSegmentationObjectIDMultiple(color_map);
-	//	airsim_client.m_agent->simSetSegmentationObjectID("default", 0);
-	//	airsim_client.m_agent->simSetSegmentationObjectID("p1g.*", 0, true);
+	//	//airsim_client.m_agent->simSetSegmentationObjectIDMultiple(background_color_map);
+	//	//airsim_client.m_agent->simSetSegmentationObjectIDMultiple(color_map);
+	//	airsim_client.m_agent->simSetSegmentationObjectID("Plane", 0);
+	//	airsim_client.m_agent->simSetSegmentationObjectID("BP_Sky_Sphere", 0);
 	//	/*for (int i = 0; i < model_num; i++)
 	//	{
 	//		airsim_client.m_agent->simSetSegmentationObjectID(std::to_string(i), rand()%255 + 1);
@@ -77,14 +78,16 @@ int main(int argc, char* argv[]) {
 
 	//Chicago modify
 	{
-		float temp = bounds[2];
+		/*float temp = bounds[2];
 		bounds[2] = -bounds[3];
-		bounds[3] = -temp;
+		bounds[3] = -temp;*/
 		for (int i = 0; i < bounds.size(); i++)
 		{
 			bounds[i] *= 100;
 		}
 		safe_bounds *= 100;
+		bounds[0] = -110000;
+		bounds[1] = -20000;
 	}
 
 	std::ofstream fTrain(output_root_path + "my_train.txt");
@@ -105,13 +108,15 @@ int main(int argc, char* argv[]) {
 			dis(generator) * (bounds[3] - bounds[2]) + bounds[2],
 			dis(generator) * (bounds[4] * 0.7 - safe_bounds) + safe_bounds
 		);
+
+
 		//posUnreal = mapConverter.convertMeshToUnreal(posUnreal);
 		float pitch = (dis(generator) * max_pitch) * M_PI / 180.f;
 		float yaw = (dis(generator) * 4) * M_PI / 2;
 
 		while (posUnreal.z() <= heightMap.get_height(posUnreal.x(), posUnreal.y()))
 		{
-			posUnreal[2] += 5;
+			posUnreal[2] += 500;
 		}
 
 		Pos_Pack pos_pack = mapConverter.get_pos_pack_from_unreal(posUnreal, yaw, pitch);

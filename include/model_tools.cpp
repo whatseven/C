@@ -914,6 +914,45 @@ std::vector<float> get_bounds(std::string path, float v_bounds)
 	return output;
 }
 
+
+std::vector<Polygon_2> get_polygons(std::string file_path)
+{
+	std::ifstream inputFile;
+	inputFile.open(file_path);
+	if (!inputFile)
+	{
+		std::cout << "can't find file" << std::endl;
+	}
+	std::vector<std::vector<float>> temp_data;
+	while (!inputFile.eof())
+	{
+		std::string x_temp, y_temp, index;
+		inputFile >> x_temp >> y_temp >> index;
+		temp_data.push_back(std::vector<float>{float(atof(x_temp.c_str())), float(atof(y_temp.c_str())), float(atof(index.c_str()))});
+	}
+	inputFile.close();
+	float now_index = temp_data[0][2];
+	std::vector<Polygon_2> polygon_vector;
+	Polygon_2 polygon;
+	for (auto point : temp_data)
+	{
+		if (point[2] == now_index)
+		{
+			polygon.push_back(Point_2(point[0], point[1]));
+		}
+		else
+		{
+			if (polygon.is_simple())
+				polygon_vector.push_back(polygon);
+			polygon = Polygon_2();
+			polygon.push_back(Point_2(point[0], point[1]));
+			now_index = point[2];
+		}
+	}
+	return polygon_vector;
+}
+
+
 float point_box_distance_eigen(const Eigen::Vector2f& v_pos, const Eigen::AlignedBox2f& v_box) {
 	float sqDist = 0.0f;
 	float x = v_pos.x();
@@ -925,6 +964,7 @@ float point_box_distance_eigen(const Eigen::Vector2f& v_pos, const Eigen::Aligne
 	if (y > v_box.max().y()) sqDist += (y - v_box.max().y()) * (y - v_box.max().y());
 	return sqDist;
 }
+
 
 bool inside_box(const Eigen::Vector2f& v_pos, const Eigen::AlignedBox2f& v_box) {
 	return v_pos.x() >= v_box.min().x() && v_pos.x() <= v_box.max().x() && v_pos.y() >= v_box.min().y() && v_pos.y() <= v_box.max().y();

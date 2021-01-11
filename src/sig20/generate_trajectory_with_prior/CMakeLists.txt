@@ -13,3 +13,4 @@ target_link_libraries(${PROJECT_NAME} general C)
 target_link_libraries(${PROJECT_NAME} general pangolin)
 target_link_libraries(${PROJECT_NAME} general glog::glog)
 target_link_libraries(${PROJECT_NAME} jsoncpp_lib)
+

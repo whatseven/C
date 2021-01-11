@@ -5,6 +5,7 @@
 #include <opencv2/opencv.hpp>
 #include <opencv2/highgui.hpp>
 #include <eigen3/Eigen/Core>
+#include <fstream>
 
 #include "cgal_tools.h"
 #include "CGAL/Polygon_2.h"
@@ -89,6 +90,13 @@ void rename_material(const std::string& file_dir, const std::string& file_name, 
 //          Safe bounds to determine z range
 // @ret:
 std::vector<float> get_bounds(std::string path, float v_bounds);
+// @brief: Get valid polygons
+// @notice: 
+// @param: 
+//          Point coordinate file of multiple-vertices lines
+// @ret:
+std::vector<Polygon_2> get_polygons(std::string file_path);
+
 
 class Height_map {
 	
@@ -109,7 +117,7 @@ public:
             if (cur_height < point.z())
                 m_map.at<float>((int)((point.y() - m_start[1]) / m_resolution), (int)((point.x() - m_start[0]) / m_resolution)) = point.z();
         }
-        cv::dilate(m_map, m_map_dilated, cv::getStructuringElement(CV_SHAPE_RECT, cv::Size(5, 5)), cv::Point(-1, -1), 3);
+        cv::dilate(m_map, m_map_dilated, cv::getStructuringElement(cv::MorphShapes::MORPH_RECT, cv::Size(5, 5)), cv::Point(-1, -1), 3);
     }
 
     Height_map(const Eigen::Vector3f& v_min, const Eigen::Vector3f& v_max, const float v_resolution)
@@ -141,7 +149,7 @@ public:
         for (int y = ymin; y <= ymax; ++y)
             for (int x = xmin; x <= xmax; ++x)
                 m_map.at<float>(y, x) = m_map.at<float>(y, x) > v_box.max()[2] ? m_map.at<float>(y, x) : v_box.max()[2];
-        cv::dilate(m_map, m_map_dilated, cv::getStructuringElement(CV_SHAPE_RECT, cv::Size(3, 3)),cv::Point(-1,-1),3);
+        cv::dilate(m_map, m_map_dilated, cv::getStructuringElement(cv::MorphShapes::MORPH_RECT, cv::Size(3, 3)),cv::Point(-1,-1),3);
     }
 	
     void save_height_map_png(const std::string& v_path,const float v_threshold=0.f)
