@@ -404,7 +404,22 @@ public:
 		}
 		cv::imwrite(std::to_string(frame_id) + "_global_map.png", map);
 		if(with_exploration)
-			m_ccpp_trajectory = perform_ccpp(map, v_cur_pos.pos_mesh, target_center);
+		{
+			Eigen::Vector3f t1=(v_cur_pos.pos_mesh - m_map_start) / DISTANCE_THRESHOLD;
+			Eigen::Vector3f t2=(target_center - m_map_start) / DISTANCE_THRESHOLD;
+			Eigen::Vector2i start_pos_on_map(t1.x(),t1.y());
+			Eigen::Vector2i end_pos_on_map(t2.x(), t2.y());
+			//std::vector<Eigen::Vector2i> map_trajectory = perform_ccpp(map, start_pos_on_map, end_pos_on_map);
+			//for(const Eigen::Vector3f& item: map_trajectory)
+			//{
+			//	Eigen::Vector3f t3 = m_map_start + DISTANCE_THRESHOLD * item;
+			//	t3.z() = 100;
+			//	m_ccpp_trajectory.emplace_back(
+			//		t3,
+			//		Eigen::Vector3f(0, 0, -1)
+			//	);
+			//}
+		}
 
 		// return trajectory
 		//debug_img(std::vector<cv::Mat>{map});

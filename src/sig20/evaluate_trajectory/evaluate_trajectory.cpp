@@ -36,20 +36,9 @@ const bool DOUBLE_FLAG = true;
 //const std::string trajectory_path = "C:\\repo\\C\\temp\\adjacent\\10_single_upper.log";
 const std::string trajectory_path = "D:\\SIG21_Local\\2_2_error_map\\asia18_bridge_565.txt";
 const std::string sample_points_path = "D:\\SIG21_Local\\2_2_error_map\\bridge_points.ply";
-const std::string mesh_path = "D:\\SIG21_Local\\2_2_error_map\\bridge_mesh.obj";
-//
+const std::string recon_mesh_path = "D:\\SIG21_Local\\2_2_error_map\\asia18_bridge_565.obj";
+const std::string gt_mesh_path = "D:\\SIG21_Local\\2_2_error_map\\bridge_mesh.obj";
 
-float evaluate_reconstructability(const std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> v_trajectory,
-	const std::string& v_points_path, const std::string& v_mesh_path) {
-	Point_set point_set;
-	Surface_mesh mesh=convert_obj_from_tinyobjloader_to_surface_mesh(load_obj(v_mesh_path));
-	CGAL::read_ply_point_set(std::ifstream(v_points_path), point_set);
-	std::vector<std::vector<bool>> point_view_visibility;
-	auto reconstructability = reconstructability_hueristic(v_trajectory, point_set, mesh, point_view_visibility);
-	//std::cout << "Max: " << *std::max_element(reconstructability.begin(), reconstructability.end()) << std::endl;
-	//std::cout << "Min: " << *std::min_element(reconstructability.begin(), reconstructability.end()) << std::endl;
-	return 0;
-}
 
 int main(int argc, char** argv){
 	// Read arguments
@@ -64,13 +53,42 @@ int main(int argc, char** argv){
 	}
 
 	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> trajectory = read_normal_trajectory(trajectory_path);
-	//std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> trajectory = read_wgs84_trajectory(trajectory_path);
-	Point_set points;
-	CGAL::read_ply_point_set(std::ifstream(sample_points_path), points);
-
 	std::cout << "Total length: " << evaluate_length(trajectory) << std::endl;
-	evaluate_reconstructability(trajectory, sample_points_path, mesh_path);
+	Point_set sample_points;
+	CGAL::read_ply_point_set(std::ifstream(sample_points_path), sample_points);
+	Surface_mesh gt_mesh = convert_obj_from_tinyobjloader_to_surface_mesh(load_obj(gt_mesh_path));
+	Surface_mesh recon_mesh = convert_obj_from_tinyobjloader_to_surface_mesh(load_obj(recon_mesh_path));
+	Tree gt_tree,recon_tree;
+	gt_tree.insert(CGAL::faces(gt_mesh).first, CGAL::faces(gt_mesh).second, gt_mesh);
+	gt_tree.build();
+	recon_tree.insert(CGAL::faces(recon_mesh).first, CGAL::faces(recon_mesh).second, recon_mesh);
+	recon_tree.build();
 
+	std::cout << "Build done!" << std::endl;
+
+	std::vector<std::vector<bool>> point_view_visibility;
+	std::vector<std::array<float,5>> reconstructability = reconstructability_hueristic(trajectory, sample_points, gt_mesh, point_view_visibility);
+
+	std::vector<float> gt_nearest_error;
+	for(const Point_3& p:sample_points.points())
+	{
+		Point_3 closest_gt_point=gt_tree.closest_point(p);
+		Point_3 closest_recon_point= recon_tree.closest_point(closest_gt_point);
+		float error = std::sqrt((closest_recon_point - closest_gt_point).squared_length());
+		gt_nearest_error.push_back(error);
+	}
+	std::vector<float> recon_nearest_error;
+	for(const Point_3& p:sample_points.points())
+	{
+		Point_3 closest_recon_point= recon_tree.closest_point(p);
+		Point_3 closest_gt_point= gt_tree.closest_point(closest_gt_point);
+		float error = std::sqrt((closest_recon_point - closest_gt_point).squared_length());
+		recon_nearest_error.push_back(error);
+	}
+	std::cout << "Error done!" << std::endl;
+
+	
+	
 	//Point_set point_set;
 	//Surface_mesh mesh = convert_obj_from_tinyobjloader_to_surface_mesh(load_obj(mesh_path));
 	//CGAL::read_ply_point_set(std::ifstream(sample_points_path), point_set);
@@ -108,7 +126,7 @@ int main(int argc, char** argv){
 		
 		vizer.lock();
 		vizer.m_trajectories = trajectory;
-		vizer.m_points = points;
+		vizer.m_points = sample_points;
 		//vizer.m_points_color = colors;
 		vizer.m_pos = trajectory[0].first;
 		vizer.unlock();
