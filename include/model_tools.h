@@ -8,7 +8,13 @@
 #include <fstream>
 
 #include "cgal_tools.h"
+#include "CGAL/Polygon_2.h"
 
+struct Proxy
+{
+    float height;
+    CGAL::Polygon_2<K> polygon;
+};
 
 /*
 Some useful function
@@ -19,6 +25,14 @@ Some useful function
 // @param: File path; mtl file directory
 // @ret: `attrib_t, shape_t, material_t`
 std::tuple<tinyobj::attrib_t, std::vector<tinyobj::shape_t>, std::vector<tinyobj::material_t>> load_obj(const std::string& v_mesh_name,bool v_log=true, const std::string& v_mtl_dir = "./");
+
+// @brief: Get polygon represented by footprint
+// @notice: Footprint format:
+// height
+// "1th vertex x" "1th vertex y" "2th vertex x" "2th vertex y" ...
+// @param: File path
+// @ret: Proxy
+Proxy load_footprint(const std::string& v_footprint_path);
 
 // @brief: Store mesh into obj file
 // @notice: Every shape in the vector will have a group name
@@ -57,6 +71,8 @@ void merge_obj(const std::string& v_file,
 // @ret:
 void split_obj(const std::string& file_dir, const std::string& file_name, const float resolution, const float v_filter_height=-99999, const int obj_max_builidng_num = -1);
 
+std::vector<tinyobj::shape_t> split_obj_according_to_footprint(const tinyobj::attrib_t& v_attribs, const std::vector<tinyobj::shape_t>& v_shapes, const std::vector<Proxy>& v_proxys, const float v_squared_threshold);
+
 // @brief: Rename the material and image name
 //         Unreal can not cope with complicate image name
 // @notice: 
@@ -83,6 +99,7 @@ std::vector<Polygon_2> get_polygons(std::string file_path);
 
 
 class Height_map {
+	
 public:
     Height_map(const Point_set& v_point_cloud, const float v_resolution) :m_resolution(v_resolution) {
         Eigen::AlignedBox3f bounds = get_bounding_box(v_point_cloud);
@@ -100,6 +117,7 @@ public:
             if (cur_height < point.z())
                 m_map.at<float>((int)((point.y() - m_start[1]) / m_resolution), (int)((point.x() - m_start[0]) / m_resolution)) = point.z();
         }
+        cv::dilate(m_map, m_map_dilated, cv::getStructuringElement(cv::MorphShapes::MORPH_RECT, cv::Size(5, 5)), cv::Point(-1, -1), 3);
     }
 
     Height_map(const Eigen::Vector3f& v_min, const Eigen::Vector3f& v_max, const float v_resolution)
@@ -138,6 +156,7 @@ public:
     {
         //std::cout << m_map.rows() << "," << m_map.cols() << std::endl;
         cv::Mat map(m_map.rows, m_map.cols, CV_8UC3);
+        map.setTo(cv::Scalar(0, 0, 0));
         for (int y = 0; y < m_map.rows; ++y)
             for (int x = 0; x < m_map.cols; ++x)
                 if (m_map.at<float>(y, x) > v_threshold)
@@ -155,5 +174,23 @@ public:
     cv::Mat m_map;
     cv::Mat m_map_dilated;
 };
+
+float point_box_distance_eigen(const Eigen::Vector2f& v_pos, const Eigen::AlignedBox2f& v_box)
+{
+    float sqDist = 0.0f;
+    float x = v_pos.x();
+    if (x < v_box.min().x()) sqDist += (v_box.min().x() - x) * (v_box.min().x() - x);
+    if (x > v_box.max().x()) sqDist += (x - v_box.max().x()) * (x - v_box.max().x());
+
+    float y = v_pos.y();
+    if (y < v_box.min().y()) sqDist += (v_box.min().y() - y) * (v_box.min().y() - y);
+    if (y > v_box.max().y()) sqDist += (y - v_box.max().y()) * (y - v_box.max().y());
+    return sqDist;
+}
+
+bool inside_box(const Eigen::Vector2f& v_pos, const Eigen::AlignedBox2f& v_box)
+{
+    return v_pos.x() >= v_box.min().x() && v_pos.x() <= v_box.max().x() && v_pos.y() >= v_box.min().y() && v_pos.y() <= v_box.max().y();
+}
 
 #endif // MODEL_TOOLS_H

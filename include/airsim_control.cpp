@@ -58,8 +58,8 @@ std::map<std::string, cv::Mat> Airsim_tools::get_images()
 }
 
 void Airsim_tools::adjust_pose(const Pos_Pack& v_pos_pack){
-    Eigen::Quaternionf directionQuaternion= Eigen::Quaternionf::Identity();
-    directionQuaternion= Eigen::AngleAxisf(-v_pos_pack.yaw + M_PI, Eigen::Vector3f::UnitZ())* Eigen::AngleAxisf(
+    Eigen::Quaternionf directionQuaternion;
+    directionQuaternion= Eigen::AngleAxisf(-v_pos_pack.yaw, Eigen::Vector3f::UnitZ())* Eigen::AngleAxisf(
         -v_pos_pack.pitch, Eigen::Vector3f::UnitY());
 
     m_agent->simSetVehiclePose(msr::airlib::Pose(v_pos_pack.pos_airsim,

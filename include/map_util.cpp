@@ -27,8 +27,8 @@ Eigen::Vector3f MapConverter::convertUnrealToMesh(const Eigen::Vector3f& vWorldP
 	if (!initDroneDone)
 		throw "Init is not done";
 	Eigen::Vector3f result;
-	result[0] = -(vWorldPos[0] / 100);
-	result[1] = (vWorldPos[1] / 100);
+	result[0] = (vWorldPos[0] / 100);
+	result[1] = -(vWorldPos[1] / 100);
 	result[2] = vWorldPos[2] / 100;
 	return result;
 }
@@ -37,8 +37,8 @@ Eigen::Vector3f MapConverter::convertMeshToUnreal(const Eigen::Vector3f& vMeshPo
 	if (!initDroneDone)
 		throw "Init is not done";
 	Eigen::Vector3f result;
-	result[0] = -(vMeshPos[0] * 100);
-	result[1] = (vMeshPos[1] * 100);
+	result[0] = (vMeshPos[0] * 100);
+	result[1] = -(vMeshPos[1] * 100);
 	result[2] = vMeshPos[2] * 100;
 	return result;
 }
@@ -73,14 +73,33 @@ Eigen::Vector3f MapConverter::convert_yaw_pitch_to_direction_vector(const float 
 	return direction;
 }
 
-Pos_Pack MapConverter::get_pos_pack_from_unreal(const Eigen::Vector3f& v_pos_unreal,float yaw,float pitch)
+Pos_Pack MapConverter::get_pos_pack_from_unreal(const Eigen::Vector3f& v_pos_unreal,float v_unreal_yaw,float v_unreal_pitch)
 {
 	Pos_Pack pos_pack;
-	pos_pack.yaw = yaw;
-	pos_pack.pitch = pitch;
+	pos_pack.yaw = -v_unreal_yaw;
+	pos_pack.pitch = v_unreal_pitch;
 	pos_pack.pos_mesh = convertUnrealToMesh(v_pos_unreal);
 	pos_pack.pos_airsim = convertUnrealToAirsim(v_pos_unreal);
-	pos_pack.camera_matrix = get_camera_matrix(yaw, pitch, pos_pack.pos_mesh);
+	pos_pack.camera_matrix = get_camera_matrix(pos_pack.yaw, pos_pack.pitch, pos_pack.pos_mesh);
+	pos_pack.direction = Eigen::Vector3f(
+		std::cos(pos_pack.pitch)*std::cos(pos_pack.yaw),
+		std::cos(pos_pack.pitch)*std::sin(pos_pack.yaw),
+		std::sin(-pos_pack.pitch)).normalized();
 	
+	return pos_pack;
+}
+
+Pos_Pack MapConverter::get_pos_pack_from_mesh(const Eigen::Vector3f& v_pos_mesh, float v_mesh_yaw, float v_mesh_pitch) {
+	Pos_Pack pos_pack;
+	pos_pack.yaw = v_mesh_yaw;
+	pos_pack.pitch = v_mesh_pitch;
+	pos_pack.pos_mesh = v_pos_mesh;
+	pos_pack.pos_airsim = convertUnrealToAirsim(convertMeshToUnreal(v_pos_mesh));
+	pos_pack.camera_matrix = get_camera_matrix(pos_pack.yaw, pos_pack.pitch, pos_pack.pos_mesh);
+	pos_pack.direction = Eigen::Vector3f(
+		std::cos(pos_pack.pitch) * std::cos(pos_pack.yaw),
+		std::cos(pos_pack.pitch) * std::sin(pos_pack.yaw),
+		std::sin(-pos_pack.pitch)).normalized();
+
 	return pos_pack;
 }
