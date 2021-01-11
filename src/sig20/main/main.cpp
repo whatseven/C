@@ -20,6 +20,7 @@
 #include "airsim_control.h"
 #include "metrics.h"
 #include "trajectory.h"
+#include "vcc_slam_interface.h" // see ISLAM's USAGE !
 
 //Path
 boost::filesystem::path log_root("log");
@@ -656,7 +657,7 @@ int main(int argc, char** argv){
 			params.double_flag = args["double_flag"].asBool();
 			params.step = args["step"].asFloat();
 			current_trajectory = generate_trajectory(params,total_buildings,height_map, params.z_up_bounds);
-			LOG(INFO) << "New trajectory ¡Ì!";
+			LOG(INFO) << "New trajectory ï¿½ï¿½!";
 		}
 
 		// Merging trajectory
@@ -720,7 +721,7 @@ int main(int argc, char** argv){
 				next_pos_direction.first = Eigen::Vector3f(p.x(), p.y(), 100.f);
 				next_pos_direction.second = (next_pos_direction.first-current_pos.pos_mesh).normalized();
 			}
-			LOG(INFO) << "Merge Trajectory ¡Ì";
+			LOG(INFO) << "Merge Trajectory ï¿½ï¿½";
 		}
 
 		// Statics
