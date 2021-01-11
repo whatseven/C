@@ -388,7 +388,11 @@ public:
 		cv::Mat map((m_map_end.y() - m_map_start.y()) / DISTANCE_THRESHOLD + 1,
 			(m_map_end.x() - m_map_start.x()) / DISTANCE_THRESHOLD + 1,
 			CV_8UC3,cv::Scalar(0,0,0));
+		cv::Mat ccpp_map((m_map_end.y() - m_map_start.y()) / DISTANCE_THRESHOLD + 1,
+			(m_map_end.x() - m_map_start.x()) / DISTANCE_THRESHOLD + 1,
+			CV_8UC1,cv::Scalar(0));
 
+		
 		topology.push_back(cur_box);
 		topology_viz_color.push_back(cv::Vec3b((unsigned char)(rand() / (RAND_MAX / 255.0)), (unsigned char)(rand() / (RAND_MAX / 255.0)), (unsigned char)(rand() / (RAND_MAX / 255.0))));
 		for (int y = 0; y < map.rows; y++) {
@@ -398,7 +402,13 @@ public:
 					if (inside_box(Eigen::Vector2f(x * DISTANCE_THRESHOLD + m_map_start.x(),
 						y * DISTANCE_THRESHOLD + m_map_start.y()), topology[i_topology])) {
 						map.at<cv::Vec3b>(y, x)= topology_viz_color[i_topology%(topology_viz_color.size()-1)];
+						if (i_topology == topology.size() - 1)
+							ccpp_map.at<cv::uint8_t>(y, x) = 255;
+						else
+							ccpp_map.at<cv::uint8_t>(y, x) = 0;
+
 					}
+					
 				}
 			}
 		}
@@ -409,16 +419,25 @@ public:
 			Eigen::Vector3f t2=(target_center - m_map_start) / DISTANCE_THRESHOLD;
 			Eigen::Vector2i start_pos_on_map(t1.x(),t1.y());
 			Eigen::Vector2i end_pos_on_map(t2.x(), t2.y());
-			//std::vector<Eigen::Vector2i> map_trajectory = perform_ccpp(map, start_pos_on_map, end_pos_on_map);
-			//for(const Eigen::Vector3f& item: map_trajectory)
-			//{
-			//	Eigen::Vector3f t3 = m_map_start + DISTANCE_THRESHOLD * item;
-			//	t3.z() = 100;
-			//	m_ccpp_trajectory.emplace_back(
-			//		t3,
-			//		Eigen::Vector3f(0, 0, -1)
-			//	);
-			//}
+
+			cv::Mat start_end = ccpp_map.clone();
+			start_end.setTo(0);
+			start_end.at<cv::uint8_t>(start_pos_on_map.y(), start_pos_on_map.x())=255;
+			start_end.at<cv::uint8_t>(end_pos_on_map.y(), end_pos_on_map.x()) = 255;
+			debug_img(std::vector<cv::Mat>{ccpp_map, start_end});
+
+
+			std::vector<Eigen::Vector2i> map_trajectory = perform_ccpp(ccpp_map, start_pos_on_map, end_pos_on_map);
+			for(const Eigen::Vector2i& item: map_trajectory)
+			{
+				// todo: invert x,y!!!!!!!!!!!!!
+				Eigen::Vector3f t3 = m_map_start + DISTANCE_THRESHOLD * Eigen::Vector3f(item.y(), item.x(),0.f);
+				t3.z() = 100;
+				m_ccpp_trajectory.emplace_back(
+					t3,
+					Eigen::Vector3f(0, 0, -1)
+				);
+			}
 		}
 
 		// return trajectory

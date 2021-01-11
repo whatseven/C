@@ -700,8 +700,10 @@ void explore(const cv::Mat& v_map, const cv::Mat& distance_map, const cv::Mat& o
 	}
 }
 
-std::vector<Eigen::Vector2i> perform_ccpp(const cv::Mat& v_map, const Eigen::Vector2i& start_point, const Eigen::Vector2i& goal)
+std::vector<Eigen::Vector2i> perform_ccpp(const cv::Mat& v_map, const Eigen::Vector2i& v_start_point, const Eigen::Vector2i& v_goal)
 {
+	Eigen::Vector2i goal(v_goal.y(), v_goal.x());
+	Eigen::Vector2i start_point(v_start_point.y(), v_start_point.x());
 	cv::Mat distance_map(v_map.rows, v_map.cols, CV_8UC1, cv::Scalar(0));
 	generate_distance_map(v_map, distance_map, goal, goal, 0);
 	print_map(distance_map);
