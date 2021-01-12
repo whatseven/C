@@ -786,8 +786,8 @@ std::vector<Eigen::Vector2i> perform_ccpp(const cv::Mat& ccpp_map, const Eigen::
 	}
 	std::vector<Eigen::Vector2i> trajectory;
 	bool isAllBlack = false;
-	Eigen::Vector2i goal(v_goal.y(), v_goal.x());
-	Eigen::Vector2i start_point(v_start_point.y(), v_start_point.x());
+	Eigen::Vector2i goal(v_goal.y() + 1, v_goal.x() + 1);
+	Eigen::Vector2i start_point(v_start_point.y() + 1, v_start_point.x() + 1);
 	int min_length = v_map.rows + v_map.cols;
 	if (v_map.at<cv::uint8_t>(start_point.x(),start_point.y()) == 0)
 	{
@@ -840,6 +840,11 @@ std::vector<Eigen::Vector2i> perform_ccpp(const cv::Mat& ccpp_map, const Eigen::
 	for (int i = 0; i < trajectory.size(); i++)
 	{
 		sequence_map.at<cv::uint8_t>(trajectory[i].x(), trajectory[i].y()) = i;
+	}
+	for (auto trajectory_point : trajectory)
+	{
+		trajectory_point[0] -= 1;
+		trajectory_point[1] -= 1;
 	}
 	//print_map(sequence_map);
 	return trajectory;
