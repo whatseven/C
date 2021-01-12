@@ -575,13 +575,6 @@ public:
 							ccpp_map.at<cv::uint8_t>(y, x) = 0;
 						}
 					}
-					// 1 check building
-					// 2 target_center
-					// std::min_element(unpassed_trajectory.begin(), unpassed_trajectory.end(),
-					//	[&v_cur_pos](const auto& t1, const auto& t2) {
-					//	return (t1.first - v_cur_pos.pos_mesh).norm() < (t2.first - v_cur_pos.pos_mesh).norm();
-					//});
-					// 3 
 				}
 			}
 		}

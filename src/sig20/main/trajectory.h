@@ -729,23 +729,61 @@ void explore(const cv::Mat& v_map, const cv::Mat& distance_map, const cv::Mat& o
 				return;
 			else
 			{
-				if (trajectory[trajectory.size() - 1] != now_point)
+				bool isCC = true;
+				int min_length = v_map.rows + v_map.cols;
+				Eigen::Vector2i next_point;
+				for (int i = 0; i < v_map.rows; i++)
 				{
-					trajectory.push_back(now_point);
-					break;
+					for (int j = 0; j < v_map.cols; j++)
+					{
+						if (v_map.at<cv::uint8_t>(i, j) != 0)
+						{
+							if (visited_map.at<cv::uint8_t>(i, j) == 0)
+							{
+								isCC = false;
+								int temp_distance = std::abs(now_point.x() - i) + std::abs(now_point.y() - j);
+								if (temp_distance < min_length)
+								{
+									min_length = temp_distance;
+									next_point = Eigen::Vector2i(i, j);
+								}
+							}
+						}
+					}
+				}
+				if (isCC)
+				{
+					isFinished = true;
+					trajectory.push_back(goal);
+					return;
 				}
 				else
 				{
+					explore(v_map, distance_map, obstacle_map, trajectory, next_point, goal, visited_map, isFinished);
 					break;
-				}
-					
+				}	
 			}
 		}
 	}
 }
 
-std::vector<Eigen::Vector2i> perform_ccpp(const cv::Mat& v_map, const Eigen::Vector2i& v_start_point, const Eigen::Vector2i& v_goal)
+std::vector<Eigen::Vector2i> perform_ccpp(const cv::Mat& ccpp_map, const Eigen::Vector2i& v_start_point, const Eigen::Vector2i& v_goal)
 {
+	cv::Mat v_map(ccpp_map.rows + 2, ccpp_map.cols + 2, CV_8UC1);
+	for (int i = 0; i < v_map.rows; i++)
+	{
+		for (int j = 0; j < v_map.cols; j++)
+		{
+			if (i == 0 || j == 0 || i == v_map.rows - 1 || j == v_map.cols - 1)
+			{
+				v_map.at<cv::uint8_t>(i, j) = 0;
+			}
+			else
+			{
+				v_map.at<cv::uint8_t>(i, j) = ccpp_map.at<cv::uint8_t>(i - 1, j - 1);
+			}
+		}
+	}
 	std::vector<Eigen::Vector2i> trajectory;
 	bool isAllBlack = false;
 	Eigen::Vector2i goal(v_goal.y(), v_goal.x());
