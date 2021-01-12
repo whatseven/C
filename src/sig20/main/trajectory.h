@@ -627,7 +627,7 @@ void print_map(const cv::Mat& v_map)
 	return;
 }
 
-void explore(const cv::Mat& v_map, const cv::Mat& distance_map, const cv::Mat& obstacle_map, std::vector<Eigen::Vector2i>& trajectory, Eigen::Vector2i now_point, const Eigen::Vector2i& goal, cv::Mat& visited_map, bool& isFinished)
+void explore(const cv::Mat& v_map, const cv::Mat& distance_map, const cv::Mat& obstacle_map, std::vector<Eigen::Vector2i>& trajectory, Eigen::Vector2i now_point, const Eigen::Vector2i& goal, cv::Mat& visited_map, bool& isFinished, float weight)
 {
 	trajectory.push_back(now_point);
 	visited_map.at<cv::uint8_t>(now_point.x(), now_point.y()) += 1;
@@ -678,7 +678,7 @@ void explore(const cv::Mat& v_map, const cv::Mat& distance_map, const cv::Mat& o
 					temp_num = int(visited_map.at<cv::uint8_t>(neighbor_point.x(), neighbor_point.y()));
 					if (temp_num == 0)
 					{
-						int distance = int(distance_map.at<cv::uint8_t>(neighbor_point.x(), neighbor_point.y())) + int(obstacle_map.at<cv::uint8_t>(neighbor_point.x(), neighbor_point.y()));
+						float distance = float(distance_map.at<cv::uint8_t>(neighbor_point.x(), neighbor_point.y())) + weight * float(obstacle_map.at<cv::uint8_t>(neighbor_point.x(), neighbor_point.y()));
 						if (distance > max_num)
 						{
 							max_num = distance;
@@ -695,7 +695,7 @@ void explore(const cv::Mat& v_map, const cv::Mat& distance_map, const cv::Mat& o
 			{
 				trajectory.push_back(now_point);
 			}
-			explore(v_map, distance_map, obstacle_map, trajectory, neighbors[max_id], goal, visited_map, isFinished);
+			explore(v_map, distance_map, obstacle_map, trajectory, neighbors[max_id], goal, visited_map, isFinished, weight);
 		}
 		else
 		{
@@ -759,7 +759,7 @@ void explore(const cv::Mat& v_map, const cv::Mat& distance_map, const cv::Mat& o
 				}
 				else
 				{
-					explore(v_map, distance_map, obstacle_map, trajectory, next_point, goal, visited_map, isFinished);
+					explore(v_map, distance_map, obstacle_map, trajectory, next_point, goal, visited_map, isFinished, weight);
 					break;
 				}	
 			}
@@ -767,7 +767,7 @@ void explore(const cv::Mat& v_map, const cv::Mat& distance_map, const cv::Mat& o
 	}
 }
 
-std::vector<Eigen::Vector2i> perform_ccpp(const cv::Mat& ccpp_map, const Eigen::Vector2i& v_start_point, const Eigen::Vector2i& v_goal)
+std::vector<Eigen::Vector2i> perform_ccpp(const cv::Mat& ccpp_map, const Eigen::Vector2i& v_start_point, const Eigen::Vector2i& v_goal, float weight = 1)
 {
 	cv::Mat v_map(ccpp_map.rows + 2, ccpp_map.cols + 2, CV_8UC1);
 	for (int i = 0; i < v_map.rows; i++)
@@ -832,7 +832,7 @@ std::vector<Eigen::Vector2i> perform_ccpp(const cv::Mat& ccpp_map, const Eigen::
 	Eigen::Vector2i now_point(start_point);
 	cv::Mat visited_map(v_map.rows, v_map.cols, CV_8UC1, cv::Scalar(0));
 	bool isFinished = false;
-	explore(v_map, distance_map, obstacle_map, trajectory, start_point, goal, visited_map, isFinished);
+	explore(v_map, distance_map, obstacle_map, trajectory, start_point, goal, visited_map, isFinished, weight);
 	if (v_map.at<cv::uint8_t>(goal.x(), goal.y()) == 0)
 		trajectory.push_back(goal);
 
