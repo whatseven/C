@@ -27,7 +27,7 @@ public:
     int m_current_building;
     std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> m_trajectories;
     std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> m_trajectories_spline;
-    std::vector<std::pair<Eigen::Vector2f, Region_status>> m_uncertainty_map;
+    std::vector<std::pair<Eigen::Vector2f, cv::Vec3b>> m_uncertainty_map;
     Eigen::Vector3f m_pos;
     Eigen::Vector3f m_direction;
     Point_set m_points;
@@ -185,14 +185,9 @@ public:
             // Uncertainty
             for (const auto& item_tile : m_uncertainty_map) {
                 const Eigen::Vector2f& position= item_tile.first;
-                const Region_status& status = item_tile.second;
+                const cv::Vec3b& item_color = item_tile.second;
                 Eigen::Vector4f color;
-                if (status == Region_status::Occupied)
-                    color = Eigen::Vector4f(1, 0, 0, 1);
-            	else if (status == Region_status::Free)
-                    color = Eigen::Vector4f(0, 1, 0, 1);
-                else
-                    color = Eigen::Vector4f(0, 0, 0, 1);
+                color = Eigen::Vector4f((float)item_color[2]/255.f, (float)item_color[1] / 255.f, (float)item_color[0] / 255.f, 1);
 
                 draw_cube(Eigen::AlignedBox3f(Eigen::Vector3f(position.x() - 10, position.y() - 10, -1),
                     Eigen::Vector3f(position.x() + 10, position.y() + 10, 1)), color);

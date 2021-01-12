@@ -54,9 +54,12 @@ void override_sleep(float seconds)
 std::vector<cv::Vec3b> get_color_table_bgr()
 {
         std::vector<cv::Vec3b> color_table;
+        //color_table.emplace_back(0, 0, 0);
+        //color_table.emplace_back(0, 255, 0);
+        //color_table.emplace_back(0, 0, 255);
         color_table.emplace_back(2, 0, 160);
-        color_table.emplace_back(2, 0, 104);
-        color_table.emplace_back(0, 12, 79);
+        //color_table.emplace_back(2, 0, 104);
+        //color_table.emplace_back(0, 12, 79);
         color_table.emplace_back(51, 0, 255);
         color_table.emplace_back(105, 72, 129);
         color_table.emplace_back(51, 102, 255);

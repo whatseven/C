@@ -16,6 +16,24 @@ struct Building {
 	//Used for trajectory generation
 	int start_box = -1;
 	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> trajectory;
+
+	int find_nearest_trajectory(const Eigen::Vector3f& v_pos) const 
+	{
+		return std::min_element(trajectory.begin(), trajectory.end(),
+			[&v_pos](const std::pair<Eigen::Vector3f, Eigen::Vector3f>& item1, const std::pair<Eigen::Vector3f, Eigen::Vector3f>& item2) {
+			return (item1.first - v_pos).norm() < (item2.first - v_pos).norm();
+		}) - trajectory.begin();
+	}
+
+	int find_nearest_trajectory_2d(const Eigen::Vector3f& v_pos) const {
+		return std::min_element(trajectory.begin(), trajectory.end(),
+			[&v_pos](const std::pair<Eigen::Vector3f, Eigen::Vector3f>& item1, const std::pair<Eigen::Vector3f, Eigen::Vector3f>& item2) {
+			Eigen::Vector2f drone_pos(v_pos.x(), v_pos.y());
+			Eigen::Vector2f trajectory_pos1(item1.first.x(), item1.first.y());
+			Eigen::Vector2f trajectory_pos2(item1.first.x(), item1.first.y());
+				return (trajectory_pos1 - drone_pos).norm() < (trajectory_pos2 - drone_pos).norm();
+		}) - trajectory.begin();
+	}
 };
 
 class Building_Set {
@@ -36,5 +54,3 @@ struct Next_target {
 		:origin_index_in_building_vector(v_origin_index_in_building_vector), origin_index_in_untraveled_pointset(v_origin_index_in_untraveled_pointset) {
 	}
 };
-
-enum Region_status { Unobserved, Free, Occupied };

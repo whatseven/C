@@ -34,13 +34,13 @@ const bool DOUBLE_FLAG = true;
 
 //
 //const std::string trajectory_path = "C:\\repo\\C\\temp\\adjacent\\10_single_upper.log";
-const std::string trajectory_path = "D:\\SIG21_Local\\2_2_error_map\\asia18_bridge_565.txt";
-const std::string recon_sample_points_path = "D:\\SIG21_Local\\2_2_error_map\\asia18_bridge_565_align_points.ply";
+const std::string trajectory_path = "D:\\SIG21_Local\\2_2_error_map\\ours_bridge_394.log";
+const std::string recon_sample_points_path = "D:\\SIG21_Local\\2_2_error_map\\ours_bridge_394_align_points.ply";
 const std::string gt_sample_points_path = "D:\\SIG21_Local\\2_2_error_map\\bridge_points_wo_building.ply";
-const std::string recon_mesh_path = "D:\\SIG21_Local\\2_2_error_map\\asia18_bridge_565_align.ply";
+const std::string recon_mesh_path = "D:\\SIG21_Local\\2_2_error_map\\ours_bridge_394_align.ply";
 const std::string gt_mesh_path = "D:\\SIG21_Local\\2_2_error_map\\bridge_mesh.ply";
 
-const std::string output_data_path = "D:\\SIG21_Local\\2_2_error_map\\asia18.txt";
+const std::string output_data_path = "D:\\SIG21_Local\\2_2_error_map\\ours.txt";
 
 
 int main(int argc, char** argv){
@@ -75,7 +75,7 @@ int main(int argc, char** argv){
 	std::cout << "Build done!" << std::endl;
 
 	std::vector<std::vector<bool>> point_view_visibility;
-	std::vector<std::array<float,5>> reconstructability_recon_split = reconstructability_hueristic(trajectory, sample_recon_points, gt_mesh, point_view_visibility);
+	std::vector<std::array<float,5>> reconstructability_recon_split = reconstructability_hueristic(trajectory, sample_recon_points, recon_mesh, point_view_visibility);
 	std::vector<std::array<float,5>> reconstructability_gt_split = reconstructability_hueristic(trajectory, sample_gt_points, gt_mesh, point_view_visibility);
 	std::vector<float> reconstructability_recon, reconstructability_gt;
 	for (const auto& item : reconstructability_recon_split)
@@ -83,7 +83,8 @@ int main(int argc, char** argv){
 	for (const auto& item : reconstructability_gt_split)
 		reconstructability_gt.push_back(item[4]);
 	
-	
+	std::cout << "reconstructability done!" << std::endl;
+
 	std::vector<float> recon_nearest_error;
 	for(const Point_3& p: sample_recon_points.points())
 	{
