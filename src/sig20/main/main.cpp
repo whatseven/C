@@ -565,6 +565,14 @@ public:
 						else
 							ccpp_map.at<cv::uint8_t>(y, x) = 0;
 					}
+					for (auto building : v_buildings)
+					{
+						if (inside_box(Eigen::Vector2f(x * DISTANCE_THRESHOLD + m_map_start.x(),
+							y * DISTANCE_THRESHOLD + m_map_start.y()), Eigen::AlignedBox2f(Eigen::Vector2f(building.bounding_box_3d.max().x(), building.bounding_box_3d.max().y()), Eigen::Vector2f(building.bounding_box_3d.min().x(), building.bounding_box_3d.min().y()))))
+						{
+							ccpp_map.at<cv::uint8_t>(y, x) = 0;
+						}
+					}
 					// 1 check building
 					// 2 target_center
 					// std::min_element(unpassed_trajectory.begin(), unpassed_trajectory.end(),
@@ -575,11 +583,19 @@ public:
 				}
 			}
 		}
+
+		// Find the nearest view point
+		const Eigen::Vector3f& next_point = (*std::min_element(v_buildings[untraveled_buildings[id_building].origin_index_in_building_vector].trajectory.begin(), v_buildings[untraveled_buildings[id_building].origin_index_in_building_vector].trajectory.end(),
+			[&v_cur_pos](const auto& t1, const auto& t2) {
+				return (t1.first - v_cur_pos.pos_mesh).norm() < (t2.first - v_cur_pos.pos_mesh).norm();
+			})).first;
+
 		cv::imwrite(std::to_string(frame_id) + "_global_map.png", map);
 		if(with_exploration)
 		{
 			Eigen::Vector3f t1=(v_cur_pos.pos_mesh - m_map_start) / DISTANCE_THRESHOLD;
-			Eigen::Vector3f t2=(target_center - m_map_start) / DISTANCE_THRESHOLD;
+
+			Eigen::Vector3f t2=(next_point - m_map_start) / DISTANCE_THRESHOLD;
 			Eigen::Vector2i start_pos_on_map(t1.x(),t1.y());
 			Eigen::Vector2i end_pos_on_map(t2.x(), t2.y());
 
