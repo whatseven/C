@@ -777,7 +777,7 @@ std::vector<Eigen::Vector2i> perform_ccpp(const cv::Mat& v_map, const Eigen::Vec
 	
 	cv::Mat distance_map(v_map.rows, v_map.cols, CV_8UC1, cv::Scalar(0));
 	generate_distance_map(v_map, distance_map, goal, goal, 0);
-	print_map(distance_map);
+	//print_map(distance_map);
 	cv::Mat obstacle_map(v_map.rows, v_map.cols, CV_8UC1, cv::Scalar(0));
 	for (int i = 0; i < v_map.rows; i++)
 	{
@@ -789,7 +789,7 @@ std::vector<Eigen::Vector2i> perform_ccpp(const cv::Mat& v_map, const Eigen::Vec
 			}
 		}
 	}
-	print_map(obstacle_map);
+	//print_map(obstacle_map);
 
 	Eigen::Vector2i now_point(start_point);
 	cv::Mat visited_map(v_map.rows, v_map.cols, CV_8UC1, cv::Scalar(0));
@@ -803,6 +803,6 @@ std::vector<Eigen::Vector2i> perform_ccpp(const cv::Mat& v_map, const Eigen::Vec
 	{
 		sequence_map.at<cv::uint8_t>(trajectory[i].x(), trajectory[i].y()) = i;
 	}
-	print_map(sequence_map);
+	//print_map(sequence_map);
 	return trajectory;
 }

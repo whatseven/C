@@ -132,6 +132,10 @@ class Next_best_target {
 public:
 	Motion_status m_motion_status;
 	int m_current_building_id = -1;
+
+	//TODO only for visualization
+	std::vector<CGAL::Point_2<K>> sample_points;
+	std::vector<Region_status> region_status;
 	
 	Next_best_target()
 	{
@@ -144,6 +148,159 @@ public:
 	
 	virtual std::pair<Eigen::Vector3f, Eigen::Vector3f> determine_next_target(int v_frame_id, const Pos_Pack& v_cur_pos, std::vector<Building>& v_buildings, bool with_exploration,float v_threshold) = 0;
 };
+
+class Next_best_target_min_distance :public Next_best_target {
+public:
+	float DISTANCE_THRESHOLD = 20.f;
+	float VISIBLE_DISTANCE = DISTANCE_THRESHOLD * 2;
+
+	int m_current_exploration_id = -1;
+
+	Next_best_target_min_distance(const Eigen::Vector3f& v_map_start_mesh, const Eigen::Vector3f& v_map_end_mesh) :Next_best_target() {
+		for (float y = v_map_start_mesh.y(); y < v_map_end_mesh.y(); y += DISTANCE_THRESHOLD)
+			for (float x = v_map_start_mesh.x(); x < v_map_end_mesh.x(); x += DISTANCE_THRESHOLD)
+				sample_points.push_back(CGAL::Point_2<K>(x, y));
+		region_status.resize(sample_points.size(), Unobserved);
+	}
+
+	void get_next_target(int frame_id, const Pos_Pack& v_cur_pos, const std::vector<Building>& v_buildings, bool with_exploration) override {
+		// Find next target (building or place) with higher confidence
+		std::vector<Next_target> untraveled_buildings;
+		// Find with distance
+		for (int i_building = 0; i_building < v_buildings.size(); ++i_building) {
+			if (v_buildings[i_building].passed_trajectory.size() == 0)
+				untraveled_buildings.emplace_back(i_building, -1);
+		}
+		if (with_exploration)
+			for (int i_point = 0; i_point < sample_points.size(); ++i_point)
+				if (region_status[i_point] == Unobserved)
+					untraveled_buildings.emplace_back(-1, i_point);
+
+		if (untraveled_buildings.size() == 0) {
+			m_motion_status = Motion_status::done;
+			return;
+		}
+		
+		int next_target_id = std::min_element(untraveled_buildings.begin(),
+			untraveled_buildings.end(),
+			[&v_cur_pos, &v_buildings, this](const Next_target& b1, const Next_target& b2) {
+			float distance1, distance2;
+			if (b1.origin_index_in_building_vector != -1)
+				distance1 = (v_buildings[b1.origin_index_in_building_vector].bounding_box_3d.center() - v_cur_pos.pos_mesh).norm();
+			else
+				distance1 = (Eigen::Vector2f(v_cur_pos.pos_mesh.x(), v_cur_pos.pos_mesh.y()) - Eigen::Vector2f(sample_points[b1.origin_index_in_untraveled_pointset].x(), sample_points[b1.origin_index_in_untraveled_pointset].y())).norm();
+			if (b2.origin_index_in_building_vector != -1)
+				distance2 = (v_buildings[b2.origin_index_in_building_vector].bounding_box_3d.center() - v_cur_pos.pos_mesh).norm();
+			else
+				distance2 = (Eigen::Vector2f(v_cur_pos.pos_mesh.x(), v_cur_pos.pos_mesh.y()) - Eigen::Vector2f(sample_points[b2.origin_index_in_untraveled_pointset].x(), sample_points[b2.origin_index_in_untraveled_pointset].y())).norm();
+
+			return  distance1 < distance2;
+		})- untraveled_buildings.begin();
+
+		if (!with_exploration) {
+			m_motion_status = Motion_status::reconstruction;
+			m_current_building_id = untraveled_buildings[0].origin_index_in_building_vector;
+			return;
+		}
+
+		if (untraveled_buildings[next_target_id].origin_index_in_building_vector == -1) {
+			m_motion_status = Motion_status::exploration;
+			m_current_exploration_id = untraveled_buildings[next_target_id].origin_index_in_untraveled_pointset;
+		}
+		else {
+			m_motion_status = Motion_status::reconstruction;
+			m_current_building_id = untraveled_buildings[next_target_id].origin_index_in_building_vector;
+		}
+		return;
+	}
+
+	void update_uncertainty(const Pos_Pack& v_cur_pos, const std::vector<Building>& v_buildings) override {
+		Eigen::Vector2f cur_point_cgal(v_cur_pos.pos_mesh.x(), v_cur_pos.pos_mesh.y());
+		int nearest_region_id = std::min_element(sample_points.begin(), sample_points.end(),
+			[&cur_point_cgal](const CGAL::Point_2<K>& p1, const CGAL::Point_2<K>& p2) {
+			return std::pow(p1.x() - cur_point_cgal.x(), 2) + std::pow(p1.y() - cur_point_cgal.y(), 2) < std::pow(p2.x() - cur_point_cgal.x(), 2) + std::pow(p2.y() - cur_point_cgal.y(), 2);
+		}) - sample_points.begin();
+		region_status[nearest_region_id] = Free;
+
+		for (int i_point = 0; i_point < region_status.size(); i_point++) {
+			if (region_status[i_point] != Unobserved)
+				continue;
+			const Eigen::Vector2f p(sample_points[i_point].x(), sample_points[i_point].y());
+
+			for (const auto& item_building : v_buildings) {
+				Eigen::AlignedBox2f box(Eigen::Vector2f(item_building.bounding_box_3d.min().x(), item_building.bounding_box_3d.min().y()),
+					Eigen::Vector2f(item_building.bounding_box_3d.max().x(), item_building.bounding_box_3d.max().y()));
+				if (p.x() > item_building.bounding_box_3d.min().x() && p.x() < item_building.bounding_box_3d.max().x() &&
+					p.y() > item_building.bounding_box_3d.min().y() && p.y() < item_building.bounding_box_3d.max().y()) {
+					region_status[i_point] = Occupied;
+					break;
+				}
+			}
+			continue;
+			if (region_status[i_point] != Unobserved)
+				continue;
+
+			Eigen::Vector2f direction = p - cur_point_cgal;
+			float squared_distance = direction.norm();
+
+			if (squared_distance > VISIBLE_DISTANCE)
+				continue;
+
+			if (direction.normalized().dot(Eigen::Vector2f(v_cur_pos.direction.x(), v_cur_pos.direction.y()).normalized()) < M_SQRT2 / 2)
+				continue;
+
+			region_status[i_point] = Free;
+		}
+	}
+
+	std::pair<Eigen::Vector3f, Eigen::Vector3f> determine_next_target(int v_frame_id, const Pos_Pack& v_cur_pos, std::vector<Building>& v_buildings, bool with_exploration, float v_threshold) override {
+		std::pair<Eigen::Vector3f, Eigen::Vector3f> next_pos;
+
+		if (m_motion_status == Motion_status::initialization) {
+			get_next_target(v_frame_id, v_cur_pos, v_buildings, with_exploration);
+			LOG(INFO) << "Initialization target !";
+		}
+
+		if (m_motion_status == Motion_status::exploration) {
+			get_next_target(v_frame_id, v_cur_pos, v_buildings, with_exploration);
+			Eigen::Vector3f next_pos(sample_points[m_current_exploration_id].x(), sample_points[m_current_exploration_id].y(), v_cur_pos.pos_mesh.z());
+			return std::make_pair(next_pos, (next_pos - v_cur_pos.pos_mesh).normalized());
+		}
+		if (m_motion_status == Motion_status::reconstruction) {
+			const int& cur_building_id = m_current_building_id;
+			std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> unpassed_trajectory;
+			std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>>& passed_trajectory = v_buildings[cur_building_id].passed_trajectory;
+			std::copy_if(v_buildings[cur_building_id].trajectory.begin(), v_buildings[cur_building_id].trajectory.end(),
+				std::back_inserter(unpassed_trajectory),
+				[&passed_trajectory, v_threshold](const auto& item_new_trajectory) {
+				bool untraveled = true;
+				for (const auto& item_passed_trajectory : passed_trajectory)
+					if ((item_passed_trajectory.first - item_new_trajectory.first).norm() < v_threshold) {
+						untraveled = false;
+					}
+				return untraveled;
+			});
+
+			if (unpassed_trajectory.size() == 0) {
+				get_next_target(v_frame_id, v_cur_pos, v_buildings, with_exploration);
+				LOG(INFO) << "Change target !";
+				return determine_next_target(v_frame_id, v_cur_pos, v_buildings, with_exploration, v_threshold);
+			}
+			else {
+				auto it_min_distance = std::min_element(
+					unpassed_trajectory.begin(), unpassed_trajectory.end(),
+					[&v_cur_pos](const auto& t1, const auto& t2) {
+					return (t1.first - v_cur_pos.pos_mesh).norm() < (t2.first - v_cur_pos.pos_mesh).norm();
+				});
+				next_pos = *it_min_distance;
+				passed_trajectory.push_back(next_pos);
+				return next_pos;
+			}
+		}
+	}
+
+};
+
 
 class Next_best_target_min_max_information:public Next_best_target
 {
@@ -271,6 +428,7 @@ public:
 					break;
 				}
 			}
+			continue;
 			if(region_status[i_point] != Unobserved)
 				continue;
 
@@ -296,6 +454,7 @@ public:
 		}
 
 		if (m_motion_status == Motion_status::exploration) {
+			get_next_target(v_frame_id, v_cur_pos, v_buildings, with_exploration);
 			Eigen::Vector3f next_pos(sample_points[m_current_exploration_id].x(), sample_points[m_current_exploration_id].y(), v_cur_pos.pos_mesh.z());
 			return std::make_pair(next_pos, (next_pos- v_cur_pos.pos_mesh).normalized());
 		}
@@ -391,7 +550,6 @@ public:
 		cv::Mat ccpp_map((m_map_end.y() - m_map_start.y()) / DISTANCE_THRESHOLD + 1,
 			(m_map_end.x() - m_map_start.x()) / DISTANCE_THRESHOLD + 1,
 			CV_8UC1,cv::Scalar(0));
-
 		
 		topology.push_back(cur_box);
 		topology_viz_color.push_back(cv::Vec3b((unsigned char)(rand() / (RAND_MAX / 255.0)), (unsigned char)(rand() / (RAND_MAX / 255.0)), (unsigned char)(rand() / (RAND_MAX / 255.0))));
@@ -406,9 +564,14 @@ public:
 							ccpp_map.at<cv::uint8_t>(y, x) = 255;
 						else
 							ccpp_map.at<cv::uint8_t>(y, x) = 0;
-
 					}
-					
+					// 1 check building
+					// 2 target_center
+					// std::min_element(unpassed_trajectory.begin(), unpassed_trajectory.end(),
+					//	[&v_cur_pos](const auto& t1, const auto& t2) {
+					//	return (t1.first - v_cur_pos.pos_mesh).norm() < (t2.first - v_cur_pos.pos_mesh).norm();
+					//});
+					// 3 
 				}
 			}
 		}
@@ -424,11 +587,11 @@ public:
 			start_end.setTo(0);
 			start_end.at<cv::uint8_t>(start_pos_on_map.y(), start_pos_on_map.x())=255;
 			start_end.at<cv::uint8_t>(end_pos_on_map.y(), end_pos_on_map.x()) = 255;
-			debug_img(std::vector<cv::Mat>{ccpp_map, start_end});
+			//debug_img(std::vector<cv::Mat>{ccpp_map, start_end});
 
 
 			std::vector<Eigen::Vector2i> map_trajectory = perform_ccpp(ccpp_map, start_pos_on_map, end_pos_on_map);
-			std::cout << "  " << std::endl;
+			//std::cout << "  " << std::endl;
 			for(const Eigen::Vector2i& item: map_trajectory)
 			{
 				// todo: invert x,y!!!!!!!!!!!!!
@@ -504,77 +667,6 @@ public:
 		return next_pos;
 	}
 
-};
-
-class Synthetic_building {
-public:
-
-	Synthetic_building() {
-
-	}
-
-	void get_buildings() {
-		/*
-		CGAL::Point_set_3<Point_3, Vector_3> original_point_cloud;
-		CGAL::read_ply_point_set(std::ifstream(args["model_path"].asString()), original_point_cloud);
-		CGAL::Point_set_3<Point_3, Vector_3> point_cloud(original_point_cloud);
-		Height_map height_map(point_cloud, args["heightmap_resolution"].asFloat());
-		height_map.save_height_map_png("map.png", args["HEIGHT_CLIP"].asFloat());
-		height_map.save_height_map_tiff("map.tiff");
-
-		// Delete ground planes
-		{
-			for (int idx = point_cloud.size() - 1; idx >= 0; idx--) {
-				if (point_cloud.point(idx).z() < args["HEIGHT_CLIP"].asFloat())
-					point_cloud.remove(idx);
-			}
-
-			point_cloud.collect_garbage();
-		}
-		CGAL::write_ply_point_set(std::ofstream("points_without_plane.ply"), point_cloud);
-		// Cluster building
-		std::size_t nb_clusters;
-		{
-			Point_set::Property_map<int> cluster_map = point_cloud.add_property_map<int>("cluster", -1).first;
-
-			std::vector<std::pair<std::size_t, std::size_t> > adjacencies;
-
-			nb_clusters = CGAL::cluster_point_set(point_cloud, cluster_map,
-				point_cloud.parameters().neighbor_radius(args["cluster_radius"].asFloat()).
-				adjacencies(std::back_inserter(adjacencies)));
-			fake_buildings.resize(nb_clusters);
-
-			Point_set::Property_map<unsigned char> red = point_cloud.add_property_map<unsigned char>("red", 0).first;
-			Point_set::Property_map<unsigned char> green = point_cloud.add_property_map<unsigned char>("green", 0).first;
-			Point_set::Property_map<unsigned char> blue = point_cloud.add_property_map<unsigned char>("blue", 0).first;
-			for (Point_set::Index idx : point_cloud) {
-				// One color per cluster
-				int cluster_id = cluster_map[idx];
-				CGAL::Random rand(cluster_id);
-				red[idx] = rand.get_int(64, 192);
-				green[idx] = rand.get_int(64, 192);
-				blue[idx] = rand.get_int(64, 192);
-
-				Building& current_building = fake_buildings[cluster_id];
-				current_building.points_world_space.insert(point_cloud.point(idx));
-			}
-		}
-		for (int i_building_1 = 0; i_building_1 < fake_buildings.size(); ++i_building_1) {
-			fake_buildings[i_building_1].bounding_box_3d = get_bounding_box(fake_buildings[i_building_1].points_world_space);
-			fake_buildings[i_building_1].boxes.push_back(fake_buildings[i_building_1].bounding_box_3d);
-		}
-
-		else {
-				const float distance = 30.f;
-				Eigen::AlignedBox3f drone_box(current_pos.pos_mesh - Eigen::Vector3f(distance, distance, distance), current_pos.pos_mesh + Eigen::Vector3f(distance, distance, distance));
-				for (int i_building = 0; i_building < fake_buildings.size(); ++i_building) {
-					if (fake_buildings[i_building].bounding_box_3d.intersects(drone_box))
-						current_buildings.push_back(fake_buildings[i_building]);
-				}
-				num_building_current_frame = current_buildings.size();
-			}
-		*/
-	}
 };
 
 class Mapper
@@ -899,12 +991,17 @@ int main(int argc, char** argv){
 		mapper = new Virtual_mapper(args,airsim_client);
 	
 	Next_best_target* next_best_target;
-	if(args["nbv_target"] == "Topology_decomposition")
-		next_best_target=new Next_best_target_topology_exploration(map_start_mesh, map_end_mesh);
-	else
+	if (args["nbv_target"] == "Topology_decomposition")
+		next_best_target = new Next_best_target_topology_exploration(map_start_mesh, map_end_mesh);
+	else if (args["nbv_target"] == "Min_distance")
+		next_best_target = new Next_best_target_min_distance(map_start_mesh, map_end_mesh);
+	else if (args["nbv_target"] == "Min_max_information")
 		next_best_target = new Next_best_target_min_max_information(map_start_mesh, map_end_mesh);
-
+	else
+		throw;
 	bool with_exploration = args["with_exploration"].asBool();
+	float reconstruction_length = 0.f;
+	float exploration_length = 0.f;
 	while (!end) {
 		LOG(INFO) << "<<<<<<<<<<<<< Frame " << cur_frame_id << " <<<<<<<<<<<<<";
 		
@@ -947,8 +1044,18 @@ int main(int argc, char** argv){
 		// End
 		if (next_best_target->m_motion_status==Motion_status::done)
 			break;
-		
-		total_passed_trajectory.push_back(next_pos_direction);
+
+		// Statics
+		{
+			total_passed_trajectory.push_back(next_pos_direction);
+			if (cur_frame_id > 1)
+			{
+				if(next_best_target->m_motion_status==Motion_status::reconstruction)
+					reconstruction_length += (next_pos_direction.first - current_pos.pos_mesh).norm();
+				else
+					exploration_length += (next_pos_direction.first - current_pos.pos_mesh).norm();
+			}
+		}
 
 		// Visualize
 		{
@@ -957,11 +1064,13 @@ int main(int argc, char** argv){
 			if(next_best_target->m_motion_status==Motion_status::reconstruction)
 				viz.m_current_building = next_best_target->m_current_building_id;
 			viz.m_uncertainty_map.clear();
-			//for (const auto& item : next_best_target->sample_points)
-			//{
-			//	int index = &item - &next_best_target->sample_points[0];
-			//	viz.m_uncertainty_map.emplace_back(Eigen::Vector2f(item.x(), item.y()), next_best_target->region_status[index]);
-			//}
+			if(args["nbv_target"]=="Min_distance"|| args["nbv_target"] == "Min_max_information")
+			{
+				for (const auto& item : next_best_target->sample_points) {
+					int index = &item - &next_best_target->sample_points[0];
+					viz.m_uncertainty_map.emplace_back(Eigen::Vector2f(item.x(), item.y()), next_best_target->region_status[index]);
+				}
+			}
 			viz.m_pos = current_pos.pos_mesh;
 			viz.m_direction = current_pos.direction;
 			viz.m_trajectories = total_passed_trajectory;
@@ -999,6 +1108,8 @@ int main(int argc, char** argv){
 	LOG(INFO) <<"Total path num: "<< total_passed_trajectory.size();
 	LOG(INFO) <<"Total path length: "<< evaluate_length(total_passed_trajectory);
 	LOG(INFO) <<"Total path length: "<< evaluate_length(simplified_trajectory);
+	LOG(INFO) <<"Total exploration length: "<< exploration_length;
+	LOG(INFO) <<"Total reconstruction length: "<< reconstruction_length;
 	LOG(INFO) << "Write trajectory done!";
 
 	{

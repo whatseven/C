@@ -10,7 +10,7 @@ if __name__ == "__main__":
 
     a = data[0]
     b = data[1]
-    mask = data[1] < 0.05
+    mask = data[1] < 0.014
     print(scipy.stats.spearmanr(a[mask], b[mask]))
     
 
