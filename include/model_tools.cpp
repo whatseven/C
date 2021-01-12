@@ -962,7 +962,7 @@ float point_box_distance_eigen(const Eigen::Vector2f& v_pos, const Eigen::Aligne
 	float y = v_pos.y();
 	if (y < v_box.min().y()) sqDist += (v_box.min().y() - y) * (v_box.min().y() - y);
 	if (y > v_box.max().y()) sqDist += (y - v_box.max().y()) * (y - v_box.max().y());
-	return sqDist;
+	return std::sqrt(sqDist);
 }
 
 

@@ -754,7 +754,7 @@ void explore(const cv::Mat& v_map, const cv::Mat& distance_map, const cv::Mat& o
 				if (isCC)
 				{
 					isFinished = true;
-					trajectory.push_back(goal);
+					//trajectory.push_back(goal);
 					return;
 				}
 				else
@@ -841,7 +841,7 @@ std::vector<Eigen::Vector2i> perform_ccpp(const cv::Mat& ccpp_map, const Eigen::
 	{
 		sequence_map.at<cv::uint8_t>(trajectory[i].x(), trajectory[i].y()) = i;
 	}
-	for (auto trajectory_point : trajectory)
+	for (auto& trajectory_point : trajectory)
 	{
 		trajectory_point[0] -= 1;
 		trajectory_point[1] -= 1;
