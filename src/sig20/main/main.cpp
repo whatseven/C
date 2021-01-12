@@ -133,7 +133,7 @@ public:
 	Motion_status m_motion_status;
 	int m_current_building_id = -1;
 
-	float DISTANCE_THRESHOLD = 10.f;
+	float DISTANCE_THRESHOLD = 100.f;
 	std::vector<CGAL::Point_2<K>> sample_points;
 	std::vector<cv::Vec3b> region_status;
 	std::vector<cv::Vec3b> region_viz_color;
@@ -1100,19 +1100,19 @@ int main(int argc, char** argv){
 		// Visualize
 		{
 			viz.lock();
-			viz.m_buildings = total_buildings;
-			if(next_best_target->m_motion_status==Motion_status::reconstruction)
-				viz.m_current_building = next_best_target->m_current_building_id;
-			viz.m_uncertainty_map.clear();
+			//viz.m_buildings = total_buildings;
+			//if(next_best_target->m_motion_status==Motion_status::reconstruction)
+			//	viz.m_current_building = next_best_target->m_current_building_id;
+			//viz.m_uncertainty_map.clear();
 			//if(args["nbv_target"]=="Min_distance"|| args["nbv_target"] == "Min_max_information")
 			//{
-				for (const auto& item : next_best_target->sample_points) {
-					int index = &item - &next_best_target->sample_points[0];
-					viz.m_uncertainty_map.emplace_back(Eigen::Vector2f(item.x(), item.y()), next_best_target->region_status[index]);
-				}
+				//for (const auto& item : next_best_target->sample_points) {
+				//	int index = &item - &next_best_target->sample_points[0];
+				//	viz.m_uncertainty_map.emplace_back(Eigen::Vector2f(item.x(), item.y()), next_best_target->region_status[index]);
+				//}
 			//}
-			viz.m_pos = current_pos.pos_mesh;
-			viz.m_direction = current_pos.direction;
+			//viz.m_pos = current_pos.pos_mesh;
+			//viz.m_direction = current_pos.direction;
 			viz.m_trajectories = total_passed_trajectory;
 			//viz.m_polygon = next_best_target->img_polygon;
 			viz.unlock();
