@@ -627,11 +627,14 @@ public:
 			[&cur_point_cgal](const CGAL::Point_2<K>& p1, const CGAL::Point_2<K>& p2) {
 			return std::pow(p1.x() - cur_point_cgal.x(), 2) + std::pow(p1.y() - cur_point_cgal.y(), 2) < std::pow(p2.x() - cur_point_cgal.x(), 2) + std::pow(p2.y() - cur_point_cgal.y(), 2);
 		}) - sample_points.begin();
-		if(m_motion_status==Motion_status::reconstruction)
-			region_status[nearest_region_id] = color_reconstruction;
-		else
-			region_status[nearest_region_id] = region_viz_color[m_current_color_id % (region_viz_color.size()-2)+2];
-
+		if (region_status[nearest_region_id] == color_unobserved)
+		{
+			if (m_motion_status == Motion_status::reconstruction)
+				region_status[nearest_region_id] = color_reconstruction;
+			else
+				region_status[nearest_region_id] = region_viz_color[m_current_color_id % (region_viz_color.size() - 2) + 2];
+		}
+		
 		for (int i_point = 0; i_point < region_status.size(); i_point++) {
 			const Eigen::Vector2f p(sample_points[i_point].x(), sample_points[i_point].y());
 
