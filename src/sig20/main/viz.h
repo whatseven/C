@@ -142,9 +142,12 @@ public:
                 if(m_current_building== index)
 	                draw_cube(item_building.bounding_box_3d,
 	                    Eigen::Vector4f(1.f, 0.f, 0.f, 1.f));
-                else
+                else if(item_building.passed_trajectory.size()!=0)
                     draw_cube(item_building.bounding_box_3d,
                         Eigen::Vector4f(1.f, 1.f, 1.f, 1.f));
+                else
+                    draw_cube(item_building.bounding_box_3d,
+                        Eigen::Vector4f(0.5f, .5f, .5f, .5f));
             }
         	//View points
             for (const auto& item_trajectory : m_trajectories) {
