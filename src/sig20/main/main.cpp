@@ -463,7 +463,7 @@ public:
 	cv::Vec3b color_occupied;
 	cv::Vec3b color_unobserved;
 	cv::Vec3b color_reconstruction;
-	const int CCPP_CELL_THRESHOLD = 10;
+	const int CCPP_CELL_THRESHOLD = 40;
 
 	int m_current_ccpp_trajectory_id;
 	int m_current_color_id;
@@ -491,7 +491,8 @@ public:
 	void get_ccpp_trajectory(const Eigen::Vector3f& v_cur_pos, const Building& v_building,int v_ccpp_threshold)
 	{
 		const Eigen::AlignedBox3f& cur_box_3 = v_building.bounding_box_3d;
-		Eigen::AlignedBox2f cur_box_2(Eigen::Vector2f(m_map_start.x(), m_map_start.y()), Eigen::Vector2f(cur_box_3.max().x(), cur_box_3.max().y()));
+		Eigen::AlignedBox2f cur_box_2(Eigen::Vector2f(m_map_start.x(), m_map_start.y()), 
+			Eigen::Vector2f(cur_box_3.max().x(), cur_box_3.max().y()));
 		/*float target_min_y, target_max_y;
 		if(memory_y==-1.f)
 		{
@@ -513,7 +514,6 @@ public:
 		}
 		Eigen::AlignedBox2f cur_box_2(Eigen::Vector2f(m_map_start.x(), target_min_y),
 			Eigen::Vector2f(cur_box_3.max().x(), target_max_y));*/
-		topology.push_back(cur_box_2);
 		
 		cv::Mat ccpp_map((m_map_end.y() - m_map_start.y()) / DISTANCE_THRESHOLD + 1,
 			(m_map_end.x() - m_map_start.x()) / DISTANCE_THRESHOLD + 1,
@@ -524,11 +524,21 @@ public:
 			int y = (point.y() - m_map_start.y()) / DISTANCE_THRESHOLD;
 			int x = (point.x() - m_map_start.x()) / DISTANCE_THRESHOLD;
 			Eigen::Vector2f pos(point.x(), point.y());
-			if (inside_box(pos, cur_box_2) && region_status[id_region] == color_unobserved) {
-				ccpp_map.at<cv::uint8_t>(y, x) = 255;
-				num_ccpp_cell += 1;
+			if (inside_box(pos, cur_box_2)&&region_status[id_region]==color_unobserved) {
+				/*bool already_traveled = false;
+				for (const auto& item : topology) {
+					if (inside_box(pos, item))
+						already_traveled=true;
+				}
+				if(!already_traveled)*/
+				{
+					ccpp_map.at<cv::uint8_t>(y, x) = 255;
+					num_ccpp_cell += 1;
+				}
+				
 			}
 		}
+		topology.push_back(cur_box_2);
 
 		if (num_ccpp_cell < v_ccpp_threshold)
 			return;
@@ -742,7 +752,7 @@ public:
 	Mapper(const Json::Value& v_args):m_args(v_args){};
 	virtual void get_buildings(std::vector<Building>& v_buildings,
 		const Pos_Pack& v_current_pos,
-		const int v_cur_frame_id)=0;
+		const int v_cur_frame_id, Height_map& v_height_map)=0;
 };
 
 class GT_mapper:public Mapper
@@ -809,10 +819,15 @@ public:
 
 	void get_buildings(std::vector<Building>& v_buildings,
 		const Pos_Pack& v_current_pos,
-		const int v_cur_frame_id) override
+		const int v_cur_frame_id, Height_map& v_height_map) override
 	{
 		if (v_buildings.size() == 0)
+		{
 			v_buildings = m_buildings;
+			for (auto& item_building : v_buildings) {
+				v_height_map.update(item_building.bounding_box_3d);
+			}
+		}
 		return;
 	}
 };
@@ -831,7 +846,7 @@ public:
 	
 	void get_buildings(std::vector<Building>& v_buildings,
 		const Pos_Pack& v_current_pos,
-		const int v_cur_frame_id) override {
+		const int v_cur_frame_id,Height_map& v_height_map) override {
 		std::vector<Building> current_buildings;
 		int num_building_current_frame;
 		// Get current image and pose
@@ -977,6 +992,11 @@ public:
 			}
 			LOG(INFO) << "Building BBox update: DONE!";
 		}
+
+		// Update height map
+		for (auto& item_building : v_buildings) {
+			v_height_map.update(item_building.bounding_box_3d);
+		}
 	}
 };
 
@@ -1070,12 +1090,8 @@ int main(int argc, char** argv){
 	while (!end) {
 		LOG(INFO) << "<<<<<<<<<<<<< Frame " << cur_frame_id << " <<<<<<<<<<<<<";
 		
-		mapper->get_buildings(total_buildings, current_pos, cur_frame_id);
+		mapper->get_buildings(total_buildings, current_pos, cur_frame_id,height_map);
 
-		// Update height map
-		for (auto& item_building : total_buildings) {
-			height_map.update(item_building.bounding_box_3d);
-		}
 		next_best_target->update_uncertainty(current_pos, total_buildings);
 		//debug_img(std::vector{ height_map.m_map });
 
