@@ -1484,7 +1484,14 @@ public:
 
 class Real_mapper :public Mapper
 {
+public:
+	Airsim_tools* m_airsim_client;
+	Real_mapper(const Json::Value& args, Airsim_tools* v_airsim_client)
+		: Mapper(args), m_airsim_client(v_airsim_client) {
+	}
 	
+	void get_buildings(std::vector<Building>& v_buildings, const Pos_Pack& v_current_pos, const int v_cur_frame_id,
+		Height_map& v_height_map) override;
 };
 
 int main(int argc, char** argv){
@@ -1571,7 +1578,7 @@ int main(int argc, char** argv){
 	if (args["mapper"] == "gt_mapper")
 		mapper = new GT_mapper(args);
 	else if(args["mapper"] == "real_mapper")
-		mapper = new Real_mapper(args);
+		mapper = new Real_mapper(args, airsim_client);
 	else
 		mapper = new Virtual_mapper(args,airsim_client);
 	
