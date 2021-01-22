@@ -463,7 +463,7 @@ public:
 	cv::Vec3b color_occupied;
 	cv::Vec3b color_unobserved;
 	cv::Vec3b color_reconstruction;
-	const int CCPP_CELL_THRESHOLD = 40;
+	const int CCPP_CELL_THRESHOLD = 50;
 
 	int m_current_ccpp_trajectory_id;
 	int m_current_color_id;
@@ -563,7 +563,7 @@ public:
 
 
 		std::vector<Eigen::Vector2i> map_trajectory = perform_ccpp(ccpp_map, 
-			start_pos_on_map, end_pos_on_map,0);
+			start_pos_on_map, end_pos_on_map,1);
 		//std::cout << "  " << std::endl;
 		for (const Eigen::Vector2i& item : map_trajectory) {
 			// todo: invert x,y!!!!!!!!!!!!!
