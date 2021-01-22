@@ -23,6 +23,17 @@ Eigen::Vector3f MapConverter::convertUnrealToAirsim(const Eigen::Vector3f& vWorl
 	return result;
 }
 
+Eigen::Vector3f MapConverter::convertAirsimToMesh(const Eigen::Vector3f& vAirsimPos) const {
+	if (!initDroneDone)
+		throw "Init is not done";
+	Eigen::Vector3f result;
+	
+	result[0] = vAirsimPos.x() * 100 + mDroneStart[0];
+	result[1] = vAirsimPos.y() * 100 + mDroneStart[1];
+	result[2] = -(vAirsimPos.z() * 100 - mDroneStart[2]);
+	return convertUnrealToMesh(result);
+}
+
 Eigen::Vector3f MapConverter::convertUnrealToMesh(const Eigen::Vector3f& vWorldPos) const {
 	if (!initDroneDone)
 		throw "Init is not done";

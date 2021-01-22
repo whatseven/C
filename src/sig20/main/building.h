@@ -36,17 +36,6 @@ struct Building {
 	}
 };
 
-class Building_Set {
-public:
-	std::vector<Building> buildings;
-	bool hasShot;
-	std::vector<int> id_sequence;
-	Building_Set::Building_Set(int number){
-		buildings = std::vector<Building>(number);
-		hasShot = false;
-	}
-};
-
 struct Next_target {
 	int origin_index_in_building_vector = -1;
 	int origin_index_in_untraveled_pointset = -1;

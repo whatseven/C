@@ -36,6 +36,8 @@ public:
 
     Eigen::Vector3f convertMeshToUnreal(const Eigen::Vector3f& vMeshPos) const;
 
+    Eigen::Vector3f convertAirsimToMesh(const Eigen::Vector3f& vAirsimPos) const;
+	
     Eigen::Matrix3f convert_yaw_pitch_to_matrix_mesh(const float yaw, const float pitch);
 
     Eigen::Isometry3f get_camera_matrix(const float yaw, const float pitch, const Eigen::Vector3f& v_pos);

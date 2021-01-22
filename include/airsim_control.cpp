@@ -81,9 +81,10 @@ void Airsim_tools::reset_color(const std::string& v_key_words) {
     return;
 }
 
-void demo_move_to_next(msr::airlib::MultirotorRpcLibClient& v_agent,
-	const Eigen::Vector3f& v_next_pos_airsim, const float v_speed)
+std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> demo_move_to_next(msr::airlib::MultirotorRpcLibClient& v_agent,
+	const Eigen::Vector3f& v_next_pos_airsim, const float v_speed, bool is_forward)
 {
+    std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> poses;
     Pose pose = v_agent.simGetVehiclePose();
     Eigen::Vector3f pos_cur = pose.position;
 	
@@ -95,14 +96,17 @@ void demo_move_to_next(msr::airlib::MultirotorRpcLibClient& v_agent,
         Eigen::Vector3f direction = v_next_pos_airsim - pos_cur;
         direction.normalize();
         direction = direction * v_speed;
-        v_agent.moveByVelocityAsync(direction[0], direction[1], direction[2], 20,
-            DrivetrainType::ForwardOnly, YawMode(false, 0));
+    	if(is_forward)
+			v_agent.moveByVelocityAsync(direction[0], direction[1], direction[2], 20,
+				DrivetrainType::ForwardOnly, YawMode(false, 0));
+        else
+            v_agent.moveByVelocityAsync(direction[0], direction[1], direction[2], 20);
 
         Eigen::Vector3f pos_cur = pose.position;
     	if((pos_cur-v_next_pos_airsim).norm()<1)
             break;
-
-        override_sleep(0.2);
+        poses.push_back(std::make_pair(pos_cur, Eigen::Vector3f(0, 0, -1)));
+        override_sleep(0.05);
     }
-	
+    return poses;
 }
