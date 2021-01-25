@@ -101,7 +101,8 @@ std::vector<Polygon_2> get_polygons(std::string file_path);
 class Height_map {
 	
 public:
-    Height_map(const Point_set& v_point_cloud, const float v_resolution) :m_resolution(v_resolution) {
+    Height_map(const Point_set& v_point_cloud, const float v_resolution,bool v_dilate)
+	:m_resolution(v_resolution), m_dilate(v_dilate){
         Eigen::AlignedBox3f bounds = get_bounding_box(v_point_cloud);
         m_start = bounds.min();
         Eigen::Vector3f end(bounds.max());
@@ -117,11 +118,14 @@ public:
             if (cur_height < point.z())
                 m_map.at<float>((int)((point.y() - m_start[1]) / m_resolution), (int)((point.x() - m_start[0]) / m_resolution)) = point.z();
         }
-        cv::dilate(m_map, m_map_dilated, cv::getStructuringElement(cv::MorphShapes::MORPH_RECT, cv::Size(5, 5)), cv::Point(-1, -1), 3);
+        if (v_dilate)
+            cv::dilate(m_map, m_map_dilated, cv::getStructuringElement(cv::MorphShapes::MORPH_RECT, cv::Size(5, 5)), cv::Point(-1, -1), 3);
+        else
+            m_map_dilated = m_map;
     }
 
-    Height_map(const Eigen::Vector3f& v_min, const Eigen::Vector3f& v_max, const float v_resolution)
-	:m_resolution(v_resolution),m_start(v_min) {
+    Height_map(const Eigen::Vector3f& v_min, const Eigen::Vector3f& v_max, const float v_resolution, bool v_dilate)
+	:m_resolution(v_resolution),m_start(v_min), m_dilate(v_dilate) {
         Eigen::Vector3f delta = (v_max - m_start) / m_resolution;
         m_map = cv::Mat((int)delta[1] + 1, (int)delta[0] + 1, CV_32FC1);
         m_map.setTo(std::numeric_limits<float>::lowest());
@@ -149,7 +153,11 @@ public:
         for (int y = ymin; y <= ymax; ++y)
             for (int x = xmin; x <= xmax; ++x)
                 m_map.at<float>(y, x) = m_map.at<float>(y, x) > v_box.max()[2] ? m_map.at<float>(y, x) : v_box.max()[2];
-        cv::dilate(m_map, m_map_dilated, cv::getStructuringElement(cv::MorphShapes::MORPH_RECT, cv::Size(3, 3)),cv::Point(-1,-1),3);
+        if(m_dilate)
+    		cv::dilate(m_map, m_map_dilated, cv::getStructuringElement(cv::MorphShapes::MORPH_RECT, cv::Size(3, 3)),cv::Point(-1,-1),3);
+        else
+    		m_map_dilated = m_map;
+
     }
 	
     void save_height_map_png(const std::string& v_path,const float v_threshold=0.f)
@@ -169,6 +177,7 @@ public:
         cv::imwrite(v_path, m_map);
     }
 	
+    bool m_dilate;
     Eigen::Vector3f m_start;
     float m_resolution;
     cv::Mat m_map;
@@ -178,5 +187,7 @@ public:
 float point_box_distance_eigen(const Eigen::Vector2f& v_pos, const Eigen::AlignedBox2f& v_box);
 
 bool inside_box(const Eigen::Vector2f& v_pos, const Eigen::AlignedBox2f& v_box);
+
+CGAL::Surface_mesh<Point_3> get_box_mesh(const std::vector<Eigen::AlignedBox3f>& v_boxes);
 
 #endif // MODEL_TOOLS_H

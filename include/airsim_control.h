@@ -10,6 +10,7 @@
 #include "common_util.h"
 #include "api/RpcLibClientBase.hpp"
 #include "vehicles/multirotor/api/MultirotorRpcLibClient.hpp"
+#include "vehicles/multirotor/api/MultirotorCommon.hpp"
 
 class Airsim_tools
 {
@@ -33,5 +34,5 @@ void adjust_pose(msr::airlib::RpcLibClientBase& vAgent, const Pos_Pack& v_pos_pa
 void reset_color(msr::airlib::RpcLibClientBase& vAgent,
     const std::map<std::string, std::string>& v_color_map);
 
-void demo_move_to_next(msr::airlib::MultirotorRpcLibClient& vAgent,
-    const Eigen::Vector3f& v_next_pos_airsim,const float v_speed);
+std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> demo_move_to_next(msr::airlib::MultirotorRpcLibClient& vAgent,
+    const Eigen::Vector3f& v_next_pos_airsim,const float v_speed, bool is_forward = true);

@@ -970,3 +970,27 @@ bool inside_box(const Eigen::Vector2f& v_pos, const Eigen::AlignedBox2f& v_box) 
 	return v_pos.x() >= v_box.min().x() && v_pos.x() <= v_box.max().x() && v_pos.y() >= v_box.min().y() && v_pos.y() <= v_box.max().y();
 }
 
+Surface_mesh get_box_mesh(const std::vector<Eigen::AlignedBox3f>& v_boxes)
+{
+	Surface_mesh mesh;
+
+	for(const auto& item: v_boxes)
+	{
+		auto v0=mesh.add_vertex(Point_3(item.min().x(), item.min().y(), item.min().z()));
+		auto v1=mesh.add_vertex(Point_3(item.min().x(), item.max().y(), item.min().z()));
+		auto v2=mesh.add_vertex(Point_3(item.max().x(), item.max().y(), item.min().z()));
+		auto v3=mesh.add_vertex(Point_3(item.max().x(), item.min().y(), item.min().z()));
+		auto v4 = mesh.add_vertex(Point_3(item.min().x(), item.min().y(), item.max().z()));
+		auto v5 = mesh.add_vertex(Point_3(item.min().x(), item.max().y(), item.max().z()));
+		auto v6 = mesh.add_vertex(Point_3(item.max().x(), item.max().y(), item.max().z()));
+		auto v7 = mesh.add_vertex(Point_3(item.max().x(), item.min().y(), item.max().z()));
+
+		mesh.add_face(v0, v1, v2,v3);
+		mesh.add_face(v4, v7, v6,v5);
+		mesh.add_face(v0, v4, v5,v1);
+		mesh.add_face(v3, v2, v6,v7);
+		mesh.add_face(v0, v3, v7,v4);
+		mesh.add_face(v1, v5, v6,v2);
+	}
+	return mesh;
+}
