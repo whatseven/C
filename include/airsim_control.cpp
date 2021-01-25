@@ -103,7 +103,7 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> demo_move_to_next(msr::
             v_agent.moveByVelocityAsync(direction[0], direction[1], direction[2], 20);
 
         Eigen::Vector3f pos_cur = pose.position;
-    	if((pos_cur-v_next_pos_airsim).norm()<1)
+    	if((pos_cur-v_next_pos_airsim).norm()<2)
             break;
         poses.push_back(std::make_pair(pos_cur, Eigen::Vector3f(0, 0, -1)));
         override_sleep(0.05);

@@ -994,3 +994,29 @@ Surface_mesh get_box_mesh(const std::vector<Eigen::AlignedBox3f>& v_boxes)
 	}
 	return mesh;
 }
+
+void get_box_mesh_with_colors(const std::vector<Eigen::AlignedBox3f>& v_boxes,
+	const std::vector<cv::Vec3b>& v_colors,const std::string& v_name) {
+	std::ofstream f(v_name);
+	int index = 0;
+	for (const auto& item : v_boxes) {
+		f << (boost::format("v %s %s %s %s %s %s\n") % item.min().x() % item.min().y() % item.min().z() % ((float)v_colors[index][2] / 255.f) % ((float)v_colors[index][1] / 255.f) % ((float)v_colors[index][0] / 255.f)).str();
+		f << (boost::format("v %s %s %s %s %s %s\n") % item.min().x() % item.max().y() % item.min().z() % ((float)v_colors[index][2] / 255.f) % ((float)v_colors[index][1] / 255.f) % ((float)v_colors[index][0] / 255.f)).str();
+		f << (boost::format("v %s %s %s %s %s %s\n") % item.max().x() % item.max().y() % item.min().z() % ((float)v_colors[index][2] / 255.f) % ((float)v_colors[index][1] / 255.f) % ((float)v_colors[index][0] / 255.f)).str();
+		f << (boost::format("v %s %s %s %s %s %s\n") % item.max().x() % item.min().y() % item.min().z() % ((float)v_colors[index][2] / 255.f) % ((float)v_colors[index][1] / 255.f) % ((float)v_colors[index][0] / 255.f)).str();
+		f << (boost::format("v %s %s %s %s %s %s\n") % item.min().x() % item.min().y() % item.max().z() % ((float)v_colors[index][2] / 255.f) % ((float)v_colors[index][1] / 255.f) % ((float)v_colors[index][0] / 255.f)).str();
+		f << (boost::format("v %s %s %s %s %s %s\n") % item.min().x() % item.max().y() % item.max().z() % ((float)v_colors[index][2] / 255.f) % ((float)v_colors[index][1] / 255.f) % ((float)v_colors[index][0] / 255.f)).str();
+		f << (boost::format("v %s %s %s %s %s %s\n") % item.max().x() % item.max().y() % item.max().z() % ((float)v_colors[index][2] / 255.f) % ((float)v_colors[index][1] / 255.f) % ((float)v_colors[index][0] / 255.f)).str();
+		f << (boost::format("v %s %s %s %s %s %s\n") % item.max().x() % item.min().y() % item.max().z() % ((float)v_colors[index][2] / 255.f) % ((float)v_colors[index][1] / 255.f) % ((float)v_colors[index][0] / 255.f)).str();
+
+		f << (boost::format("f %s %s %s %s\n")% (index * 8 + 1 +0) % (index * 8 + 1 + 1) % (index * 8 + 1 + 2) % (index * 8 + 1 + 3)).str();
+		f << (boost::format("f %s %s %s %s\n")% (index * 8 + 1 +4) % (index * 8 + 1 + 7) % (index * 8 + 1 + 6) % (index * 8 + 1 + 5)).str();
+		f << (boost::format("f %s %s %s %s\n")% (index * 8 + 1 +0) % (index * 8 + 1 + 4) % (index * 8 + 1 + 5) % (index * 8 + 1 + 1)).str();
+		f << (boost::format("f %s %s %s %s\n")% (index * 8 + 1 +3) % (index * 8 + 1 + 2) % (index * 8 + 1 + 6) % (index * 8 + 1 + 7)).str();
+		f << (boost::format("f %s %s %s %s\n")% (index * 8 + 1 +0) % (index * 8 + 1 + 3) % (index * 8 + 1 + 7) % (index * 8 + 1 + 4)).str();
+		f << (boost::format("f %s %s %s %s\n")% (index * 8 + 1 +1) % (index * 8 + 1 + 5) % (index * 8 + 1 + 6) % (index * 8 + 1 + 2)).str();
+		index += 1;
+	}
+	f.close();
+	return;
+}

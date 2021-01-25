@@ -159,9 +159,10 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> simplify_path_reduce_wa
 }
 
 void write_wgs_path(const std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>>& v_trajectories,const std::string& v_path) {
-	Eigen::Vector2f origin_wgs(113.92332,22.64429);
+	//Eigen::Vector2f origin_wgs(113.92332,22.64429); // Yingrenshi
+	Eigen::Vector2f origin_wgs(113.93159, 22.53537);
 	Eigen::Vector2f origin_xy=lonLat2Mercator(origin_wgs);
-	std::ofstream pose(v_path);
+	std::ofstream pose(v_path+"camera_wgs_0.txt");
 
 	for (int i_id = 0; i_id < v_trajectories.size(); i_id++) {
 		const Eigen::Vector3f& position = v_trajectories[i_id].first;
@@ -175,6 +176,11 @@ void write_wgs_path(const std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f
 		float yaw = -std::atan2f(direction[1], direction[0]) * 180. / M_PI + 90.f;
 
 		pose << (fmt % pos_wgs[0] % pos_wgs[1] % position[2] % yaw % pitch).str();
+		if(i_id%180==179)
+		{
+			pose.close();
+			pose = std::ofstream(v_path + "camera_wgs_" + std::to_string(i_id / 180 + 1) + ".txt");
+		}
 	}
 	pose.close();
 }
@@ -252,6 +258,31 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> read_normal_trajectory(
 		));
 	}
 	while (!pose.eof());
+
+	pose.close();
+	return o_trajectories;
+}
+
+std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> read_hui_trajectory(const std::string& v_path) {
+	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> o_trajectories;
+	std::ifstream pose(v_path);
+	if (!pose.is_open()) throw "File not opened";
+
+	std::string line;
+	do {
+		std::getline(pose, line);
+		if (line.size() < 3) {
+			std::getline(pose, line);
+			continue;
+		}
+		std::vector<std::string> tokens;
+		boost::split(tokens, line, boost::is_any_of(","));
+
+		o_trajectories.push_back(std::make_pair(
+			Eigen::Vector3f(std::atof(tokens[0].c_str()), std::atof(tokens[1].c_str()), std::atof(tokens[2].c_str())),
+			Eigen::Vector3f(0, 0, -1)
+		));
+	} while (!pose.eof());
 
 	pose.close();
 	return o_trajectories;
@@ -344,6 +375,8 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> read_smith_spline_traje
 	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> o_trajectories;
 	std::ifstream pose(v_path);
 	if (!pose.is_open()) throw "File not opened";
+	std::string t;
+	std::getline(pose, t);
 
 	std::string line;
 	do
@@ -357,9 +390,9 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> read_smith_spline_traje
 		std::vector<std::string> tokens;
 		boost::split(tokens, line, boost::is_any_of(","));
 
-		float z = std::atof(tokens[3].c_str()) / 100;
-		float x = -std::atof(tokens[1].c_str()) / 100;
-		float y = std::atof(tokens[2].c_str()) / 100;
+		float z = std::atof(tokens[2].c_str());
+		float x = std::atof(tokens[0].c_str());
+		float y = std::atof(tokens[1].c_str());
 
 		o_trajectories.push_back(std::make_pair(
 			Eigen::Vector3f(x, y, z),
@@ -632,13 +665,27 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 					));
 					cur_pos[0] += v_params.step;
 				}
-				else if(i > delta-1)
+				else if (i == 1) {
+					focus_point = cur_pos + Eigen::Vector3f(v_params.view_distance/2, v_params.view_distance, -v_params.view_distance / 1.732f);
+					item_trajectory.push_back(std::make_pair(
+						cur_pos, focus_point
+					));
+					cur_pos[0] += v_params.step;
+				}
+				else if(i >= delta-1)
 				{
 					cur_pos[0] = xmax + v_params.view_distance;
 					focus_point = cur_pos + Eigen::Vector3f(-v_params.view_distance, v_params.view_distance, -v_params.view_distance / 1.732f);
 					item_trajectory.push_back(std::make_pair(
 						cur_pos, focus_point
 					));
+				}
+				else if (i >= delta - 2) {
+					focus_point = cur_pos + Eigen::Vector3f(-v_params.view_distance / 2, v_params.view_distance, -v_params.view_distance / 1.732f);
+					item_trajectory.push_back(std::make_pair(
+						cur_pos, focus_point
+					));
+					cur_pos[0] += v_params.step;
 				}
 				else
 				{
@@ -658,12 +705,26 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 					));
 					cur_pos[1] += v_params.step;
 				}
-				else if (i > delta - 1) {
+				else if (i == 1) {
+					focus_point = cur_pos + Eigen::Vector3f(-v_params.view_distance, v_params.view_distance/2, -v_params.view_distance / 1.732f);
+					item_trajectory.push_back(std::make_pair(
+						cur_pos, focus_point
+					));
+					cur_pos[1] += v_params.step;
+				}
+				else if (i >= delta - 1) {
 					cur_pos[1] = ymax + v_params.view_distance;
 					focus_point = cur_pos + Eigen::Vector3f(-v_params.view_distance, -v_params.view_distance, -v_params.view_distance / 1.732f);
 					item_trajectory.push_back(std::make_pair(
 						cur_pos, focus_point
 					));
+				}
+				else if (i >= delta - 2) {
+					focus_point = cur_pos + Eigen::Vector3f(-v_params.view_distance, -v_params.view_distance / 2, -v_params.view_distance / 1.732f);
+					item_trajectory.push_back(std::make_pair(
+						cur_pos, focus_point
+					));
+					cur_pos[1] += v_params.step;
 				}
 				else {
 					focus_point = cur_pos + Eigen::Vector3f(-v_params.view_distance, 0, -v_params.view_distance / 1.732f);
@@ -682,12 +743,26 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 					));
 					cur_pos[0] -= v_params.step;
 				}
-				else if (i > delta - 1){
+				else if (i == 1) {
+					focus_point = cur_pos + Eigen::Vector3f(-v_params.view_distance/2, -v_params.view_distance, -v_params.view_distance / 1.732f);
+					item_trajectory.push_back(std::make_pair(
+						cur_pos, focus_point
+					));
+					cur_pos[0] -= v_params.step;
+				}
+				else if (i >= delta - 1){
 					cur_pos[0] = xmin - v_params.view_distance;
 					focus_point = cur_pos + Eigen::Vector3f(v_params.view_distance, -v_params.view_distance, -v_params.view_distance / 1.732f);
 					item_trajectory.push_back(std::make_pair(
 						cur_pos, focus_point
 					));
+				}
+				else if (i >= delta - 2) {
+					focus_point = cur_pos + Eigen::Vector3f(v_params.view_distance / 2, -v_params.view_distance, -v_params.view_distance / 1.732f);
+					item_trajectory.push_back(std::make_pair(
+						cur_pos, focus_point
+					));
+					cur_pos[0] -= v_params.step;
 				}
 				else {
 					focus_point = cur_pos + Eigen::Vector3f(0, -v_params.view_distance, -v_params.view_distance / 1.732f);
@@ -706,13 +781,29 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 					));
 					cur_pos[1] -= v_params.step;
 				}
-				else if (i > delta - 1) {
+				else if (i == 1) {
+					focus_point = cur_pos + Eigen::Vector3f(v_params.view_distance, -v_params.view_distance/2, -v_params.view_distance / 1.732f);
+					item_trajectory.push_back(std::make_pair(
+						cur_pos, focus_point
+					));
+					cur_pos[1] -= v_params.step;
+				}
+				else if (i >= delta - 1) {
 					cur_pos[1] = ymin - v_params.view_distance;
 					focus_point = cur_pos + Eigen::Vector3f(v_params.view_distance, v_params.view_distance, -v_params.view_distance / 1.732f);
 					item_trajectory.push_back(std::make_pair(
 						cur_pos, focus_point
 					));
 				}
+				else if (i >= delta - 2) {
+					focus_point = cur_pos + Eigen::Vector3f(v_params.view_distance, v_params.view_distance/2, -v_params.view_distance / 1.732f);
+					item_trajectory.push_back(std::make_pair(
+						cur_pos, focus_point
+					));
+					cur_pos[1] -= v_params.step;
+
+				}
+
 				else {
 					focus_point = cur_pos + Eigen::Vector3f(v_params.view_distance, 0, -v_params.view_distance / 1.732f);
 					item_trajectory.push_back(std::make_pair(
@@ -1007,7 +1098,8 @@ std::vector<Eigen::Vector2i> perform_ccpp(const cv::Mat& ccpp_map, const Eigen::
 	
 	cv::Mat distance_map(v_map.rows, v_map.cols, CV_8UC1, cv::Scalar(0));
 	generate_distance_map(v_map, distance_map, goal, goal, 0);
-	//print_map(distance_map);
+	std::cout << "distance_map" << std::endl;
+	print_map(distance_map);
 	cv::Mat obstacle_map(v_map.rows, v_map.cols, CV_8UC1, cv::Scalar(0));
 	for (int i = 0; i < v_map.rows; i++)
 	{
@@ -1019,7 +1111,10 @@ std::vector<Eigen::Vector2i> perform_ccpp(const cv::Mat& ccpp_map, const Eigen::
 			}
 		}
 	}
-	//print_map(obstacle_map);
+	std::cout << "v_map" << std::endl;
+	print_map(v_map);
+	std::cout << "obstacle_map" << std::endl;
+	print_map(obstacle_map);
 
 	Eigen::Vector2i now_point(start_point);
 	cv::Mat visited_map(v_map.rows, v_map.cols, CV_8UC1, cv::Scalar(0));

@@ -21,57 +21,48 @@
 #include "common_util.h"
 #include "metrics.h"
 
-const float ACCELERATE = 1;
+const float ACCELERATE = 4;
 const float MAX_SPEED = 8;
 MapConverter map_converter;
 void fixed_point_fly(const std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>>& v_trajectory)
 {
-	msr::airlib::MultirotorRpcLibClient m_agent;
-	m_agent.confirmConnection();
-	m_agent.enableApiControl(true);
-	m_agent.takeoffAsync()->waitOnLastTask();
-	MapConverter map_converter;
+	//msr::airlib::MultirotorRpcLibClient m_agent;
+	//m_agent.confirmConnection();
+	//m_agent.enableApiControl(true);
+	//m_agent.takeoffAsync()->waitOnLastTask();
+	//MapConverter map_converter;
 	//map_converter.initDroneStart(Eigen::Vector3f(0.f, 0.f, 200.f));
-	map_converter.initDroneStart(Eigen::Vector3f(-16000, -16000.f, 1000.f));
+	//map_converter.initDroneStart(Eigen::Vector3f(-16000, -16000.f, 1000.f));
 
-	Pos_Pack pos_start = map_converter.get_pos_pack_from_mesh(v_trajectory[0].first, 0, 0);
-	m_agent.moveToPositionAsync(pos_start.pos_airsim.x(), pos_start.pos_airsim.y(), pos_start.pos_airsim.z(), 6)->waitOnLastTask();
+	//Pos_Pack pos_start = map_converter.get_pos_pack_from_mesh(v_trajectory[0].first, 0, 0);
+	//m_agent.moveToPositionAsync(pos_start.pos_airsim.x(), pos_start.pos_airsim.y(), pos_start.pos_airsim.z(), 6)->waitOnLastTask();
 
 	LOG(INFO) << "Start capture";
-	auto recorder = recordTime();
+	//auto recorder = recordTime();
+	float total_t=0;
 	for(int i=1;i<v_trajectory.size();++i)
 	{
 		Eigen::Vector3f next_pos = v_trajectory[i].first;
-		Eigen::Vector3f direction = next_pos- v_trajectory[i].first;
-		float distance = direction.norm();
-		float speed = 0;
-		float max_speed;
-		if (MAX_SPEED / 2 * (MAX_SPEED / ACCELERATE) * 2 < distance)
-			max_speed = MAX_SPEED;
-		
-		Pos_Pack pos= map_converter.get_pos_pack_from_mesh(next_pos, 0, 0);
+		Eigen::Vector3f cur_pos = v_trajectory[i-1].first;
 
-		Pose pose = m_agent.simGetVehiclePose();
-		Eigen::Vector3f pos_cur = pose.position;
-
-		float cur_time;
-		while (true) {
-			pose = m_agent.simGetVehiclePose();
-			pos_cur = pose.position;
-
-			Eigen::Vector3f direction = pos.pos_airsim - pos_cur;
-			direction.normalize();
-			direction = direction * speed;
-			m_agent.moveByVelocityAsync(direction[0], direction[1], direction[2], 20);
-
-			Eigen::Vector3f pos_cur = pose.position;
-			if ((pos_cur - pos.pos_airsim).norm() < 1)
-				break;
-
-			override_sleep(0.05);
+		float distance = (next_pos - cur_pos).norm();
+		if(distance<MAX_SPEED*MAX_SPEED/ACCELERATE)
+		{
+			float t = 2 * std::sqrt(distance / ACCELERATE);
+			total_t += t;
 		}
+		else
+		{
+			float t = (distance-MAX_SPEED* MAX_SPEED/ACCELERATE)/ MAX_SPEED+2* MAX_SPEED/ACCELERATE;
+			total_t += t;
+		}
+		//Pos_Pack pos= map_converter.get_pos_pack_from_mesh(next_pos, 0, 0);
+
+		//m_agent.moveToPositionAsync(pos.pos_airsim.x(), pos.pos_airsim.y(), pos.pos_airsim.z(), MAX_SPEED)->waitOnLastTask();
+		//LOG(INFO) << i << "/" << v_trajectory.size();
 	}
-	profileTime(recorder, "Done, total time:");
+	//profileTime(recorder, "Done, total time:");
+	LOG(INFO) << total_t << "s";
 }
 
 std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> continuous_fly(const std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>>& v_trajectory) {
@@ -94,7 +85,7 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> continuous_fly(const st
 		Eigen::Vector3f next_direction = (v_trajectory[i +1].first - next_pos).normalized();
 		float speed = 6;
 		if (i < v_trajectory.size() - 1 && cur_direction.dot(next_direction) < 0.9f)
-			speed = 2;
+			speed = 4;
 			
 		Pos_Pack pos = map_converter.get_pos_pack_from_mesh(next_pos, 0, 0);
 		auto poses = demo_move_to_next(m_agent, pos.pos_airsim, speed,false);
@@ -141,8 +132,12 @@ int main(int argc, char** argv){
 
 	//std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> trajectory = read_smith_spline_trajectory(trajectory_path);
 	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> trajectory;
-	if(!args["is_smith"].asBool())
+	if (args["format"].asString() == "normal")
 		trajectory = read_normal_trajectory(args["trajectory_path"].asString());
+	else if (args["format"].asString() == "smith_spline")
+		trajectory = read_smith_spline_trajectory(args["trajectory_path"].asString());
+	else if (args["format"].asString() == "hui")
+		trajectory = read_hui_trajectory(args["trajectory_path"].asString());
 	else
 		trajectory = read_smith_trajectory(args["trajectory_path"].asString());
 
@@ -159,6 +154,8 @@ int main(int argc, char** argv){
 	vizer.m_pos = trajectory[0].first;
 	vizer.unlock();
 
+	debug_img(std::vector<cv::Mat>{cv::Mat(50, 50, CV_8UC3, cv::Scalar(255, 0, 0))});
+	
 	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> runtime_trajectory;
 	if(args["continuous_fly"].asBool())
 		runtime_trajectory=continuous_fly(trajectory);
