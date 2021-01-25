@@ -1,0 +1,4 @@
+[submodule "src/sig20/main/SLAM"]
+	path = src/sig20/main/SLAM
+	url = https://github.com/zhangshaos/MyOrbSLAM.git
+	branch = dev

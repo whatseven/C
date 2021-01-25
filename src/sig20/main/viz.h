@@ -158,12 +158,12 @@ public:
                 if(m_current_building == index)
 	                draw_cube(item_building.bounding_box_3d,
 	                    Eigen::Vector4f(1.f, 0.f, 0.f, 1.f));
-                //else if(item_building.passed_trajectory.size()!=0)
-                //    draw_cube(item_building.bounding_box_3d,
-                //        Eigen::Vector4f(1.f, 1.f, 1.f, 1.f));
-                //else
-                //    draw_cube(item_building.bounding_box_3d,
-                //        Eigen::Vector4f(0.5f, .5f, .5f, .5f));
+                else if(item_building.passed_trajectory.size()!=0)
+                    draw_cube(item_building.bounding_box_3d,
+                        Eigen::Vector4f(1.f, 1.f, 1.f, 1.f));
+                else
+                    draw_cube(item_building.bounding_box_3d,
+                        Eigen::Vector4f(0.5f, .5f, .5f, .5f));
             }
         	//View points
             for (const auto& item_trajectory : m_trajectories) {
@@ -175,14 +175,19 @@ public:
         	//View spline
             int i_iter = 0;
             for (const auto& item_trajectory : m_trajectories_spline) {
+                int index = &item_trajectory - &m_trajectories_spline[0];
                 draw_cube(Eigen::AlignedBox3f(item_trajectory.first - Eigen::Vector3f(1.f, 1.f, 1.f), item_trajectory.first + Eigen::Vector3f(1.f, 1.f, 1.f)),
                     Eigen::Vector4f(0.f, 1.f, 0.f, 1.f));
                 Eigen::Vector3f look_at = item_trajectory.first + item_trajectory.second * 10;
                 //pangolin::glDrawLine(item_trajectory.first[0], item_trajectory.first[1], item_trajectory.first[2], look_at[0], look_at[1], look_at[2]);
+                glLineWidth(5);
+                glColor3f(1-1 / (index+1), 1 - 1 / (index + 1), 1 - 1 / (index + 1));
             	if(i_iter>=1)
                     pangolin::glDrawLine(item_trajectory.first[0], item_trajectory.first[1], item_trajectory.first[2], 
                         m_trajectories_spline[i_iter-1].first[0], m_trajectories_spline[i_iter - 1].first[1], m_trajectories_spline[i_iter - 1].first[2]);
-                i_iter += 1;
+                glLineWidth(1);
+            	i_iter += 1;
+                glColor3f(0,0,0);
             }
         	// View points
             //for (const auto& id_point : m_points)
@@ -233,6 +238,4 @@ public:
     void unlock() {
         m_mutex.unlock();
     }
-
-	
 };
