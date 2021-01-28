@@ -26,9 +26,9 @@ if __name__ == "__main__":
 
     fig, ax = plt.subplots(2, 2)
 
-    ax[0,0].hist(asia18_reconstructability_recon, density=True,bins=10,range=[0,100])
-    ax[0,0].set_ylabel('Density')
-    ax[0,0].set_xlabel('Asia18 Reconstructability')
+    ax[0,0].hist(asia18_reconstructability_recon, density=True,bins=10,range=[0,100],cumulative=True)
+    ax[0,0].set_ylabel('Accumulate Density')
+    ax[0,0].set_xlabel('Reconstructability [Smith et al. 2018]')
 
     accuracy_x=[]
     accuracy_y=[]
@@ -47,13 +47,13 @@ if __name__ == "__main__":
     ax[0,1].plot(accuracy_x, accuracy_y, label='Accuracy')
     ax[0,1].plot(completeness_x, completeness_y, label='Completeness')
     ax[0,1].legend(loc="lower right")
-    ax[0,1].set_xlabel('Reconstructability')
+    ax[0,1].set_xlabel('Reconstructability [Smith et al. 2018]')
     ax[0,1].set_ylabel('Spearman Correlation')
 
     ax[1,0] = plt.subplot(2, 2, 3)
-    ax[1,0].hist(asia20_reconstructability_recon, density=True,bins=10,range=[0,100])
-    ax[1,0].set_ylabel('Density')
-    ax[1,0].set_xlabel('Asia20 Reconstructability')
+    ax[1,0].hist(asia20_reconstructability_recon, density=True,bins=10,range=[0,100],cumulative=True)
+    ax[1,0].set_ylabel('Accumulate Density')
+    ax[1,0].set_xlabel('Reconstructability [Zhou et al. 2020]')
 
     accuracy_x=[]
     accuracy_y=[]
@@ -72,7 +72,7 @@ if __name__ == "__main__":
     ax[1,1].plot(accuracy_x, accuracy_y, label='Accuracy')
     ax[1,1].plot(completeness_x, completeness_y, label='Completeness')
     ax[1,1].legend(loc="lower right")
-    ax[1,1].set_xlabel('Reconstructability')
+    ax[1,1].set_xlabel('Reconstructability [Smith et al. 2018]')
     ax[1,1].set_ylabel('Spearman Correlation')
 
     fig.tight_layout()
