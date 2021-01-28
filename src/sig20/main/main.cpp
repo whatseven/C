@@ -1238,14 +1238,22 @@ public:
 							return (v_cur_pos.pos_mesh - a1.first).norm() < (v_cur_pos.pos_mesh - a2.first).norm();
 						}) - start_points.begin();
 
-						for(int i_exploration=0; i_exploration <4;++i_exploration)
-						{
-							
-							m_exploration_point.emplace(
-								start_points[nearest_id].first + DISTANCE_THRESHOLD * 0.2 * i_exploration * start_points[nearest_id].second,
-								Eigen::Vector3f(start_points[nearest_id].second.x(), start_points[nearest_id].second.y(), -std::tan(64.f / 180 * M_PI)).normalized()
-							);
-						}
+						m_exploration_point.emplace(
+							start_points[nearest_id].first + DISTANCE_THRESHOLD * 0.2 * 0 * start_points[nearest_id].second,
+							Eigen::Vector3f(0, 1, -std::tan(64.f / 180 * M_PI)).normalized()
+						);
+						m_exploration_point.emplace(
+							start_points[nearest_id].first + DISTANCE_THRESHOLD * 0.2 * 1 * start_points[nearest_id].second,
+							Eigen::Vector3f(1, 0, -std::tan(64.f / 180 * M_PI)).normalized()
+						);
+						m_exploration_point.emplace(
+							start_points[nearest_id].first + DISTANCE_THRESHOLD * 0.2 * 2 * start_points[nearest_id].second,
+							Eigen::Vector3f(0, -1, -std::tan(64.f / 180 * M_PI)).normalized()
+						);
+						m_exploration_point.emplace(
+							start_points[nearest_id].first + DISTANCE_THRESHOLD * 0.2 * 3 * start_points[nearest_id].second,
+							Eigen::Vector3f(-1, 0, -std::tan(64.f / 180 * M_PI)).normalized()
+						);
 						
 						/*m_exploration_point.emplace(
 							Eigen::Vector3f(
