@@ -23,14 +23,18 @@
 #include "trajectory.h"
 #include "common_util.h"
 #include <cpr/cpr.h>
+#include <opencv2/features2d.hpp>
+//#include "SLAM/include/vcc_zxm_mslam.h"
 
 
 //Path
 boost::filesystem::path log_root("log");
-const Eigen::Vector3f UNREAL_START(0.f, 0.f, 0.f);
+const Eigen::Vector3f UNREAL_START(-4000.f, 30000.f, 200.f);
 //Camera
 const cv::Vec3b BACKGROUND_COLOR(57,181,55);
 const cv::Vec3b SKY_COLOR(161, 120, 205);
+const int MAX_FEATURES = 100000;
+
 Eigen::Matrix3f INTRINSIC;
 
 MapConverter map_converter;
@@ -100,21 +104,76 @@ public:
 
 	}
 
-	std::string process_results(std::string input)
+	std::vector<cv::Rect2f> process_results(std::string input, int cols, int rows)
 	{
 		std::string now_string = input;
 		std::vector<std::string> labels;
 		std::string::size_type position = now_string.find("], ");
 		while (position != now_string.npos)
 		{
-			labels.push_back(now_string.substr(0, position));
-			now_string = now_string.substr(position);
+			labels.push_back(now_string.substr(0, position + 3));
+			now_string = now_string.substr(position + 3);
+			position = now_string.find("], ");
 		}
-		
+		if (now_string.length() > 10)
+			labels.push_back(now_string);
+		std::vector<cv::Rect2f> result;
+		for (auto label : labels)
+		{
+			now_string = label;
+			cv::Rect2f box;
+			std::string::size_type position1 = now_string.find_first_of("[");
+			std::string::size_type position2 = now_string.find_first_of(",");
+			float xmin = atof((now_string.substr(position1 + 1, position2 - position1 - 1)).c_str());
+			now_string = now_string.substr(position2 + 2);
+			position2 = now_string.find_first_of(",");
+			float ymin = atof((now_string.substr(0, position2 - 1)).c_str());
+			now_string = now_string.substr(position2 + 2);
+			position2 = now_string.find_first_of(",");
+			float xmax = atof((now_string.substr(0, position2 - 1)).c_str());
+			now_string = now_string.substr(position2 + 2);
+			position2 = now_string.find_first_of("]");
+			float ymax = atof((now_string.substr(0, position2 - 1)).c_str());
+			if (xmin < 0 && ymin < 0 && xmax > cols && ymax > rows)
+				continue;
+			if (xmin < 0)
+				xmin = 0;
+			if (ymin < 0)
+				ymin = 0;
+			if (xmax > cols)
+				xmax = cols;
+			if (ymax > rows)
+				ymax = rows;
+			box.x = xmin;
+			box.y = ymin;
+			box.width = xmax - xmin;
+			box.height = ymax - ymin;
+			result.push_back(box);
+		}
+		return result;
 	}
 
-	void get_bounding_box(std::map<std::string, cv::Mat>& v_img, std::vector<Building>& v_buildings)
+	cv::Vec3b stringToVec3b(std::string input)
 	{
+		std::string now_string = input;
+		std::vector<std::string> color;
+		color.push_back(now_string.substr(0, now_string.find_first_of(" ")));
+		now_string = now_string.substr(now_string.find_first_of(" ") + 1);
+		color.push_back(now_string.substr(0, now_string.find_first_of(" ")));
+		now_string = now_string.substr(now_string.find_first_of(" ") + 1);
+		color.push_back(now_string);
+
+		return cv::Vec3b(uchar(atoi(color[0].c_str())), uchar(atoi(color[1].c_str())), uchar(atoi(color[2].c_str())));
+	}
+
+	std::string Vec3bToString(cv::Vec3b color)
+	{
+		return std::to_string(color.val[0]) + " " + std::to_string(color.val[1]) + " " + std::to_string(color.val[2]);
+	}
+
+	void get_bounding_box(std::map<std::string, cv::Mat>& v_img, std::vector<cv::Vec3b>& v_color_map, std::vector<Building>& v_buildings)
+	{
+		std::vector<cv::Rect2f> boxes;
 		cv::Mat img = v_img["rgb"];
 		std::vector<uchar> data(img.ptr(), img.ptr() + img.size().width * img.size().height * img.channels());
 		std::string s(data.begin(), data.end());
@@ -125,6 +184,50 @@ public:
 			cpr::Body{ s },
 			cpr::Header{ {"Content-Type", "text/plain"} });
 		std::cout << r.text << std::endl;
+		boxes = process_results(r.text, img.cols, img.rows);
+		// Updata color map
+		for (auto box : boxes)
+		{
+			// Calculate the main color
+			std::map<std::string, int> color_num;
+			cv::Rect rect(box.x, box.y, box.width, box.height);
+			cv::Mat img_roi = v_img["segmentation"](rect);
+			for (int y = 0; y < img_roi.rows; y++)
+			{
+				for (int x = 0; x < img_roi.cols; x++)
+				{
+					cv::Vec3b color = img_roi.at<cv::Vec3b>(y, x);
+					std::string color_string = Vec3bToString(color);
+					auto find_result = color_num.find(color_string);
+					if (find_result == color_num.end())
+						color_num.insert(std::make_pair(color_string, 1));
+					else
+						color_num[color_string] += 1;
+				}
+			}
+			cv::Vec3b current_color;
+			int max_num = 0;
+			for (auto color : color_num)
+			{
+				if (color.second > max_num)
+				{
+					max_num = color.second;
+					current_color = stringToVec3b(color.first);
+				}
+			}
+			Building current_building;
+			current_building.bounding_box_2d = CGAL::Bbox_2(box.x, box.y, box.x + box.width, box.y + box.height);
+			current_building.segmentation_color = current_color;
+			v_buildings.resize(v_color_map.size());
+			auto found = std::find(v_color_map.begin(), v_color_map.end(), current_color);
+			if (found == v_color_map.end())
+			{
+				v_color_map.push_back(current_color);
+				v_buildings.push_back(current_building);
+			}
+				
+		}
+		return;
 	}
 
 };
@@ -139,8 +242,9 @@ public:
 	void get_points(const std::map<std::string, cv::Mat>& v_img,const std::vector<cv::Vec3b>& v_color_map, std::vector<Building>& v_buildings) {
 		std::vector<cv::KeyPoint> keypoints;
 		cv::Mat rgb = v_img.at("rgb").clone();
-		auto orb = cv::ORB::create(3000);
-		orb->detect(rgb, keypoints, v_img.at("roi_mask"));
+		auto orb = cv::ORB::create(200);
+		//orb->detect(rgb, keypoints, v_img.at("roi_mask"));
+		orb->detect(rgb, keypoints);
 		cv::drawKeypoints(rgb, keypoints, rgb);
 		for (auto it = keypoints.begin(); it != keypoints.end(); it++) {
 			cv::Vec3b point_color = v_img.at("segmentation").at<cv::Vec3b>(it->pt.y, it->pt.x);
@@ -152,7 +256,8 @@ public:
 
 			auto find_result = std::find(v_color_map.begin(), v_color_map.end(), point_color);
 			if (find_result == v_color_map.end()) {
-				throw "";
+				LOG(INFO) << "It's not a building.";
+				//throw "";
 			}
 			else {
 				v_buildings[&*find_result - &v_color_map[0]].points_camera_space.insert(Point_3(point(0), point(1), point(2)));
@@ -1360,7 +1465,7 @@ public:
 				current_building.boxes.push_back(current_building.bounding_box_3d);
 			}
 		}
-		else if (true)
+		else if (false)
 		{
 			tinyobj::attrib_t attr;
 			std::vector<tinyobj::shape_t> shapes;
@@ -1389,7 +1494,7 @@ public:
 				current_building.boxes.push_back(current_building.bounding_box_3d);
 			}
 		}
-		else if (false)
+		else if (true)
 		{
 
 			CGAL::Point_set_3<Point_3, Vector_3> original_point_cloud;
@@ -1658,11 +1763,14 @@ class Real_mapper :public Mapper
 {
 public:
 	Real_object_detector* m_real_object_detector;
+	cv::Ptr<cv::Feature2D> orb;
 	Synthetic_SLAM* m_synthetic_SLAM;
+	//zxm::ISLAM* slam = GetInstanceOfSLAM();
 	Airsim_tools* m_airsim_client;
 	Real_mapper(const Json::Value& args, Airsim_tools* v_airsim_client)
 		: Mapper(args), m_airsim_client(v_airsim_client) {
 			m_real_object_detector = new Real_object_detector;
+			orb = cv::ORB::create(MAX_FEATURES);
 			m_synthetic_SLAM = new Synthetic_SLAM;
 	}
 	
@@ -1671,13 +1779,18 @@ public:
 	{
 		std::vector<Building> current_buildings;
 		int num_building_current_frame;
+		std::vector<cv::KeyPoint> keypoints;
 		// Get current image and pose
 		// Input: 
 		// Output: Image(cv::Mat), Camera matrix(Pos_pack)
 		std::map<std::string, cv::Mat> current_image;
 		{
 			m_airsim_client->adjust_pose(v_current_pos);
+			//demo_move_to_next(*(m_airsim_client->m_agent), v_current_pos.pos_airsim, v_current_pos.yaw, 5, false);
 			current_image = m_airsim_client->get_images();
+			cv::imwrite("F:\\Sig\\Shanghai\\" + std::to_string(v_cur_frame_id) + "_rgb.jpg", current_image["rgb"]);
+			cv::imwrite("F:\\Sig\\Shanghai\\" + std::to_string(v_cur_frame_id) + "_seg.png", current_image["segmentation"]);
+
 			LOG(INFO) << "Image done";
 		}
 
@@ -1685,8 +1798,9 @@ public:
 		// Input: Vector of building (std::vector<Building>)
 		// Output: Vector of building with 2D bounding box (std::vector<Building>)
 		std::vector<cv::Vec3b> color_map;
+		std::vector<cv::Rect2f> detection_boxes;
 		{
-			m_real_object_detector->get_bounding_box(current_image, current_buildings);
+			m_real_object_detector->get_bounding_box(current_image, color_map, current_buildings);
 			LOG(INFO) << "Object detection done";
 		}
 
@@ -1873,10 +1987,11 @@ int main(int argc, char** argv){
 		map_converter.initDroneStart(UNREAL_START);
 		INTRINSIC << 400, 0, 400, 0, 400, 400, 0, 0, 1;
 
-		if(args["mapper"].asString()=="Virtual_mapper")
+		if(args["mapper"].asString()!="gt_mapper")
 		{
 			airsim_client = new Airsim_tools(UNREAL_START);
 			airsim_client->reset_color("building");
+			//	airsim_client.m_agent->simSetSegmentationObjectID("BP_Sky_Sphere", 0);
 		}
 		LOG(INFO) << "Initialization done";
 	}
@@ -2032,6 +2147,7 @@ int main(int argc, char** argv){
 			Eigen::Vector3f direction = next_pos_direction.first - current_pos.pos_mesh;
 			Eigen::Vector3f next_direction;
 			Eigen::Vector3f next_pos;
+			int interpolated_num = int(direction.norm() /  DRONE_STEP);
 			if (direction.norm() < 2 * DRONE_STEP||!with_interpolated)
 			{
 				next_direction = next_pos_direction.second.normalized();
@@ -2042,6 +2158,41 @@ int main(int argc, char** argv){
 			{
 				next_direction = direction.normalized();
 				next_pos = current_pos.pos_mesh + next_direction * DRONE_STEP;
+				Eigen::Vector2f next_2D_direction(next_pos_direction.second.x(), next_pos_direction.second.y());
+				Eigen::Vector2f current_2D_direction(current_pos.direction.x(), current_pos.direction.y());
+				float current_yaw = atan2(current_2D_direction.y(), current_2D_direction.x());
+				float next_direction_yaw = atan2(next_2D_direction.y(), next_2D_direction.x());
+				float angle_delta;
+				if (abs(current_yaw - next_direction_yaw) > M_PI)
+				{
+					if (current_yaw > next_direction_yaw)
+					{
+						angle_delta = (next_direction_yaw - current_yaw + M_PI * 2) / interpolated_num;
+						next_direction.x() = cos(current_yaw + angle_delta);
+						next_direction.y() = sin(current_yaw + angle_delta);
+					}
+					else
+					{
+						angle_delta = (current_yaw - next_direction_yaw + M_PI * 2) / interpolated_num;
+						next_direction.x() = cos(current_yaw - angle_delta + M_PI * 2);
+						next_direction.y() = sin(current_yaw - angle_delta + M_PI * 2);
+					}
+				}
+				else
+				{
+					if (current_yaw > next_direction_yaw)
+					{
+						angle_delta = (current_yaw - next_direction_yaw) / interpolated_num;
+						next_direction.x() = cos(current_yaw - angle_delta);
+						next_direction.y() = sin(current_yaw - angle_delta);
+					}
+					else
+					{
+						angle_delta = (next_direction_yaw - current_yaw) / interpolated_num;
+						next_direction.x() = cos(current_yaw + angle_delta);
+						next_direction.y() = sin(current_yaw + angle_delta);
+					}
+				}
 				next_direction.z() = -std::sqrt(next_direction.x() * next_direction.x() + next_direction.y() * next_direction.y()) * std::tan(45.f / 180 * M_PI);
 				next_direction.normalize();
 				is_interpolated = true;

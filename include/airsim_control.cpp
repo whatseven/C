@@ -71,18 +71,32 @@ void Airsim_tools::adjust_pose(const Pos_Pack& v_pos_pack){
 
 void Airsim_tools::reset_color(const std::string& v_key_words) {
     int num = 1;
-    for(const auto& item:m_agent->simListSceneObjects())
+    auto a = m_agent->simListSceneObjects();
+    for(int i = 0; i < a.size(); i++)
     {
-    	if(v_key_words.size()>0&& item.find(v_key_words)!=item.npos)
-            m_agent->simSetSegmentationObjectID(item, num++);
+        std::string temp = a[i];
+        std::cout << a[i].length() << a[i].size() << std::endl;
+        //if (a[i].length() <= 4)
+        if (v_key_words.size() > 0 && a[i].find(v_key_words) != a[i].npos)
+        {
+            m_agent->simSetSegmentationObjectID(a[i], num++);
+            std::cout << a[i] << " add color" << std::endl;
+        }
         else
-			m_agent->simSetSegmentationObjectID(item, 0);
+        {
+            std::cout<<m_agent->simSetSegmentationObjectID(a[i], 0)<<std::endl;
+            std::cout << a[i] << " set 0" << std::endl;
+            if (a[i] == "stupid_floor")
+            {
+                std::cout << "here" << std::endl;
+            }
+        }
     }
     return;
 }
 
 std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> demo_move_to_next(msr::airlib::MultirotorRpcLibClient& v_agent,
-	const Eigen::Vector3f& v_next_pos_airsim, const float v_speed, bool is_forward)
+	const Eigen::Vector3f& v_next_pos_airsim, float angle, const float v_speed, bool is_forward)
 {
     std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> poses;
     Pose pose = v_agent.simGetVehiclePose();
@@ -103,8 +117,11 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> demo_move_to_next(msr::
             v_agent.moveByVelocityAsync(direction[0], direction[1], direction[2], 20);
 
         Eigen::Vector3f pos_cur = pose.position;
-    	if((pos_cur-v_next_pos_airsim).norm()<2)
+        if ((pos_cur - v_next_pos_airsim).norm() < 2)
+        {
+            v_agent.rotateToYawAsync(angle);
             break;
+        }
         poses.push_back(std::make_pair(pos_cur, Eigen::Vector3f(0, 0, -1)));
         override_sleep(0.05);
     }

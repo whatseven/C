@@ -17,8 +17,12 @@ class Airsim_tools
 public:
 	Airsim_tools(const Eigen::Vector3f& v_drone_start):m_drone_start(v_drone_start)
 	{
-        m_agent = new msr::airlib::RpcLibClientBase();
+		m_agent = new msr::airlib::RpcLibClientBase();
 		m_agent->confirmConnection();
+		/*m_agent = new msr::airlib::MultirotorRpcLibClient("192.168.123.64");
+		m_agent->enableApiControl(true);
+		m_agent->armDisarm(true);
+		m_agent->takeoffAsync(5)->waitOnLastTask();*/
 	}
 
     std::map<std::string, cv::Mat> get_images();
@@ -35,4 +39,4 @@ void reset_color(msr::airlib::RpcLibClientBase& vAgent,
     const std::map<std::string, std::string>& v_color_map);
 
 std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> demo_move_to_next(msr::airlib::MultirotorRpcLibClient& vAgent,
-    const Eigen::Vector3f& v_next_pos_airsim,const float v_speed, bool is_forward = true);
+    const Eigen::Vector3f& v_next_pos_airsim, float angle, const float v_speed, bool is_forward = true);
