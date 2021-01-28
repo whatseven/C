@@ -2,6 +2,8 @@
 
 #include <CGAL/Point_set_3.h>
 #include <CGAL/Point_set_3/IO.h>
+#include <CGAL/Polygon_2.h>
+#include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 //#include <CGAL/cluster_point_set.h>
 #include <CGAL/Random.h>
 #include <glog/logging.h>
@@ -23,6 +25,9 @@
 #include "trajectory.h"
 #include "common_util.h"
 
+typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
+typedef K::Point_2 Point;
+typedef CGAL::Polygon_2<K> Polygon_2;
 
 //Path
 boost::filesystem::path log_root("log");
@@ -134,7 +139,7 @@ public:
 	Motion_status m_motion_status;
 	int m_current_building_id = -1;
 
-	float DISTANCE_THRESHOLD = 130.f;
+	float DISTANCE_THRESHOLD;
 	//float DISTANCE_THRESHOLD = 30.f;
 	std::vector<CGAL::Point_2<K>> sample_points;
 	std::vector<cv::Vec3b> region_status;
@@ -142,9 +147,12 @@ public:
 
 	Eigen::Vector3f m_map_start;
 	Eigen::Vector3f m_map_end;
+
+	Polygon_2 m_boundary;
 	
-	Next_best_target(const Eigen::Vector3f& v_map_start_mesh, const Eigen::Vector3f& v_map_end_mesh):m_map_start(v_map_start_mesh), m_map_end(v_map_end_mesh)
+	Next_best_target(const Eigen::Vector3f& v_map_start_mesh, const Eigen::Vector3f& v_map_end_mesh,float v_ccpp_cell_distance):m_map_start(v_map_start_mesh), m_map_end(v_map_end_mesh)
 	{
+		DISTANCE_THRESHOLD = v_ccpp_cell_distance;
 		m_motion_status = Motion_status::initialization;
 		for (float y = v_map_start_mesh.y(); y < v_map_end_mesh.y(); y += DISTANCE_THRESHOLD)
 			for (float x = v_map_start_mesh.x(); x < v_map_end_mesh.x(); x += DISTANCE_THRESHOLD)
@@ -169,8 +177,8 @@ public:
 
 	std::queue<std::pair<Eigen::Vector3f, Eigen::Vector3f>> m_exploration_point;
 	
-	Next_best_target_min_distance_ccpp(const Eigen::Vector3f& v_map_start_mesh, const Eigen::Vector3f& v_map_end_mesh)
-		:Next_best_target(v_map_start_mesh, v_map_end_mesh) {
+	Next_best_target_min_distance_ccpp(const Eigen::Vector3f& v_map_start_mesh, const Eigen::Vector3f& v_map_end_mesh, float v_ccpp_cell_distance)
+		:Next_best_target(v_map_start_mesh, v_map_end_mesh,v_ccpp_cell_distance) {
 		color_unobserved = region_viz_color[0];
 		color_free = region_viz_color[1];
 		color_occupied = region_viz_color[2];
@@ -373,8 +381,8 @@ public:
 	int m_current_exploration_id = -1;
 	cv::Vec3b color_unobserved, color_free, color_occupied;
 
-	Next_best_target_reconstruction_only(const Eigen::Vector3f& v_map_start_mesh, const Eigen::Vector3f& v_map_end_mesh)
-		:Next_best_target(v_map_start_mesh, v_map_end_mesh) {
+	Next_best_target_reconstruction_only(const Eigen::Vector3f& v_map_start_mesh, const Eigen::Vector3f& v_map_end_mesh,float v_ccpp_cell_distance)
+		:Next_best_target(v_map_start_mesh, v_map_end_mesh, v_ccpp_cell_distance) {
 		color_unobserved = region_viz_color[0];
 		color_free = region_viz_color[1];
 		color_occupied = region_viz_color[2];
@@ -440,6 +448,161 @@ public:
 
 };
 
+class Next_best_target_exploration_only :public Next_best_target {
+public:
+	int m_current_exploration_id = 0;
+	cv::Vec3b color_unobserved, color_free, color_occupied;
+	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> m_ccpp_trajectory;
+
+	Next_best_target_exploration_only(const Eigen::Vector3f& v_map_start_mesh, const Eigen::Vector3f& v_map_end_mesh, float v_ccpp_cell_distance)
+		:Next_best_target(v_map_start_mesh, v_map_end_mesh, v_ccpp_cell_distance) {
+		color_occupied = region_viz_color[0];
+		color_unobserved = cv::Vec3b(0, 0, 0);
+		m_current_building_id = -1;
+		m_motion_status = Motion_status::exploration;
+		int num = region_status.size();
+		region_status.clear();
+		region_status.resize(num, color_unobserved);
+	}
+
+	void get_next_target(int frame_id, const Pos_Pack& v_cur_pos, const std::vector<Building>& v_buildings, bool with_exploration) override {
+		return;
+	}
+	
+	bool get_ccpp_trajectory(const Eigen::Vector3f& v_cur_pos) {
+		cv::Mat ccpp_map((m_map_end.y() - m_map_start.y()) / DISTANCE_THRESHOLD,
+			(m_map_end.x() - m_map_start.x()) / DISTANCE_THRESHOLD,
+			CV_8UC1, cv::Scalar(255));
+		Eigen::Vector3f t1 = (v_cur_pos - m_map_start) / DISTANCE_THRESHOLD;
+		Eigen::Vector3f t2 = (m_map_end - m_map_start) / DISTANCE_THRESHOLD;
+		Eigen::Vector2i start_pos_on_map(t1.x(), t1.y());
+		Eigen::Vector2i end_pos_on_map(t2.x(), t2.y());
+		cv::Mat start_end = ccpp_map.clone();
+		start_end.at<cv::uint8_t>(start_pos_on_map.y(), start_pos_on_map.x()) = 255;
+		start_end.at<cv::uint8_t>(end_pos_on_map.y(), end_pos_on_map.x()) = 255;
+
+		std::vector<Eigen::Vector2i> map_trajectory = perform_ccpp(start_end,
+			start_pos_on_map, end_pos_on_map, 0);
+		cv::Mat viz_ccpp = ccpp_map.clone();
+
+		float iter_trajectory = 0;
+		for (const Eigen::Vector2i& item : map_trajectory) {
+			// todo: invert x,y!!!!!!!!!!!!!
+			viz_ccpp.at<cv::uint8_t>(item.x(), item.y()) = iter_trajectory++ * 255. / map_trajectory.size();
+			Eigen::Vector3f t3 = m_map_start + DISTANCE_THRESHOLD * Eigen::Vector3f(item.y(), item.x(), 0.f);
+			t3.z() = 100;
+			m_ccpp_trajectory.emplace_back(
+				t3,
+				Eigen::Vector3f(0, 0, -1)
+			);
+		}
+		//Eigen::Vector3f next_point(m_map_end.x()-60, m_map_end.y() - 60,100);
+		//m_ccpp_trajectory.emplace_back(
+		//	next_point,
+		//	Eigen::Vector3f(0, 0, -1)
+		//);
+		return true;
+	}
+
+	void update_uncertainty(const Pos_Pack& v_cur_pos, const std::vector<Building>& v_buildings) override {
+		Eigen::Vector2f cur_point_cgal(v_cur_pos.pos_mesh.x(), v_cur_pos.pos_mesh.y());
+		int nearest_region_id = std::min_element(sample_points.begin(), sample_points.end(),
+			[&cur_point_cgal](const CGAL::Point_2<K>& p1, const CGAL::Point_2<K>& p2) {
+			return std::pow(p1.x() - cur_point_cgal.x(), 2) + std::pow(p1.y() - cur_point_cgal.y(), 2) < std::pow(p2.x() - cur_point_cgal.x(), 2) + std::pow(p2.y() - cur_point_cgal.y(), 2);
+		}) - sample_points.begin();
+		if (m_motion_status == Motion_status::exploration)
+			region_status[nearest_region_id] = color_occupied;
+	}
+
+	std::pair<Eigen::Vector3f, Eigen::Vector3f> determine_next_target(int v_frame_id, const Pos_Pack& v_cur_pos, std::vector<Building>& v_buildings, bool with_exploration, float v_threshold) override {
+		std::pair<Eigen::Vector3f, Eigen::Vector3f> next_pos;
+
+		if (m_motion_status == Motion_status::exploration) {
+			if (m_ccpp_trajectory.size() == 0)
+				get_ccpp_trajectory(v_cur_pos.pos_mesh);
+			next_pos = m_ccpp_trajectory[m_current_exploration_id];
+			m_current_exploration_id += 1;
+			if (m_current_exploration_id == m_ccpp_trajectory.size())
+			{
+				std::vector<Next_target> untraveled_buildings;
+				for (int i_building = 0; i_building < v_buildings.size(); ++i_building) {
+					if (v_buildings[i_building].passed_trajectory.size() == 0)
+						untraveled_buildings.emplace_back(i_building, -1);
+				}
+
+				if (untraveled_buildings.size() == 0) {
+					m_motion_status = Motion_status::done;
+					return next_pos;
+				}
+
+				int next_target_id = std::min_element(untraveled_buildings.begin(),
+					untraveled_buildings.end(),
+					[&v_cur_pos, &v_buildings, this](const Next_target& b1, const Next_target& b2) {
+					float distance1, distance2;
+					int id_trajectory = v_buildings[b1.origin_index_in_building_vector].find_nearest_trajectory_2d(v_cur_pos.pos_mesh);
+					Eigen::Vector3f pos = v_buildings[b1.origin_index_in_building_vector].trajectory[id_trajectory].first;
+					Eigen::Vector2f pos_2(pos.x(), pos.y());
+					distance1 = (pos_2 - Eigen::Vector2f(v_cur_pos.pos_mesh.x(), v_cur_pos.pos_mesh.y())).norm();
+					id_trajectory = v_buildings[b2.origin_index_in_building_vector].find_nearest_trajectory_2d(v_cur_pos.pos_mesh);
+					pos = v_buildings[b2.origin_index_in_building_vector].trajectory[id_trajectory].first;
+					pos_2 = Eigen::Vector2f(pos.x(), pos.y());
+					distance2 = (pos_2 - Eigen::Vector2f(v_cur_pos.pos_mesh.x(), v_cur_pos.pos_mesh.y())).norm();
+					return  distance1 < distance2;
+				}) - untraveled_buildings.begin();
+
+				m_current_building_id = untraveled_buildings[next_target_id].origin_index_in_building_vector;
+				m_motion_status = Motion_status::reconstruction;
+				return determine_next_target(v_frame_id, v_cur_pos, v_buildings, with_exploration, v_threshold);
+			}
+		}
+		else {
+			std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> unpassed_trajectory;
+			std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>>& passed_trajectory = v_buildings[m_current_building_id].passed_trajectory;
+
+			if (passed_trajectory.size() == v_buildings[m_current_building_id].trajectory.size()) {
+				std::vector<Next_target> untraveled_buildings;
+				for (int i_building = 0; i_building < v_buildings.size(); ++i_building) {
+					if (v_buildings[i_building].passed_trajectory.size() == 0)
+						untraveled_buildings.emplace_back(i_building, -1);
+				}
+
+				if (untraveled_buildings.size() == 0) {
+					m_motion_status = Motion_status::done;
+					return next_pos;
+				}
+
+				int next_target_id = std::min_element(untraveled_buildings.begin(),
+					untraveled_buildings.end(),
+					[&v_cur_pos, &v_buildings, this](const Next_target& b1, const Next_target& b2) {
+					float distance1, distance2;
+					int id_trajectory = v_buildings[b1.origin_index_in_building_vector].find_nearest_trajectory_2d(v_cur_pos.pos_mesh);
+					Eigen::Vector3f pos = v_buildings[b1.origin_index_in_building_vector].trajectory[id_trajectory].first;
+					Eigen::Vector2f pos_2(pos.x(), pos.y());
+					distance1 = (pos_2 - Eigen::Vector2f(v_cur_pos.pos_mesh.x(), v_cur_pos.pos_mesh.y())).norm();
+					id_trajectory = v_buildings[b2.origin_index_in_building_vector].find_nearest_trajectory_2d(v_cur_pos.pos_mesh);
+					pos = v_buildings[b2.origin_index_in_building_vector].trajectory[id_trajectory].first;
+					pos_2 = Eigen::Vector2f(pos.x(), pos.y());
+					distance2 = (pos_2 - Eigen::Vector2f(v_cur_pos.pos_mesh.x(), v_cur_pos.pos_mesh.y())).norm();
+					return  distance1 < distance2;
+				}) - untraveled_buildings.begin();
+
+				m_current_building_id = untraveled_buildings[next_target_id].origin_index_in_building_vector;
+
+				if (m_motion_status == Motion_status::done)
+					return next_pos;
+				return determine_next_target(v_frame_id, v_cur_pos, v_buildings, with_exploration, v_threshold);
+			}
+			else {
+				next_pos = v_buildings[m_current_building_id].trajectory[passed_trajectory.size()];
+				passed_trajectory.push_back(next_pos);
+				return next_pos;
+			}
+		}
+		return next_pos;
+	}
+
+};
+
 class Next_best_target_random_min_distance:public Next_best_target
 {
 public:
@@ -447,11 +610,17 @@ public:
 	cv::Vec3b color_unobserved, color_free, color_occupied;
 	std::vector<bool> already_explored;
 
-	Next_best_target_random_min_distance(const Eigen::Vector3f& v_map_start_mesh, const Eigen::Vector3f& v_map_end_mesh)
-		:Next_best_target(v_map_start_mesh, v_map_end_mesh) {
-		color_unobserved = region_viz_color[0];
+	Next_best_target_random_min_distance(const Eigen::Vector3f& v_map_start_mesh, const Eigen::Vector3f& v_map_end_mesh,float v_ccpp_cell_distance)
+		:Next_best_target(v_map_start_mesh, v_map_end_mesh, v_ccpp_cell_distance) {
+		//color_unobserved = region_viz_color[0];
 		color_free = region_viz_color[1];
 		color_occupied = region_viz_color[2];
+		color_unobserved = cv::Vec3b(0, 0, 0);
+
+		int num = region_status.size();
+		region_status.clear();
+		region_status.resize(num, color_unobserved);
+		
 		already_explored.resize(region_status.size(), false);
 	}
 
@@ -521,9 +690,11 @@ public:
 			[&cur_point_cgal](const CGAL::Point_2<K>& p1, const CGAL::Point_2<K>& p2) {
 			return std::pow(p1.x() - cur_point_cgal.x(), 2) + std::pow(p1.y() - cur_point_cgal.y(), 2) < std::pow(p2.x() - cur_point_cgal.x(), 2) + std::pow(p2.y() - cur_point_cgal.y(), 2);
 		})- sample_points.begin();
-		region_status[nearest_region_id] = color_free;
 		if (m_motion_status == Motion_status::exploration)
+		{
+			region_status[nearest_region_id] = region_viz_color[1];
 			already_explored[nearest_region_id] = true;
+		}
 		
 		for (int i_point = 0; i_point < region_status.size(); i_point++) {
 			const Eigen::Vector2f p(sample_points[i_point].x(), sample_points[i_point].y());
@@ -594,8 +765,8 @@ public:
 	cv::Vec3b color_unobserved, color_free, color_occupied;
 	std::vector<bool> already_explored;
 
-	Next_best_target_first_building_next_region(const Eigen::Vector3f& v_map_start_mesh, const Eigen::Vector3f& v_map_end_mesh)
-		:Next_best_target(v_map_start_mesh, v_map_end_mesh) {
+	Next_best_target_first_building_next_region(const Eigen::Vector3f& v_map_start_mesh, const Eigen::Vector3f& v_map_end_mesh,float v_ccpp_cell_distance)
+		:Next_best_target(v_map_start_mesh, v_map_end_mesh, v_ccpp_cell_distance) {
 		color_unobserved = region_viz_color[0];
 		color_free = region_viz_color[1];
 		color_occupied = region_viz_color[2];
@@ -667,7 +838,10 @@ public:
 		}) - sample_points.begin();
 		//region_status[nearest_region_id] = color_free;
 		if (m_motion_status == Motion_status::exploration|| m_motion_status == Motion_status::initialization)
+		{
+			region_status[nearest_region_id] = color_free;
 			already_explored[nearest_region_id] = true;
+		}
 
 		for (int i_point = 0; i_point < region_status.size(); i_point++) {
 			const Eigen::Vector2f p(sample_points[i_point].x(), sample_points[i_point].y());
@@ -756,19 +930,29 @@ public:
 	float dummy3 = 0;
 
 	Next_best_target_topology_exploration(const Eigen::Vector3f& v_map_start_mesh, const Eigen::Vector3f& v_map_end_mesh,
-		int v_CCPP_CELL_THRESHOLD):CCPP_CELL_THRESHOLD(v_CCPP_CELL_THRESHOLD),
-		Next_best_target(v_map_start_mesh, v_map_end_mesh)
+		int v_CCPP_CELL_THRESHOLD,const Polygon_2& m_boundary,float v_ccpp_cell_distance):CCPP_CELL_THRESHOLD(v_CCPP_CELL_THRESHOLD),
+		Next_best_target(v_map_start_mesh, v_map_end_mesh, v_ccpp_cell_distance)
 	{
 		//color_reconstruction = region_viz_color[2];
 		//color_occupied = region_viz_color[1];
 		//color_unobserved = region_viz_color[0];
 		color_reconstruction = cv::Vec3b(0, 255, 0);
-		color_occupied = cv::Vec3b(0, 0, 255);
+		color_occupied = cv::Vec3b(0, 255, 0);
 		color_unobserved = cv::Vec3b(0,0,0);
 		region_status.clear();
 		region_status.resize(sample_points.size(), color_unobserved);
-		m_current_color_id = 3;
-		region_status[0] = region_viz_color[m_current_color_id % (region_viz_color.size() - 2) + 2];
+
+		if(m_boundary.size()!=0){
+			for (int i_sample_point = 0; i_sample_point < sample_points.size(); ++i_sample_point) {
+				if (m_boundary.bounded_side(sample_points[i_sample_point]) != CGAL::ON_BOUNDED_SIDE) {
+					//LOG(INFO) << m_boundary.is_simple();
+					region_status[i_sample_point] = color_occupied;
+				}
+			}
+		}
+		
+		m_current_color_id = 0;
+		region_status[0] = region_viz_color[m_current_color_id];
 		//topology.emplace_back(Eigen::Vector2f(m_map_start.x(), m_map_start.y()), 
 		//	Eigen::Vector2f(m_map_start.x()+1, m_map_start.y()+1));
 		//topology_viz_color= get_color_table_bgr();
@@ -778,7 +962,7 @@ public:
 	{
 		const Eigen::AlignedBox3f& cur_box_3 = v_building.bounding_box_3d;
 		Eigen::AlignedBox2f cur_box_2(Eigen::Vector2f(m_map_start.x(), m_map_start.y()),
-			Eigen::Vector2f(cur_box_3.center().x(), cur_box_3.center().y()));
+			Eigen::Vector2f(cur_box_3.max().x(), cur_box_3.max().y()));
 		Eigen::Vector3f next_point = v_building.bounding_box_3d.center();
 		if(m_motion_status != Motion_status::final_check)
 		{
@@ -823,6 +1007,8 @@ public:
 		Eigen::Vector3f t2 = (next_point - m_map_start) / DISTANCE_THRESHOLD;
 		Eigen::Vector2i start_pos_on_map(t1.x(), t1.y());
 		Eigen::Vector2i end_pos_on_map(t2.x(), t2.y());
+		if (v_ccpp_threshold == 0)//Last check
+			end_pos_on_map = start_pos_on_map;
 
 		cv::Mat start_end = ccpp_map.clone();
 		//start_end.setTo(0);
@@ -934,9 +1120,9 @@ public:
 			//else
 		//		region_status[nearest_region_id] = region_viz_color[m_current_color_id % (region_viz_color.size() - 2) + 2];
 		//}
-		if (m_motion_status == Motion_status::exploration|| m_motion_status == Motion_status::final_check)
+		if ((m_motion_status == Motion_status::exploration|| m_motion_status == Motion_status::final_check )&& region_status[nearest_region_id]==color_unobserved)
 		{
-			region_status[nearest_region_id] = region_viz_color[m_current_color_id % (region_viz_color.size() - 2) + 2];
+			region_status[nearest_region_id] = region_viz_color[m_current_color_id % region_viz_color.size()];
 		}
 		
 		for (int i_point = 0; i_point < region_status.size(); i_point++) {
@@ -1016,7 +1202,52 @@ public:
 					}
 					else {
 						auto& item = m_ccpp_trajectory[m_current_ccpp_trajectory_id].first;
-						m_exploration_point.emplace(
+
+						std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> start_points;
+						start_points.emplace_back(
+							Eigen::Vector3f(
+								item.x() - DISTANCE_THRESHOLD * 0.3,
+								item.y(),
+								100),
+							Eigen::Vector3f(1,0,0)
+						);
+						start_points.emplace_back(
+							Eigen::Vector3f(
+								item.x() + DISTANCE_THRESHOLD * 0.3,
+								item.y(),
+								100),
+							Eigen::Vector3f(-1,0,0)
+						);
+						start_points.emplace_back(
+							Eigen::Vector3f(
+								item.x() ,
+								item.y() + DISTANCE_THRESHOLD * 0.3,
+								100),
+							Eigen::Vector3f(0,-1,0)
+						);
+						start_points.emplace_back(
+							Eigen::Vector3f(
+								item.x() ,
+								item.y() - DISTANCE_THRESHOLD * 0.3,
+								100),
+							Eigen::Vector3f(0,1,0)
+						);
+
+						int nearest_id = std::min_element(start_points.begin(), start_points.end(),
+							[&v_cur_pos](auto& a1, auto& a2) {
+							return (v_cur_pos.pos_mesh - a1.first).norm() < (v_cur_pos.pos_mesh - a2.first).norm();
+						}) - start_points.begin();
+
+						for(int i_exploration=0; i_exploration <4;++i_exploration)
+						{
+							
+							m_exploration_point.emplace(
+								start_points[nearest_id].first + DISTANCE_THRESHOLD * 0.2 * i_exploration * start_points[nearest_id].second,
+								Eigen::Vector3f(start_points[nearest_id].second.x(), start_points[nearest_id].second.y(), -std::tan(64.f / 180 * M_PI)).normalized()
+							);
+						}
+						
+						/*m_exploration_point.emplace(
 							Eigen::Vector3f(
 								item.x() - DISTANCE_THRESHOLD * 0.3,
 								item.y(),
@@ -1043,14 +1274,14 @@ public:
 								item.y(),
 								100),
 							Eigen::Vector3f(-1, 0, -std::tan(64.f / 180 * M_PI)).normalized()
-						);
-						/*m_exploration_point.emplace(
-							Eigen::Vector3f(
-								item.x(),
-								item.y(),
-								100),
-							Eigen::Vector3f(-1, 0, -std::tan(64.f / 180 * M_PI)).normalized()
-						);*/
+						); */
+						//m_exploration_point.emplace(
+						//	Eigen::Vector3f(
+						//		item.x(),
+						//		item.y(),
+						//		100),
+						//	Eigen::Vector3f(-1, 0, -std::tan(64.f / 180 * M_PI)).normalized()
+						//);
 						//next_pos = m_ccpp_trajectory[m_current_ccpp_trajectory_id];
 						next_pos = m_exploration_point.front();
 						m_exploration_point.pop();
@@ -1107,8 +1338,8 @@ public:
 	int m_current_exploration_id = -1;
 	cv::Vec3b color_unobserved, color_free, color_occupied;
 	
-	Next_best_target_min_max_information(const Eigen::Vector3f& v_map_start_mesh, const Eigen::Vector3f& v_map_end_mesh)
-	:Next_best_target(v_map_start_mesh,v_map_end_mesh) {
+	Next_best_target_min_max_information(const Eigen::Vector3f& v_map_start_mesh, const Eigen::Vector3f& v_map_end_mesh,float v_ccpp_cell_distance)
+	:Next_best_target(v_map_start_mesh,v_map_end_mesh, v_ccpp_cell_distance) {
 		color_unobserved = region_viz_color[0];
 		color_free = region_viz_color[1];
 		color_occupied = region_viz_color[2];
@@ -1286,8 +1517,21 @@ class Mapper
 {
 public:
 	Json::Value m_args;
-	
-	Mapper(const Json::Value& v_args):m_args(v_args){};
+	Polygon_2 m_boundary;
+	Mapper(const Json::Value& v_args):m_args(v_args)
+	{
+		std::vector<Point_2> points;
+		if (!v_args["boundary"].isNull()) {
+			int num_point = v_args["boundary"].size() / 3;
+			for (int i_point = 0; i_point < num_point; ++i_point) {
+				Point_2 p_lonlat(v_args["boundary"][i_point * 3 + 0].asFloat(),
+					v_args["boundary"][i_point * 3 + 1].asFloat());
+				Eigen::Vector2f p_mercator = lonLat2Mercator(Eigen::Vector2f(p_lonlat.x(), p_lonlat.y())) - lonLat2Mercator(Eigen::Vector2f(v_args["geo_origin"][0].asFloat(), v_args["geo_origin"][1].asFloat()));
+				points.emplace_back(p_mercator.x(), p_mercator.y());
+			}
+			m_boundary = Polygon_2(points.begin(), points.end());
+		}
+	};
 	virtual void get_buildings(std::vector<Building>& v_buildings,
 		const Pos_Pack& v_current_pos,
 		const int v_cur_frame_id, Height_map& v_height_map)=0;
@@ -1296,41 +1540,43 @@ public:
 class GT_mapper:public Mapper
 {
 public:
-	std::vector<Building> m_buildings;
+	std::vector<Building> m_buildings_target;
+	std::vector<Building> m_buildings_safe_place;
 	GT_mapper(const Json::Value& args): Mapper(args)
 	{
 		if(false)
 		{
-			m_buildings.resize(3);
-			m_buildings[0].bounding_box_3d= Eigen::AlignedBox3f(
+			m_buildings_target.resize(3);
+			m_buildings_target[0].bounding_box_3d= Eigen::AlignedBox3f(
 				Eigen::Vector3f(130 * 4 - 10, 130 * 6 - 10, 0),
 				Eigen::Vector3f(130 * 4 + 10, 130 * 6 + 10, 50)
 			);
-			m_buildings[1].bounding_box_3d= Eigen::AlignedBox3f(
+			m_buildings_target[1].bounding_box_3d= Eigen::AlignedBox3f(
 				Eigen::Vector3f(130 * 8 - 10,130 * 3 - 10,0),
 				Eigen::Vector3f(130 * 8 + 10,130 * 3 + 10,50)
 			);
-			m_buildings[2].bounding_box_3d= Eigen::AlignedBox3f(
+			m_buildings_target[2].bounding_box_3d= Eigen::AlignedBox3f(
 				Eigen::Vector3f(130 * 6 - 10, 130 * 1 - 10, 0),
 				Eigen::Vector3f(130 * 6 + 10, 130 * 1 + 10, 50)
 			);
 			
 			
-			for (int cluster_id = 0; cluster_id < m_buildings.size(); ++cluster_id) {
-				Building& current_building = m_buildings[cluster_id];
+			for (int cluster_id = 0; cluster_id < m_buildings_target.size(); ++cluster_id) {
+				Building& current_building = m_buildings_target[cluster_id];
 				current_building.boxes.push_back(current_building.bounding_box_3d);
 			}
+			m_buildings_safe_place = m_buildings_target;
 		}
-		else if (true)
+		else if (false)
 		{
 			tinyobj::attrib_t attr;
 			std::vector<tinyobj::shape_t> shapes;
 			std::vector<tinyobj::material_t> mtl;
 			std::tie(attr, shapes, mtl) = load_obj(args["model_path"].asString());
 
-			m_buildings.resize(shapes.size());
+			m_buildings_target.resize(shapes.size());
 			for (int cluster_id = 0; cluster_id < shapes.size(); ++cluster_id) {
-				Building& current_building = m_buildings[cluster_id];
+				Building& current_building = m_buildings_target[cluster_id];
 				size_t index_offset = 0;
 				for(int i_face=0; i_face <shapes[cluster_id].mesh.num_face_vertices.size();++i_face)
 				{
@@ -1349,8 +1595,10 @@ public:
 				current_building.bounding_box_3d = get_bounding_box(current_building.points_world_space);
 				current_building.boxes.push_back(current_building.bounding_box_3d);
 			}
+			m_buildings_safe_place = m_buildings_target;
+
 		}
-		else if (false)
+		else if (true)
 		{
 
 			CGAL::Point_set_3<Point_3, Vector_3> original_point_cloud;
@@ -1362,18 +1610,32 @@ public:
 					CGAL::read_ply_point_set(std::ifstream(iter->path().string(), std::ios::binary), pc_item);
 					pcs.push_back(pc_item);
 				}
-				CGAL::read_ply_point_set(std::ifstream("D:\\datasets\\Realcity\\Shenzhen\\sample_500000.ply", std::ios::binary), original_point_cloud);
-				CGAL::Point_set_3<Point_3, Vector_3> point_cloud(original_point_cloud);
+				//CGAL::read_ply_point_set(std::ifstream("D:\\datasets\\Realcity\\Shenzhen\\sample_500000.ply", std::ios::binary), original_point_cloud);
+				//CGAL::Point_set_3<Point_3, Vector_3> point_cloud(original_point_cloud);
 
-				m_buildings.resize(pcs.size());
+				m_buildings_safe_place.resize(pcs.size());
 				for (int cluster_id = 0; cluster_id < pcs.size(); ++cluster_id) {
-					Building& current_building = m_buildings[cluster_id];
+					Building& current_building = m_buildings_safe_place[cluster_id];
+					bool add_as_target = true;
 					for (Point_set::Index idx : pcs[cluster_id]) {
 						current_building.points_world_space.insert(pcs[cluster_id].point(idx));
+						Point_2 p(pcs[cluster_id].point(idx).x(), pcs[cluster_id].point(idx).y());
+						if(m_boundary.size()>0)
+						{
+							for (auto iter_segment = m_boundary.edges_begin(); iter_segment != m_boundary.edges_end(); ++iter_segment)
+								if (CGAL::squared_distance(p, *iter_segment) < 00 * 00)
+									add_as_target = false;
+							if(m_boundary.bounded_side(p)!=CGAL::ON_BOUNDED_SIDE)
+								add_as_target = false;
+						}
 					}
 					current_building.bounding_box_3d = get_bounding_box(current_building.points_world_space);
 					current_building.boxes.push_back(current_building.bounding_box_3d);
+
+					if(add_as_target)
+						m_buildings_target.push_back(current_building);
 				}
+				return;
 			}
 			else {
 				CGAL::read_ply_point_set(std::ifstream(args["model_path"].asString(), std::ios::binary), original_point_cloud);
@@ -1399,7 +1661,7 @@ public:
 						point_cloud.parameters().neighbor_radius(
 							args["cluster_radius"].asFloat()).
 						adjacencies(std::back_inserter(adjacencies)));
-					m_buildings.resize(nb_clusters);
+					m_buildings_target.resize(nb_clusters);
 
 					Point_set::Property_map<unsigned char> red = point_cloud.add_property_map<unsigned char>("red", 0).first;
 					Point_set::Property_map<unsigned char> green = point_cloud
@@ -1413,15 +1675,16 @@ public:
 						green[idx] = rand.get_int(64, 192);
 						blue[idx] = rand.get_int(64, 192);
 
-						Building& current_building = m_buildings[cluster_id];
+						Building& current_building = m_buildings_target[cluster_id];
 						current_building.points_world_space.insert(point_cloud.point(idx));
 					}
 				}
-				for (int i_building_1 = 0; i_building_1 < m_buildings.size(); ++i_building_1) {
-					m_buildings[i_building_1].bounding_box_3d = get_bounding_box(m_buildings[i_building_1].points_world_space);
-					m_buildings[i_building_1].bounding_box_3d.min().z() -= args["HEIGHT_CLIP"].asFloat();
-					m_buildings[i_building_1].boxes.push_back(m_buildings[i_building_1].bounding_box_3d);
+				for (int i_building_1 = 0; i_building_1 < m_buildings_target.size(); ++i_building_1) {
+					m_buildings_target[i_building_1].bounding_box_3d = get_bounding_box(m_buildings_target[i_building_1].points_world_space);
+					m_buildings_target[i_building_1].bounding_box_3d.min().z() -= args["HEIGHT_CLIP"].asFloat();
+					m_buildings_target[i_building_1].boxes.push_back(m_buildings_target[i_building_1].bounding_box_3d);
 				}
+				m_buildings_safe_place = m_buildings_target;
 			}
 		}
 		
@@ -1433,8 +1696,8 @@ public:
 	{
 		if (v_buildings.size() == 0)
 		{
-			v_buildings = m_buildings;
-			for (auto& item_building : v_buildings) {
+			v_buildings = m_buildings_target;
+			for (auto& item_building : m_buildings_safe_place) {
 				v_height_map.update(item_building.bounding_box_3d);
 			}
 		}
@@ -1661,6 +1924,7 @@ int main(int argc, char** argv){
 	// Reset segmentation color, initialize map converter
 	Airsim_tools* airsim_client;
 	Visualizer* viz = new Visualizer;
+	viz->m_uncertainty_map_distance=args["ccpp_cell_distance"].asFloat();
 	CGAL::Point_set_3<Point_3, Vector_3> original_point_cloud;
 	CGAL::read_ply_point_set(std::ifstream(args["model_path"].asString(), std::ios::binary), original_point_cloud);
 	viz->lock();
@@ -1674,6 +1938,8 @@ int main(int argc, char** argv){
 		boost::filesystem::create_directories(log_root/"seg");
 		boost::filesystem::create_directories(log_root/"point_world");
 		boost::filesystem::create_directories(log_root/"ccpp_map");
+		boost::filesystem::create_directories(log_root/"wgs_log");
+		boost::filesystem::create_directories(log_root/"gradually_results");
 		
 		map_converter.initDroneStart(UNREAL_START);
 		INTRINSIC << 400, 0, 400, 0, 400, 400, 0, 0, 1;
@@ -1718,17 +1984,20 @@ int main(int argc, char** argv){
 	
 	Next_best_target* next_best_target;
 	if (args["nbv_target"] == "Topology_decomposition")
-		next_best_target = new Next_best_target_topology_exploration(map_start_mesh, map_end_mesh, args["CCPP_CELL_THRESHOLD"].asInt());
+		next_best_target = new Next_best_target_topology_exploration(map_start_mesh, map_end_mesh, 
+			args["CCPP_CELL_THRESHOLD"].asInt(), mapper->m_boundary, args["ccpp_cell_distance"].asFloat());
 	else if (args["nbv_target"] == "Min_distance")
-		next_best_target = new Next_best_target_min_distance_ccpp(map_start_mesh, map_end_mesh);
+		next_best_target = new Next_best_target_min_distance_ccpp(map_start_mesh, map_end_mesh, args["ccpp_cell_distance"].asFloat());
 	else if (args["nbv_target"] == "Random_min_distance")
-		next_best_target = new Next_best_target_random_min_distance(map_start_mesh, map_end_mesh);
+		next_best_target = new Next_best_target_random_min_distance(map_start_mesh, map_end_mesh, args["ccpp_cell_distance"].asFloat());
 	else if (args["nbv_target"] == "Min_max_information")
-		next_best_target = new Next_best_target_min_max_information(map_start_mesh, map_end_mesh);
+		next_best_target = new Next_best_target_min_max_information(map_start_mesh, map_end_mesh, args["ccpp_cell_distance"].asFloat());
 	else if (args["nbv_target"] == "First_building_next_region")
-		next_best_target = new Next_best_target_first_building_next_region(map_start_mesh, map_end_mesh);
+		next_best_target = new Next_best_target_first_building_next_region(map_start_mesh, map_end_mesh, args["ccpp_cell_distance"].asFloat());
 	else if (args["nbv_target"] == "Reconstruction_only")
-		next_best_target = new Next_best_target_reconstruction_only(map_start_mesh, map_end_mesh);
+		next_best_target = new Next_best_target_reconstruction_only(map_start_mesh, map_end_mesh, args["ccpp_cell_distance"].asFloat());
+	else if (args["nbv_target"] == "Exploration_only")
+		next_best_target = new Next_best_target_exploration_only(map_start_mesh, map_end_mesh, args["ccpp_cell_distance"].asFloat());
 	else
 		throw;
 	bool with_exploration = args["with_exploration"].asBool();
@@ -1741,13 +2010,6 @@ int main(int argc, char** argv){
 	std::pair<Eigen::Vector3f, Eigen::Vector3f> next_pos_direction;
 	//total_passed_trajectory.push_back(std::make_pair(current_pos.pos_mesh, Eigen::Vector3f(0,0,-1)));
 
-	std::vector<Eigen::AlignedBox3f> boxess;
-	Surface_mesh meshs = get_box_mesh(boxess);
-	for (const auto& item : next_best_target->sample_points) {
-		boxess.push_back(Eigen::AlignedBox3f(Eigen::Vector3f(item.x() - 60, item.y() - 60, -1),
-			Eigen::Vector3f(item.x() + 60, item.y() + 60, 1)));
-	}
-	get_box_mesh_with_colors(boxess, next_best_target->region_status, "uncertainty_map.obj");
 	while (!end) {
 		LOG(INFO) << "<<<<<<<<<<<<< Frame " << cur_frame_id << " <<<<<<<<<<<<<";
 
@@ -1870,16 +2132,19 @@ int main(int argc, char** argv){
 		//	break;
 
 		std::vector<Eigen::AlignedBox3f> boxes;
-		if(cur_frame_id==150|| cur_frame_id == 450||cur_frame_id == 750)
+		if(cur_frame_id == 50 || cur_frame_id == 100 || cur_frame_id==150|| cur_frame_id == 450||cur_frame_id == 750)
 		{
 			for (const auto& item : total_buildings)
 				boxes.push_back(item.bounding_box_3d);
 			Surface_mesh mesh = get_box_mesh(boxes);
-			CGAL::write_ply(std::ofstream("box" + std::to_string(cur_frame_id) + ".ply"), mesh);
-			write_normal_path(total_passed_trajectory, "camera_normal_" + std::to_string(cur_frame_id) + ".log");
+			CGAL::write_ply(std::ofstream("log/gradually_results/box" + std::to_string(cur_frame_id) + ".ply"), mesh);
+			write_normal_path_with_flag(total_passed_trajectory, 
+				"log/gradually_results/camera_normal_" + std::to_string(cur_frame_id) + ".log", 
+				trajectory_flag);
 		}
 		
 	}
+	total_passed_trajectory.pop_back();
 	debug_img(std::vector<cv::Mat>{height_map.m_map_dilated});
 
 	write_unreal_path(total_passed_trajectory, "camera_after_transaction.log");
@@ -1894,19 +2159,35 @@ int main(int argc, char** argv){
 
 	boxes.clear();
 	// Uncertainty
+	std::vector<Eigen::AlignedBox3f> boxess1;
+	std::vector<cv::Vec3b> boxess1_color;
+	std::vector<Eigen::AlignedBox3f> boxess2;
+	std::vector<cv::Vec3b> boxess2_color;
 	for (const auto& item : next_best_target->sample_points) {
-		boxes.push_back(Eigen::AlignedBox3f(Eigen::Vector3f(item.x() - 60, item.y() - 60, -1),
-			Eigen::Vector3f(item.x() + 60, item.y() + 60, 1)));
+		int index = &item - &next_best_target->sample_points[0];
+		if (next_best_target->region_status[index] == cv::Vec3b(0, 255, 0))
+		{
+			boxess1.push_back(Eigen::AlignedBox3f(Eigen::Vector3f(item.x() - args["ccpp_cell_distance"].asFloat() / 2, item.y() - args["ccpp_cell_distance"].asFloat() / 2, -1),
+				Eigen::Vector3f(item.x() + args["ccpp_cell_distance"].asFloat() / 2, item.y() + args["ccpp_cell_distance"].asFloat() / 2, 1)));
+			boxess1_color.push_back(next_best_target->region_status[index]);
+		}
+		else
+		{
+			boxess2_color.push_back(next_best_target->region_status[index]);
+			boxess2.push_back(Eigen::AlignedBox3f(Eigen::Vector3f(item.x() - args["ccpp_cell_distance"].asFloat() / 2, item.y() - args["ccpp_cell_distance"].asFloat() / 2, -1),
+				Eigen::Vector3f(item.x() + args["ccpp_cell_distance"].asFloat() / 2, item.y() + args["ccpp_cell_distance"].asFloat() / 2, 1)));
+		}
 	}
-	get_box_mesh_with_colors(boxess, next_best_target->region_status, "uncertainty_map.obj");
+	get_box_mesh_with_colors(boxess1, boxess1_color, "uncertainty_map1.obj");
+	get_box_mesh_with_colors(boxess2, boxess2_color, "uncertainty_map2.obj");
 	
 	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> safe_global_trajectory;
 	if(args["output_waypoint"].asBool())
 	{
 		
 		safe_global_trajectory = simplify_path_reduce_waypoints(ensure_global_safe(
-			total_passed_trajectory, height_map, args["Z_UP_BOUNDS"].asFloat()));
-		write_wgs_path(safe_global_trajectory, "./");
+			total_passed_trajectory, height_map, args["Z_UP_BOUNDS"].asFloat(),mapper->m_boundary));
+		write_wgs_path(args,ensure_three_meter_dji(safe_global_trajectory), "./log/wgs_log/");
 		LOG(ERROR) << "Total waypoint length: " << evaluate_length(safe_global_trajectory);
 	}
 	
@@ -1924,9 +2205,13 @@ int main(int argc, char** argv){
 		viz->m_direction = total_passed_trajectory[0].second;
 		viz->m_trajectories.clear();
 		if (args["output_waypoint"].asBool())
-			viz->m_trajectories_spline= safe_global_trajectory;
+		{
+			viz->m_trajectories_spline = safe_global_trajectory;
+		}
 		else
+		{
 			viz->m_trajectories_spline = total_passed_trajectory;
+		}
 		viz->m_uncertainty_map.clear();
 		for (const auto& item : next_best_target->sample_points) {
 			int index = &item - &next_best_target->sample_points[0];

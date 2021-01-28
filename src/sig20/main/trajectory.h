@@ -158,9 +158,9 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> simplify_path_reduce_wa
 	return simplified_trajectory;
 }
 
-void write_wgs_path(const std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>>& v_trajectories,const std::string& v_path) {
+void write_wgs_path(const Json::Value& v_args,const std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>>& v_trajectories,const std::string& v_path) {
 	//Eigen::Vector2f origin_wgs(113.92332,22.64429); // Yingrenshi
-	Eigen::Vector2f origin_wgs(113.93159, 22.53537);
+	Eigen::Vector2f origin_wgs(v_args["geo_origin"][0].asFloat(), v_args["geo_origin"][1].asFloat());
 	Eigen::Vector2f origin_xy=lonLat2Mercator(origin_wgs);
 	std::ofstream pose(v_path+"camera_wgs_0.txt");
 
@@ -419,49 +419,55 @@ float evaluate_length(const std::vector<std::pair<Eigen::Vector3f, Eigen::Vector
 std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> ensure_three_meter_dji(
 	const std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>>& v_trajectory) {
 	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> safe_trajectory;
-	std::unordered_set<Eigen::Vector3f> views;
+	std::vector<Eigen::Vector3f> views;
 	for (int i = 0; i < v_trajectory.size(); ++i) {
 		auto cur_item = v_trajectory[i].first;
-		if(views.insert(cur_item).second)
+		bool duplicated = false;
+		for(auto item: views)
 		{
-			safe_trajectory.push_back(v_trajectory[i]);
+			if ((item - cur_item).norm() < 4)
+				duplicated = true;
 		}
-		else
-		{
-			do
-			{
-				cur_item.z() += 3;
-			} while (views.insert(cur_item).second);
-			safe_trajectory.push_back(std::make_pair(cur_item, v_trajectory[i].second));
-			LOG(ERROR) << "Detect duplicate views, raise" << cur_item.z() - v_trajectory[i].first.z() << " meters";
-		}
+		auto item = v_trajectory[i];
+		if (item.first.z() > 120)
+			item.first.z() = 119;
+		if(!duplicated)
+			safe_trajectory.push_back(item);
 	}
 	return safe_trajectory;
 }
 
 std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> ensure_global_safe(
 	const std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>>& v_trajectory,
-	const Height_map& v_height_map, const float Z_UP_BOUNDS)
+	const Height_map& v_height_map, const float Z_UP_BOUNDS,const Polygon_2& v_boundary)
 {
 	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> safe_trajectory;
 	for (int i = 0; i < v_trajectory.size()-1;++i) {
 		safe_trajectory.push_back(v_trajectory[i]);
 		Eigen::Vector3f cur_item = v_trajectory[i].first;
-		const auto& next_item = v_trajectory[i + 1];
-		Eigen::Vector3f direction = (next_item.first- cur_item).normalized();
-		while((cur_item-next_item.first).norm()<3)
+		auto next_item = v_trajectory[i + 1];
+		if (v_height_map.get_height(next_item.first.x(), next_item.first.y()) + Z_UP_BOUNDS > next_item.first.z()) {
+			while (v_height_map.get_height(next_item.first.x(), next_item.first.y()) + Z_UP_BOUNDS > next_item.first.z()) {
+				next_item.first.z() += 5;
+			}
+		}
+		Eigen::Vector3f direction = (next_item.first - cur_item).normalized();
+
+		bool accept = true;
+		while((cur_item-next_item.first).norm()>5)
 		{
 			cur_item += direction * 2;
 			if(v_height_map.get_height(cur_item.x(), cur_item.y()) + Z_UP_BOUNDS > cur_item.z())
 			{
-				while (v_height_map.get_height(cur_item.x(), cur_item.y()) + Z_UP_BOUNDS > cur_item.z()) {
-					cur_item[2] += 5;
-				}
-				LOG(ERROR) << "Detect collision, Raise";
-				direction = (next_item.first - cur_item).normalized();
-				safe_trajectory.emplace_back(cur_item, direction);
+				accept = false;
 			}
 		}
+		if(!accept)
+		{
+			safe_trajectory.emplace_back(Eigen::Vector3f(v_trajectory[i].first.x(), v_trajectory[i].first.y(),100), v_trajectory[i].second);
+			safe_trajectory.emplace_back(Eigen::Vector3f(next_item.first.x(), next_item.first.y(),100), v_trajectory[i+1].second);
+		}
+
 	}
 	safe_trajectory.push_back(v_trajectory.back());
 	return safe_trajectory;
@@ -857,20 +863,20 @@ void generate_distance_map(const cv::Mat& v_map, cv::Mat& distance_map, const Ei
 	{
 		if (now_point.x() < 0 || now_point.x() > v_map.rows - 1 || now_point.y() < 0 || now_point.y() > v_map.cols - 1)
 			return;
-		if (v_map.at<cv::uint8_t>(now_point.x(), now_point.y()) == 0)
+		if (v_map.at<cv::int32_t>(now_point.x(), now_point.y()) == 0)
 			return;
-		if (distance_map.at<cv::uint8_t>(now_point.x(), now_point.y()) != 0)
+		if (distance_map.at<cv::int32_t>(now_point.x(), now_point.y()) != 0)
 		{
-			if (distance < distance_map.at<cv::uint8_t>(now_point.x(), now_point.y()))
-				distance_map.at<cv::uint8_t>(now_point.x(), now_point.y()) = distance;
+			if (distance < distance_map.at<cv::int32_t>(now_point.x(), now_point.y()))
+				distance_map.at<cv::int32_t>(now_point.x(), now_point.y()) = distance;
 			else
 				return;
 		}
 		else
-			distance_map.at<cv::uint8_t>(now_point.x(), now_point.y()) = distance;
+			distance_map.at<cv::int32_t>(now_point.x(), now_point.y()) = distance;
 	}
 	else
-		distance_map.at<cv::uint8_t>(now_point.x(), now_point.y()) = 0;
+		distance_map.at<cv::int32_t>(now_point.x(), now_point.y()) = 0;
 	
 	distance++;
 	generate_distance_map(v_map, distance_map, goal, Eigen::Vector2i(now_point.x() + 1, now_point.y()), distance);
@@ -899,7 +905,7 @@ void print_map(const cv::Mat& v_map)
 	{
 		for (int j = 0; j < v_map.cols; j++)
 		{
-			std::cout << int(v_map.at<cv::uint8_t>(i, j)) << " ";
+			std::cout << int(v_map.at<cv::int32_t>(i, j)) << " ";
 		}
 		std::cout << std::endl;
 	}
@@ -909,7 +915,7 @@ void print_map(const cv::Mat& v_map)
 void explore(const cv::Mat& v_map, const cv::Mat& distance_map, const cv::Mat& obstacle_map, std::vector<Eigen::Vector2i>& trajectory, Eigen::Vector2i now_point, const Eigen::Vector2i& goal, cv::Mat& visited_map, bool& isFinished, float weight)
 {
 	trajectory.push_back(now_point);
-	visited_map.at<cv::uint8_t>(now_point.x(), now_point.y()) += 1;
+	visited_map.at<cv::int32_t>(now_point.x(), now_point.y()) += 1;
 	if (now_point == goal)
 	{
 		bool isCC = true;
@@ -917,9 +923,9 @@ void explore(const cv::Mat& v_map, const cv::Mat& distance_map, const cv::Mat& o
 		{
 			for (int j = 0; j < v_map.cols; j++)
 			{
-				if (v_map.at<cv::uint8_t>(i, j) != 0)
+				if (v_map.at<cv::int32_t>(i, j) != 0)
 				{
-					if (visited_map.at<cv::uint8_t>(i, j) == 0)
+					if (visited_map.at<cv::int32_t>(i, j) == 0)
 					{
 						isCC = false;
 						break;
@@ -955,13 +961,13 @@ void explore(const cv::Mat& v_map, const cv::Mat& distance_map, const cv::Mat& o
 		{
 			if (!(neighbor_point.x() < 0 || neighbor_point.x() > v_map.rows - 1 || neighbor_point.y() < 0 || neighbor_point.y() > v_map.cols - 1))
 			{
-				temp_num = int(v_map.at<cv::uint8_t>(neighbor_point.x(), neighbor_point.y()));
+				temp_num = int(v_map.at<cv::int32_t>(neighbor_point.x(), neighbor_point.y()));
 				if (temp_num != 0)
 				{
-					temp_num = int(visited_map.at<cv::uint8_t>(neighbor_point.x(), neighbor_point.y()));
+					temp_num = int(visited_map.at<cv::int32_t>(neighbor_point.x(), neighbor_point.y()));
 					if (temp_num == 0)
 					{
-						float distance = float(distance_map.at<cv::uint8_t>(neighbor_point.x(), neighbor_point.y())) + weight * float(obstacle_map.at<cv::uint8_t>(neighbor_point.x(), neighbor_point.y()));
+						float distance = float(distance_map.at<cv::int32_t>(neighbor_point.x(), neighbor_point.y())) + weight * float(obstacle_map.at<cv::int32_t>(neighbor_point.x(), neighbor_point.y()));
 						if (distance > max_num)
 						{
 							max_num = distance;
@@ -989,9 +995,9 @@ void explore(const cv::Mat& v_map, const cv::Mat& distance_map, const cv::Mat& o
 				{
 					for (int j = 0; j < v_map.cols; j++)
 					{
-						if (v_map.at<cv::uint8_t>(i, j) != 0)
+						if (v_map.at<cv::int32_t>(i, j) != 0)
 						{
-							if (visited_map.at<cv::uint8_t>(i, j) == 0)
+							if (visited_map.at<cv::int32_t>(i, j) == 0)
 							{
 								isCC = false;
 								break;
@@ -1019,9 +1025,9 @@ void explore(const cv::Mat& v_map, const cv::Mat& distance_map, const cv::Mat& o
 				{
 					for (int j = 0; j < v_map.cols; j++)
 					{
-						if (v_map.at<cv::uint8_t>(i, j) != 0)
+						if (v_map.at<cv::int32_t>(i, j) != 0)
 						{
-							if (visited_map.at<cv::uint8_t>(i, j) == 0)
+							if (visited_map.at<cv::int32_t>(i, j) == 0)
 							{
 								isCC = false;
 								int temp_distance = std::abs(now_point.x() - i) + std::abs(now_point.y() - j);
@@ -1052,18 +1058,18 @@ void explore(const cv::Mat& v_map, const cv::Mat& distance_map, const cv::Mat& o
 
 std::vector<Eigen::Vector2i> perform_ccpp(const cv::Mat& ccpp_map, const Eigen::Vector2i& v_start_point, const Eigen::Vector2i& v_goal, float weight = 1)
 {
-	cv::Mat v_map(ccpp_map.rows + 2, ccpp_map.cols + 2, CV_8UC1);
+	cv::Mat v_map(ccpp_map.rows + 2, ccpp_map.cols + 2, CV_32SC1);
 	for (int i = 0; i < v_map.rows; i++)
 	{
 		for (int j = 0; j < v_map.cols; j++)
 		{
 			if (i == 0 || j == 0 || i == v_map.rows - 1 || j == v_map.cols - 1)
 			{
-				v_map.at<cv::uint8_t>(i, j) = 0;
+				v_map.at<cv::int32_t>(i, j) = 0;
 			}
 			else
 			{
-				v_map.at<cv::uint8_t>(i, j) = ccpp_map.at<cv::uint8_t>(i - 1, j - 1);
+				v_map.at<cv::int32_t>(i, j) = ccpp_map.at<cv::uint8_t>(i - 1, j - 1);
 			}
 		}
 	}
@@ -1072,14 +1078,14 @@ std::vector<Eigen::Vector2i> perform_ccpp(const cv::Mat& ccpp_map, const Eigen::
 	Eigen::Vector2i goal(v_goal.y() + 1, v_goal.x() + 1);
 	Eigen::Vector2i start_point(v_start_point.y() + 1, v_start_point.x() + 1);
 	int min_length = v_map.rows + v_map.cols;
-	if (v_map.at<cv::uint8_t>(start_point.x(),start_point.y()) == 0)
+	if (v_map.at<cv::int32_t>(start_point.x(),start_point.y()) == 0)
 	{
 		trajectory.push_back(start_point);
 		for (int i = 0; i < v_map.rows; i++)
 		{
 			for (int j = 0; j < v_map.cols; j++)
 			{
-				if (v_map.at<cv::uint8_t>(i, j) != 0)
+				if (v_map.at<cv::int32_t>(i, j) != 0)
 				{
 					int temp_length = std::abs(v_start_point.y() - i) + std::abs(v_start_point.x() - j);
 					if (temp_length < min_length)
@@ -1096,16 +1102,16 @@ std::vector<Eigen::Vector2i> perform_ccpp(const cv::Mat& ccpp_map, const Eigen::
 		}
 	}
 	
-	cv::Mat distance_map(v_map.rows, v_map.cols, CV_8UC1, cv::Scalar(0));
+	cv::Mat distance_map(v_map.rows, v_map.cols, CV_32SC1, cv::Scalar(0));
 	generate_distance_map(v_map, distance_map, goal, goal, 0);
 	std::cout << "distance_map" << std::endl;
 	print_map(distance_map);
-	cv::Mat obstacle_map(v_map.rows, v_map.cols, CV_8UC1, cv::Scalar(0));
+	cv::Mat obstacle_map(v_map.rows, v_map.cols, CV_32SC1, cv::Scalar(0));
 	for (int i = 0; i < v_map.rows; i++)
 	{
 		for (int j = 0; j < v_map.cols; j++)
 		{
-			if (v_map.at<cv::uint8_t>(i, j) == 0)
+			if (v_map.at<cv::int32_t>(i, j) == 0)
 			{
 				update_obstacle_map(v_map, obstacle_map, Eigen::Vector2i(i, j), Eigen::Vector2i(i, j), 0);
 			}
@@ -1117,16 +1123,16 @@ std::vector<Eigen::Vector2i> perform_ccpp(const cv::Mat& ccpp_map, const Eigen::
 	print_map(obstacle_map);
 
 	Eigen::Vector2i now_point(start_point);
-	cv::Mat visited_map(v_map.rows, v_map.cols, CV_8UC1, cv::Scalar(0));
+	cv::Mat visited_map(v_map.rows, v_map.cols, CV_32SC1, cv::Scalar(0));
 	bool isFinished = false;
 	explore(v_map, distance_map, obstacle_map, trajectory, start_point, goal, visited_map, isFinished, weight);
-	if (v_map.at<cv::uint8_t>(goal.x(), goal.y()) == 0)
+	if (v_map.at<cv::int32_t>(goal.x(), goal.y()) == 0)
 		trajectory.push_back(goal);
 
-	cv::Mat sequence_map(v_map.rows, v_map.cols, CV_8UC1, cv::Scalar(0));
+	cv::Mat sequence_map(v_map.rows, v_map.cols, CV_32SC1, cv::Scalar(0));
 	for (int i = 0; i < trajectory.size(); i++)
 	{
-		sequence_map.at<cv::uint8_t>(trajectory[i].x(), trajectory[i].y()) = i;
+		sequence_map.at<cv::int32_t>(trajectory[i].x(), trajectory[i].y()) = i;
 	}
 	for (auto& trajectory_point : trajectory)
 	{

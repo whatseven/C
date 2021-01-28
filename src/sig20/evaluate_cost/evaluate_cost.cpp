@@ -149,7 +149,8 @@ int main(int argc, char** argv){
 	
 	Visualizer vizer;
 	vizer.lock();
-	vizer.m_trajectories = trajectory;
+	//vizer.m_trajectories = trajectory;
+	vizer.m_trajectories_spline = trajectory;
 	vizer.m_points = points;
 	vizer.m_pos = trajectory[0].first;
 	vizer.unlock();

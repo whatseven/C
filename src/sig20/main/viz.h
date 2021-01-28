@@ -28,6 +28,7 @@ public:
     std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> m_trajectories;
     std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> m_trajectories_spline;
     std::vector<std::pair<Eigen::Vector2f, cv::Vec3b>> m_uncertainty_map;
+    float m_uncertainty_map_distance;
     Eigen::Vector3f m_pos;
     Eigen::Vector3f m_direction;
     Point_set m_points;
@@ -213,10 +214,8 @@ public:
                 Eigen::Vector4f color;
                 color = Eigen::Vector4f((float)item_color[2]/255.f, (float)item_color[1] / 255.f, (float)item_color[0] / 255.f, 1);
 
-                draw_cube(Eigen::AlignedBox3f(Eigen::Vector3f(position.x() - 60, position.y() - 60, -1),
-                    Eigen::Vector3f(position.x() + 60, position.y() + 60, 1)), color);
-                draw_cube(Eigen::AlignedBox3f(Eigen::Vector3f(position.x() - 60, position.y() - 60, -1),
-                    Eigen::Vector3f(position.x() + 60, position.y() + 60, 1)), color);
+                draw_cube(Eigen::AlignedBox3f(Eigen::Vector3f(position.x() - m_uncertainty_map_distance/2, position.y() - m_uncertainty_map_distance / 2, -1),
+                    Eigen::Vector3f(position.x() + m_uncertainty_map_distance / 2, position.y() + m_uncertainty_map_distance / 2, 1)), color);
             }
 
             
