@@ -2077,6 +2077,18 @@ public:
 			LOG(INFO) << "Sparse point cloud generation and building cluster done";
 		}
 
+		cv::Mat rgb = current_image["rgb"].clone();
+		auto orb = cv::ORB::create(200);
+		//orb->detect(rgb, keypoints, v_img.at("roi_mask"));
+		orb->detect(rgb, keypoints);
+		cv::drawKeypoints(rgb, keypoints, rgb);
+		for (auto box : detection_boxes)
+		{
+			cv::rectangle(rgb, box, cv::Scalar(0, 0, 255));
+		}
+		cv::imwrite("F:\\Sig\\demo\\" + std::to_string(v_cur_frame_id) + ".jpg", rgb);
+		
+
 		// Post process point cloud
 		// Input: Vector of building (std::vector<Building>)
 		// Output: Vector of building with point cloud in world space (std::vector<Building>)
