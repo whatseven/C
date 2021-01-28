@@ -1107,7 +1107,7 @@ public:
 		const Eigen::AlignedBox3f& cur_box_3 = v_building.bounding_box_3d;
 		Eigen::AlignedBox2f cur_box_2(Eigen::Vector2f(m_map_start.x(), m_map_start.y()),
 			Eigen::Vector2f(cur_box_3.max().x(), cur_box_3.max().y()));
-		Eigen::Vector3f next_point = v_building.bounding_box_3d.center();
+		Eigen::Vector3f next_point = v_building.bounding_box_3d.max();
 		if(m_motion_status != Motion_status::final_check)
 		{
 			//cur_box_2.max().x() += 2*DISTANCE_THRESHOLD;

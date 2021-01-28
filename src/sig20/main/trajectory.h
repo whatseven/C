@@ -1089,7 +1089,7 @@ std::vector<Eigen::Vector2i> perform_ccpp(const cv::Mat& ccpp_map, const Eigen::
 	Eigen::Vector2i start_point(v_start_point.y() + 1, v_start_point.x() + 1);
 
 	// Test
-	goal = start_point;
+	//goal = start_point;
 
 	int min_length = v_map.rows + v_map.cols;
 	if (v_map.at<cv::int32_t>(start_point.x(),start_point.y()) == 0)
