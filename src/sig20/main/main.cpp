@@ -1081,7 +1081,8 @@ public:
 		//color_unobserved = region_viz_color[0];
 		color_reconstruction = cv::Vec3b(0, 255, 0);
 		color_occupied = cv::Vec3b(0, 255, 0);
-		color_unobserved = cv::Vec3b(0,0,0);
+		color_unobserved = cv::Vec3b(205, 205, 209);
+		
 		region_status.clear();
 		region_status.resize(sample_points.size(), color_unobserved);
 
@@ -1124,7 +1125,7 @@ public:
 			int y = (point.y() - m_map_start.y()) / DISTANCE_THRESHOLD;
 			int x = (point.x() - m_map_start.x()) / DISTANCE_THRESHOLD;
 			Eigen::Vector2f pos(point.x(), point.y());
-			if (inside_box(pos, cur_box_2)&&region_status[id_region]==color_unobserved) {
+			if (inside_box(pos, cur_box_2) && region_status[id_region]==color_unobserved) {
 			//if (inside_box(pos, cur_box_2)) {
 				bool already_traveled = false;
 				for (const auto& item : topology) {
@@ -2414,6 +2415,7 @@ int main(int argc, char** argv){
 			viz->m_direction = current_pos.direction;
 			//viz->m_trajectories = current_trajectory;
 			viz->m_trajectories = total_passed_trajectory;
+			viz->m_is_reconstruction_status = trajectory_flag;
 			//viz->m_trajectories_spline = total_passed_trajectory;
 			//viz.m_polygon = next_best_target->img_polygon;
 			viz->unlock();
@@ -2483,7 +2485,7 @@ int main(int argc, char** argv){
 			std::ofstream pose("D:/test_data/" + std::to_string(cur_frame_id) + ".txt");
 			pose << next_pos << next_direction;
 			pose.close();
-			if(next_best_target->m_motion_status==Motion_status::exploration)
+			if(next_best_target->m_motion_status==Motion_status::exploration|| next_best_target->m_motion_status == Motion_status::final_check)
 				trajectory_flag.push_back(0);
 			else
 				trajectory_flag.push_back(1);

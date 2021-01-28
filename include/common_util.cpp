@@ -58,18 +58,17 @@ std::vector<cv::Vec3b> get_color_table_bgr()
         //color_table.emplace_back(226, 226, 255);
         //color_table.emplace_back(255, 226, 197);
         //color_table.emplace_back(197, 255, 226);
-
+        //color_table.emplace_back(2, 0, 160);
+        //color_table.emplace_back(0, 12, 79);
+        //color_table.emplace_back(105, 72, 129);
+        //color_table.emplace_back(153, 0, 102);
+        //color_table.emplace_back(153, 150, 102);
 	
         //color_table.emplace_back(0, 0, 0);
         //color_table.emplace_back(0, 255, 0);
         //color_table.emplace_back(0, 0, 255);
-        color_table.emplace_back(2, 0, 160);
         //color_table.emplace_back(2, 0, 104);
-        color_table.emplace_back(0, 12, 79);
         //color_table.emplace_back(51, 0, 255);
-        color_table.emplace_back(105, 72, 129);
-        color_table.emplace_back(153, 0, 102);
-        color_table.emplace_back(153, 150, 102);
         //color_table.emplace_back(51, 102, 255);
         //color_table.emplace_back(47, 84, 227);
         //color_table.emplace_back(25, 0, 203);
@@ -79,6 +78,12 @@ std::vector<cv::Vec3b> get_color_table_bgr()
         //color_table.emplace_back(0, 102, 255);
         //color_table.emplace_back(0, 206, 255);
         //color_table.emplace_back(24, 104, 235);
+        
+        color_table.emplace_back(153, 255, 204);
+        color_table.emplace_back(255, 204, 153);
+        color_table.emplace_back(153, 255, 255);
+        color_table.emplace_back(253, 196, 225);
+        
         return color_table;
 }
 

@@ -26,6 +26,7 @@ public:
     std::vector<Building> m_buildings;
     int m_current_building;
     std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> m_trajectories;
+    std::vector<int> m_is_reconstruction_status;
     std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> m_trajectories_spline;
     std::vector<std::pair<Eigen::Vector2f, cv::Vec3b>> m_uncertainty_map;
     float m_uncertainty_map_distance;
@@ -39,7 +40,6 @@ public:
 	{
         m_thread = new std::thread(&Visualizer::run, this);
         //render_loop.join();
-
         return;
 	}
     
@@ -108,15 +108,18 @@ public:
 
     void run() {
         //pangolin::CreateWindowAndBind("Main", 640, 960);
-        pangolin::CreateWindowAndBind("Main", 1280, 960);
+        pangolin::CreateWindowAndBind("Main", 1600, 960);
+        //pangolin::CreateWindowAndBind("Main", 1280, 960);
         glEnable(GL_DEPTH_TEST);
         pangolin::OpenGlRenderState s_cam1(
             pangolin::ProjectionMatrix(640, 480, 420, 420, 320, 240, 0.2, 99999),
             pangolin::ModelViewLookAt(40, 40, 40, 0, 0, 0, pangolin::AxisZ)
         );
 		pangolin::OpenGlRenderState s_cam2(
-            pangolin::ProjectionMatrix(640, 480, 420, 420, 320, 240, 0.2, 99999),
-            pangolin::ModelViewLookAt(40, 40, 40, 0, 0, 0, pangolin::AxisZ)
+            pangolin::ProjectionMatrix(1280, 960, 50, 50, 640, 480, 0.2, 99999),
+            //pangolin::ProjectionMatrix(640, 480, 420, 420, 320, 240, 0.2, 99999),
+            // pangolin::ProjectionMatrixOrthographic(-1, 1, -1,1, 0.2, 99999),
+            pangolin::ModelViewLookAt(-250, 1.f, 40.f, -250, 0, 0, pangolin::AxisZ)
         );
 		
 
@@ -124,33 +127,43 @@ public:
         MyHandler handler1(s_cam1, pangolin::AxisZ);
         MyHandler handler2(s_cam2,pangolin::AxisZ);
         pangolin::View& d_cam1 = pangolin::CreateDisplay()
-            .SetBounds(0.0, 1.0, 0.0, 1.0, -640 / 480.f)
+            .SetBounds(0.0, 1.0, 0.0, 1.0f, -640 / 480.f)
             .SetHandler(&handler1);
         pangolin::View& d_cam2 = pangolin::CreateDisplay()
-            .SetBounds(0.0, 1.0, 0.0, 1.0, -640 / 480.f)
+            .SetBounds(0, 1.0f, 1.0f, 1.f, -640 / 480.f)
 			.SetHandler(&handler2);
 
         pangolin::Display("multi")
             .SetBounds(0.0, 1.0, 0.0, 1.0)
-            .SetLayout(pangolin::LayoutEqual)
+            .SetLayout(pangolin::LayoutEqualHorizontal)
             .AddDisplay(d_cam1)
-            //.AddDisplay(d_cam2)
+            .AddDisplay(d_cam2)
 		;
 
 		
         while (!pangolin::ShouldQuit()) {
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-            glClearColor(0.75f, 0.75f, 0.75f, 1);
+            glClearColor(0.56f, 0.56f, 0.56f, 1);
 
-            //d_cam2.Activate(s_cam2);
+            lock();
+            d_cam2.Activate(s_cam2);
+            for (const auto& item_tile : m_uncertainty_map) {
+                const Eigen::Vector2f& position = item_tile.first;
+                const cv::Vec3b& item_color = item_tile.second;
+                Eigen::Vector4f color;
+                color = Eigen::Vector4f((float)item_color[2] / 255.f, (float)item_color[1] / 255.f, (float)item_color[0] / 255.f, 1);
+
+                draw_cube(Eigen::AlignedBox3f(Eigen::Vector3f(position.x() - m_uncertainty_map_distance / 2, position.y() - m_uncertainty_map_distance / 2, -1),
+                    Eigen::Vector3f(position.x() + m_uncertainty_map_distance / 2, position.y() + m_uncertainty_map_distance / 2, 1)), color);
+            }
+        	
             //pangolin::glDrawAxis(1000);
             //draw_point_cloud(m_points);
         	
             d_cam1.Activate(s_cam1);
-            pangolin::glDrawAxis(1000);
+            //pangolin::glDrawAxis(1000);
             // Render
-            lock();
-            draw_point_cloud(m_points);
+            //draw_point_cloud(m_points);
 
         	//Building
         	for (const auto& item_building : m_buildings)
@@ -166,28 +179,30 @@ public:
                     draw_cube(item_building.bounding_box_3d,
                         Eigen::Vector4f(0.5f, .5f, .5f, .5f));
             }
+
         	//View points
-            for (const auto& item_trajectory : m_trajectories) {
-                draw_cube(Eigen::AlignedBox3f(item_trajectory.first - Eigen::Vector3f(1.f, 1.f, 1.f), item_trajectory.first + Eigen::Vector3f(1.f, 1.f, 1.f)),
-                    Eigen::Vector4f(0.f, 1.f, 0.f, 1.f));
-                Eigen::Vector3f look_at = item_trajectory.first + item_trajectory.second * 10;
-                draw_line(item_trajectory.first, look_at,2,Eigen::Vector4f(0,1,0,1));
-            }
+            //for (const auto& item_trajectory : m_trajectories) {
+            //    draw_cube(Eigen::AlignedBox3f(item_trajectory.first - Eigen::Vector3f(1.f, 1.f, 1.f), item_trajectory.first + Eigen::Vector3f(1.f, 1.f, 1.f)),
+            //        Eigen::Vector4f(0.f, 1.f, 0.f, 1.f));
+            //    Eigen::Vector3f look_at = item_trajectory.first + item_trajectory.second * 10;
+            //    draw_line(item_trajectory.first, look_at,2,Eigen::Vector4f(0,1,0,1));
+            //}
+            m_trajectories_spline = m_trajectories;
         	//View spline
-            int i_iter = 0;
-            for (const auto& item_trajectory : m_trajectories_spline) {
+            for (const auto& item_trajectory: m_trajectories_spline) {
                 int index = &item_trajectory - &m_trajectories_spline[0];
-                draw_cube(Eigen::AlignedBox3f(item_trajectory.first - Eigen::Vector3f(1.f, 1.f, 1.f), item_trajectory.first + Eigen::Vector3f(1.f, 1.f, 1.f)),
-                    Eigen::Vector4f(0.f, 1.f, 0.f, 1.f));
-                Eigen::Vector3f look_at = item_trajectory.first + item_trajectory.second * 10;
-                //pangolin::glDrawLine(item_trajectory.first[0], item_trajectory.first[1], item_trajectory.first[2], look_at[0], look_at[1], look_at[2]);
-                glLineWidth(5);
-                glColor3f(1-1 / (index+1), 1 - 1 / (index + 1), 1 - 1 / (index + 1));
-            	if(i_iter>=1)
+
+                Eigen::Vector4f color(250./255, 157./255, 0./255, 1);
+                if (m_is_reconstruction_status[index] == 1)
+                    color = Eigen::Vector4f( 23./255, 73./255, 179./255, 1);
+                
+                //draw_cube(Eigen::AlignedBox3f(item_trajectory.first - Eigen::Vector3f(1.f, 1.f, 1.f), item_trajectory.first + Eigen::Vector3f(1.f, 1.f, 1.f)),
+                //    Eigen::Vector4f(0.f, 1.f, 0.f, 1.f));
+                glColor3f(color.x(), color.y(), color.z());
+            	if(index >=1)
                     pangolin::glDrawLine(item_trajectory.first[0], item_trajectory.first[1], item_trajectory.first[2], 
-                        m_trajectories_spline[i_iter-1].first[0], m_trajectories_spline[i_iter - 1].first[1], m_trajectories_spline[i_iter - 1].first[2]);
-                glLineWidth(1);
-            	i_iter += 1;
+                        m_trajectories_spline[index -1].first[0], m_trajectories_spline[index - 1].first[1], m_trajectories_spline[index - 1].first[2]);
+
                 glColor3f(0,0,0);
             }
         	// View points
@@ -202,9 +217,9 @@ public:
             //        Eigen::Vector3f(p.x() + radius, p.y() + radius, p.z() + radius)), color);
             //}
         	// Current Position and orientation
-            draw_cube(Eigen::AlignedBox3f(m_pos - Eigen::Vector3f(2.f, 2.f, 2.f), m_pos + Eigen::Vector3f(2.f, 2.f, 2.f)),
+            draw_cube(Eigen::AlignedBox3f(m_pos - Eigen::Vector3f(4.f, 4.f, 4.f), m_pos + Eigen::Vector3f(4.f, 4.f, 4.f)),
                 Eigen::Vector4f(1.f, 0.f, 0.f, 1.f));
-            Eigen::Vector3f look_at = m_pos + m_direction * 10;
+            Eigen::Vector3f look_at = m_pos + m_direction * 20;
             draw_line(m_pos, look_at, 2, Eigen::Vector4f(0, 1, 0, 1));
         	
             // Uncertainty

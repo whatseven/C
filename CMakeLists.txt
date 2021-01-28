@@ -3,8 +3,8 @@ PROJECT(C)
 
 set(is_build_model true)
 
-set(YILIN 0)
-set(RUIQI 1)
+set(YILIN 1)
+set(RUIQI 0)
 
 IF (CMAKE_SYSTEM_NAME MATCHES "Linux")
     set(AIRSIM_ROOT "/root/code/AirSim")
