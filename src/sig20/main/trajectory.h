@@ -944,8 +944,9 @@ void explore(const cv::Mat& v_map, const cv::Mat& distance_map, const cv::Mat& o
 	std::vector<Eigen::Vector2i> neighbors;
 	neighbors.push_back(Eigen::Vector2i(now_point.x() + 1, now_point.y()));
 	neighbors.push_back(Eigen::Vector2i(now_point.x(), now_point.y() + 1));
-	neighbors.push_back(Eigen::Vector2i(now_point.x() - 1, now_point.y()));
 	neighbors.push_back(Eigen::Vector2i(now_point.x(), now_point.y() - 1));
+	neighbors.push_back(Eigen::Vector2i(now_point.x() - 1, now_point.y()));
+
 	neighbors.push_back(Eigen::Vector2i(now_point.x()-1, now_point.y() - 1));
 	neighbors.push_back(Eigen::Vector2i(now_point.x()-1, now_point.y() + 1));
 	neighbors.push_back(Eigen::Vector2i(now_point.x()+1, now_point.y() - 1));
@@ -961,6 +962,7 @@ void explore(const cv::Mat& v_map, const cv::Mat& distance_map, const cv::Mat& o
 		{
 			if (!(neighbor_point.x() < 0 || neighbor_point.x() > v_map.rows - 1 || neighbor_point.y() < 0 || neighbor_point.y() > v_map.cols - 1))
 			{
+
 				temp_num = int(v_map.at<cv::int32_t>(neighbor_point.x(), neighbor_point.y()));
 				if (temp_num != 0)
 				{
@@ -980,6 +982,13 @@ void explore(const cv::Mat& v_map, const cv::Mat& distance_map, const cv::Mat& o
 		}
 		if (max_id >= 0)
 		{
+			/*if (max_id >= 4)
+			{
+				if (int(visited_map.at<cv::uint8_t>(neighbors[max_id].x(), now_point.y())) == 0)
+					trajectory.push_back(Eigen::Vector2i(neighbors[max_id].x(), now_point.y()));
+				else
+					trajectory.push_back(Eigen::Vector2i(now_point.x(), neighbors[max_id].y()));
+			}*/
 			if (i != 0)
 			{
 				trajectory.push_back(now_point);
@@ -996,6 +1005,7 @@ void explore(const cv::Mat& v_map, const cv::Mat& distance_map, const cv::Mat& o
 					for (int j = 0; j < v_map.cols; j++)
 					{
 						if (v_map.at<cv::int32_t>(i, j) != 0)
+
 						{
 							if (visited_map.at<cv::int32_t>(i, j) == 0)
 							{
@@ -1077,6 +1087,10 @@ std::vector<Eigen::Vector2i> perform_ccpp(const cv::Mat& ccpp_map, const Eigen::
 	bool isAllBlack = false;
 	Eigen::Vector2i goal(v_goal.y() + 1, v_goal.x() + 1);
 	Eigen::Vector2i start_point(v_start_point.y() + 1, v_start_point.x() + 1);
+
+	// Test
+	goal = start_point;
+
 	int min_length = v_map.rows + v_map.cols;
 	if (v_map.at<cv::int32_t>(start_point.x(),start_point.y()) == 0)
 	{

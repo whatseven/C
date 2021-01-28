@@ -3,8 +3,8 @@ PROJECT(C)
 
 set(is_build_model true)
 
-set(YILIN 1)
-set(RUIQI 0)
+set(YILIN 0)
+set(RUIQI 1)
 
 IF (CMAKE_SYSTEM_NAME MATCHES "Linux")
     set(AIRSIM_ROOT "/root/code/AirSim")
@@ -46,6 +46,7 @@ find_package(OpenMP REQUIRED)
 find_package(tinyobjloader CONFIG REQUIRED)
 find_package(tinyxml2 CONFIG REQUIRED)
 find_package(glog CONFIG REQUIRED)
+find_package(cpr CONFIG REQUIRED)
 
 if (OPENMP_FOUND)
     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
@@ -62,6 +63,7 @@ function(link_general arg)
     target_link_libraries(${ARGV0} general tinyobjloader::tinyobjloader)
     target_link_libraries(${ARGV0} general tinyxml2::tinyxml2)
     target_link_libraries(${ARGV0} general glog::glog)
+    target_link_libraries(${ARGV0} general cpr)
 endfunction()
 
 FILE(GLOB LIBRARY_FILE "include/*.cpp" "include/*.h")
