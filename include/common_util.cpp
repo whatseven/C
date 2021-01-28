@@ -83,6 +83,7 @@ std::vector<cv::Vec3b> get_color_table_bgr()
         color_table.emplace_back(255, 204, 153);
         color_table.emplace_back(153, 255, 255);
         color_table.emplace_back(253, 196, 225);
+        color_table.emplace_back(0, 182, 246);
         
         return color_table;
 }
