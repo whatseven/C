@@ -1132,7 +1132,7 @@ public:
 					if (inside_box(pos, item))
 						already_traveled=true;
 				}
-				//if(!already_traveled)
+				if(!already_traveled)
 				{
 					ccpp_map.at<cv::uint8_t>(y, x) = 255;
 					num_ccpp_cell += 1;
@@ -1267,7 +1267,12 @@ public:
 		//}
 		if ((m_motion_status == Motion_status::exploration|| m_motion_status == Motion_status::final_check )&& region_status[nearest_region_id]==color_unobserved)
 		{
-			region_status[nearest_region_id] = region_viz_color[m_current_color_id % region_viz_color.size()];
+			bool inside = false;
+			for(auto item:topology)
+				if(inside_box(Eigen::Vector2f(sample_points[nearest_region_id].x(), sample_points[nearest_region_id].y()), item))
+					inside = true;
+			if(inside)
+				region_status[nearest_region_id] = region_viz_color[m_current_color_id % region_viz_color.size()];
 		}
 		
 		for (int i_point = 0; i_point < region_status.size(); i_point++) {
