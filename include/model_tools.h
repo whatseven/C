@@ -52,6 +52,13 @@ void fix_mtl_from_unreal(const std::string& filename);
 // @ret:
 void clean_vertex(tinyobj::attrib_t& attrib, tinyobj::shape_t& shape);
 
+// @brief: Clean unused materials
+// @notice: 
+// @param: shape_t, vector<material_t>
+// @ret:
+void clean_materials(tinyobj::shape_t& shape, std::vector<tinyobj::material_t>& materials);
+
+
 /*
 Get split mesh with a big whole mesh
 */
@@ -69,7 +76,7 @@ void merge_obj(const std::string& v_file,
 //          OBJ file name
 //          Resolution indicates the resolution of the height map. (How far will the two building is considered to be one component)
 // @ret:
-void split_obj(const std::string& file_dir, const std::string& file_name, const float resolution, const float v_filter_height=-99999, const int obj_max_builidng_num = -1);
+void split_obj(const std::string& file_dir, const std::string& file_name, const float resolution, const float v_filter_height=-99999, const int obj_max_builidng_num = -1,const std::string& output_dir="./",const int split_axis = 2);
 
 std::vector<tinyobj::shape_t> split_obj_according_to_footprint(const tinyobj::attrib_t& v_attribs, const std::vector<tinyobj::shape_t>& v_shapes, const std::vector<Proxy>& v_proxys, const float v_squared_threshold);
 

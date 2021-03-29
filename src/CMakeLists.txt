@@ -6,4 +6,5 @@ add_subdirectory(rename_material)
 add_subdirectory(generate_data_1216)
 add_subdirectory(process_cad)
 add_subdirectory(split_obj_according_to_footprint)
-
+add_subdirectory(record_airsim_video)
+add_subdirectory(split_obj_according_to_objgroup)

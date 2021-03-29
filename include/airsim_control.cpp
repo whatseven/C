@@ -1,6 +1,7 @@
 #pragma once
 
 #include "airsim_control.h"
+#include <glog/logging.h>
 
 std::map<std::string, cv::Mat> Airsim_tools::get_images()
 {
@@ -69,23 +70,54 @@ void Airsim_tools::adjust_pose(const Pos_Pack& v_pos_pack){
     return;
 }
 
+void Airsim_tools::reset_color(std::function<bool(std::string)> v_func)
+{
+    int num = 1;
+    auto a = m_agent->simListSceneObjects();
+    for (int i = 0; i < a.size(); i++)
+    {
+        bool result;
+        if (v_func(a[i]))
+        {
+            result = m_agent->simSetSegmentationObjectID(a[i], num++);
+            if (!result)
+                LOG(ERROR) << "Set " << a[i] << " color " << num << " failed";
+        }
+        else
+        {
+            result = m_agent->simSetSegmentationObjectID(a[i], 0);
+            if (!result)
+                LOG(ERROR) << "Set " << a[i] << " background color" << " failed";
+            //std::cout << a[i] << " set 0" << std::endl;
+            if (a[i] == "stupid_floor")
+            {
+                std::cout << "here" << std::endl;
+            }
+        }
+    }
+}
+
 void Airsim_tools::reset_color(const std::string& v_key_words) {
     int num = 1;
     auto a = m_agent->simListSceneObjects();
     for(int i = 0; i < a.size(); i++)
     {
         std::string temp = a[i];
-        std::cout << a[i].length() << a[i].size() << std::endl;
+        //std::cout << a[i].length() << a[i].size() << std::endl;
         //if (a[i].length() <= 4)
-        if (v_key_words.size() > 0 && a[i].find(v_key_words) != a[i].npos)
+        bool result;
+        if ((v_key_words.size() > 0 && a[i].find(v_key_words) != a[i].npos)|| v_key_words.size()==0)
         {
-            m_agent->simSetSegmentationObjectID(a[i], num++);
-            std::cout << a[i] << " add color" << std::endl;
+            result=m_agent->simSetSegmentationObjectID(a[i], num++);
+            if (!result)
+                LOG(ERROR) << "Set " << a[i] << " color " << num << " failed";
         }
         else
         {
-            std::cout<<m_agent->simSetSegmentationObjectID(a[i], 0)<<std::endl;
-            std::cout << a[i] << " set 0" << std::endl;
+            result = m_agent->simSetSegmentationObjectID(a[i], 0);
+            if (!result)
+                LOG(ERROR) << "Set " << a[i] << " background color" << " failed";
+            //std::cout << a[i] << " set 0" << std::endl;
             if (a[i] == "stupid_floor")
             {
                 std::cout << "here" << std::endl;

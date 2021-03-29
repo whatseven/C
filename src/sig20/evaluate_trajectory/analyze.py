@@ -4,12 +4,16 @@ import scipy.stats
 
 if __name__ == "__main__":
     asia20_data = [item.strip().split(",")[:-1] for item in open(
-        r"D:\\SIG21_Local\\2_2_error_map\\asia20.txt").readlines()]
+        r"D:\\BACKUP\\SIG21_Local\\2_2_error_map\\asia20.txt").readlines()]
     asia20_data = np.asarray(asia20_data).astype(np.float32)
 
     asia18_data = [item.strip().split(",")[:-1] for item in open(
-        r"D:\\SIG21_Local\\2_2_error_map\\asia18.txt").readlines()]
+        r"D:\\BACKUP\\SIG21_Local\\2_2_error_map\\asia18.txt").readlines()]
     asia18_data = np.asarray(asia18_data).astype(np.float32)
+
+    ours_data = [item.strip().split(",")[:-1] for item in open(
+        r"D:\\BACKUP\\SIG21_Local\\2_2_error_map\\ours.txt").readlines()]
+    ours_data = np.asarray(ours_data).astype(np.float32)
 
     asia18_reconstructability_recon=asia18_data[0]
     asia18_accuracy=asia18_data[1]
@@ -21,6 +25,12 @@ if __name__ == "__main__":
     asia20_reconstructability_gt=asia20_data[2]
     asia20_completeness = asia20_data[3]
     
+    ours_reconstructability_recon=ours_data[0]
+    ours_accuracy=ours_data[1]
+    ours_reconstructability_gt=ours_data[2]
+    ours_completeness = ours_data[3]
+    
+
     # print(scipy.stats.spearmanr(data[0], data[1]))
     # print(scipy.stats.spearmanr(data[2], data[3]))
 

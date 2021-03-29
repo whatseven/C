@@ -3,6 +3,8 @@
 #include <boost/filesystem.hpp>
 #include <boost/algorithm/string.hpp>
 
+#include <CGAL/approximated_offset_2.h>
+
 /*
 Some useful function
 */
@@ -95,7 +97,7 @@ bool WriteMat(const std::string& filename, const std::vector<tinyobj::material_t
 		fprintf(fp, "Ks %f %f %f\n", mat.specular[0], mat.specular[1], mat.specular[2]);
 		fprintf(fp, "Kt %f %f %f\n", mat.transmittance[0], mat.specular[1], mat.specular[2]);
 		fprintf(fp, "Ke %f %f %f\n", mat.emission[0], mat.emission[1], mat.emission[2]);
-		fprintf(fp, "d %f\n", mat.dissolve);
+		fprintf(fp, "d %f\n", 1);
 		fprintf(fp, "Ns %f\n", mat.shininess);
 		fprintf(fp, "Ni %f\n", mat.ior);
 		fprintf(fp, "illum %d\n", mat.illum);
@@ -280,6 +282,12 @@ void fix_mtl_from_unreal(const std::string& filename)
 
 void clean_vertex(tinyobj::attrib_t& attrib, tinyobj::shape_t& shape)
 {
+	bool has_texcoords = false,has_normal=false;
+	if (attrib.texcoords.size() > 0)
+		has_texcoords = true;
+	if (attrib.normals.size() > 0)
+		has_normal = true;
+	
 	// Find out used vertex, mark true
 	std::vector<bool> vertex_used(attrib.vertices.size() / 3, false);
 	std::vector<bool> tex_used(attrib.texcoords.size() / 2, false);
@@ -292,20 +300,25 @@ void clean_vertex(tinyobj::attrib_t& attrib, tinyobj::shape_t& shape)
 		vertex_used[idx0.vertex_index] = true;
 		vertex_used[idx1.vertex_index] = true;
 		vertex_used[idx2.vertex_index] = true;
-		tex_used[idx0.texcoord_index] = true;
-		tex_used[idx1.texcoord_index] = true;
-		tex_used[idx2.texcoord_index] = true;
+		if (has_texcoords)
+		{
+			tex_used[idx0.texcoord_index] = true;
+			tex_used[idx1.texcoord_index] = true;
+			tex_used[idx2.texcoord_index] = true;
+		}
 	}
 	// Filter out vertex, normals, texcoords
 	attrib.vertices.erase(std::remove_if(attrib.vertices.begin(), attrib.vertices.end(), [&](const tinyobj::real_t& idx)
 	{
 		return vertex_used[(&idx - &*attrib.vertices.begin()) / 3] == false;
 	}), attrib.vertices.end());
-	attrib.normals.erase(std::remove_if(attrib.normals.begin(), attrib.normals.end(), [&](const tinyobj::real_t& idx)
-	{
-		return vertex_used[(&idx - &*attrib.normals.begin()) / 3] == false;
-	}), attrib.normals.end());
-	attrib.texcoords.erase(std::remove_if(attrib.texcoords.begin(), attrib.texcoords.end(),
+	if(has_normal)
+		attrib.normals.erase(std::remove_if(attrib.normals.begin(), attrib.normals.end(), [&](const tinyobj::real_t& idx)
+		{
+			return vertex_used[(&idx - &*attrib.normals.begin()) / 3] == false;
+		}), attrib.normals.end());
+	if (has_texcoords)
+		attrib.texcoords.erase(std::remove_if(attrib.texcoords.begin(), attrib.texcoords.end(),
 	                                      [&](const tinyobj::real_t& idx)
 	                                      {
 		                                      return tex_used[(&idx - &*attrib.texcoords.begin()) / 2] == false;
@@ -326,16 +339,17 @@ void clean_vertex(tinyobj::attrib_t& attrib, tinyobj::shape_t& shape)
 		else
 			vertex_redirect.push_back(0);
 	}
-	for (size_t tex_id = 0; tex_id < tex_used.size(); tex_id++)
-	{
-		if (tex_used[tex_id])
+	if(has_texcoords)
+		for (size_t tex_id = 0; tex_id < tex_used.size(); tex_id++)
 		{
-			tex_redirect.push_back(current_tex_id + 1);
-			current_tex_id += 1;
+			if (tex_used[tex_id])
+			{
+				tex_redirect.push_back(current_tex_id + 1);
+				current_tex_id += 1;
+			}
+			else
+				tex_redirect.push_back(0);
 		}
-		else
-			tex_redirect.push_back(0);
-	}
 
 	// Adjust index from face to vertex according to the vertex_redirect array
 	// Also delete duplicated faces
@@ -360,24 +374,31 @@ void clean_vertex(tinyobj::attrib_t& attrib, tinyobj::shape_t& shape)
 			face_should_delete.push_back(true);
 		
 		idx0.vertex_index = vertex_redirect[idx0.vertex_index] - 1;
-		idx0.normal_index = vertex_redirect[idx0.normal_index] - 1;
-		idx0.texcoord_index = tex_redirect[idx0.texcoord_index] - 1;
 		idx1.vertex_index = vertex_redirect[idx1.vertex_index] - 1;
-		idx1.normal_index = vertex_redirect[idx1.normal_index] - 1;
-		idx1.texcoord_index = tex_redirect[idx1.texcoord_index] - 1;
 		idx2.vertex_index = vertex_redirect[idx2.vertex_index] - 1;
-		idx2.normal_index = vertex_redirect[idx2.normal_index] - 1;
-		idx2.texcoord_index = tex_redirect[idx2.texcoord_index] - 1;
+		if(has_normal)
+		{
+			idx0.normal_index = vertex_redirect[idx0.normal_index] - 1;
+			idx1.normal_index = vertex_redirect[idx1.normal_index] - 1;
+			idx2.normal_index = vertex_redirect[idx2.normal_index] - 1;
+			assert(idx0.normal_index != -1);
+			assert(idx1.normal_index != -1);
+			assert(idx2.normal_index != -1);
+		}
+		if(has_texcoords)
+		{
+			idx0.texcoord_index = tex_redirect[idx0.texcoord_index] - 1;
+			idx1.texcoord_index = tex_redirect[idx1.texcoord_index] - 1;
+			idx2.texcoord_index = tex_redirect[idx2.texcoord_index] - 1;
+			assert(idx0.texcoord_index != -1);
+			assert(idx1.texcoord_index != -1);
+			assert(idx2.texcoord_index != -1);
+		}
+
 
 		assert(idx0.vertex_index != -1);
-		assert(idx0.normal_index != -1);
-		assert(idx0.texcoord_index != -1);
 		assert(idx1.vertex_index != -1);
-		assert(idx1.normal_index != -1);
-		assert(idx1.texcoord_index != -1);
 		assert(idx2.vertex_index != -1);
-		assert(idx2.normal_index != -1);
-		assert(idx2.texcoord_index != -1);
 		
 	}
 	shape.mesh.indices.erase(
@@ -404,6 +425,41 @@ void clean_vertex(tinyobj::attrib_t& attrib, tinyobj::shape_t& shape)
 	
 }
 
+void clean_materials(tinyobj::shape_t& shape, std::vector<tinyobj::material_t>& materials)
+{
+	if (materials.size() == 0)
+		return;
+	// Find out used vertex, mark true
+	std::vector<bool> materials_used(materials.size(), false);
+	std::vector<int> materials_reid(materials.size(),-1);
+
+	for (size_t material_id = 0; material_id < shape.mesh.material_ids.size(); material_id++)
+	{
+		materials_used[shape.mesh.material_ids[material_id]] = true;
+	}
+
+	int cur_id_num = 0;
+	for(int id_material=0;id_material<materials.size();++id_material)
+	{
+		if(materials_used[id_material]==true)
+		{
+			materials_reid[id_material] = cur_id_num;
+			cur_id_num += 1;
+		}
+	}
+
+	for (size_t material_id = 0; material_id < shape.mesh.material_ids.size(); material_id++)
+	{
+		shape.mesh.material_ids[material_id] = materials_reid[shape.mesh.material_ids[material_id]];
+	}
+	
+	// Filter out vertex, normals, texcoords
+	materials.erase(std::remove_if(materials.begin(), materials.end(),
+		[&](const tinyobj::material_t& idx)
+		{
+			return materials_used[(&idx - &*materials.begin())] == false;
+		}), materials.end());
+}
 
 /*
 Get split mesh with a big whole mesh
@@ -506,8 +562,22 @@ void merge_obj(const std::string& v_file,
 	bool ret = WriteMat(material_filename, materials);
 }
 
-void split_obj(const std::string& file_dir, const std::string& file_name, const float resolution,const float v_filter_height, const int obj_max_builidng_num)
+void split_obj(const std::string& file_dir, const std::string& file_name, const float resolution,const float v_filter_height, const int obj_max_builidng_num,
+	const std::string& output_dir,const int split_axis)
 {
+	int ref_axis1, ref_axis2;
+	if(split_axis==0)
+	{
+		ref_axis1 = 1;ref_axis2 = 2;
+	}
+	else if(split_axis == 1)
+	{
+		ref_axis1 = 0;ref_axis2 = 2;
+	}
+	else if (split_axis == 2)
+	{
+		ref_axis1 = 0;ref_axis2 = 1;
+	}
 	std::cout << "----------Start split obj----------" << std::endl;
 
 	const float Z_THRESHOLD = v_filter_height;
@@ -520,8 +590,8 @@ void split_obj(const std::string& file_dir, const std::string& file_name, const 
 
 	// Calculate bounding box
 	std::cout << "2/6 Calculate bounding box" << std::endl;
-	float xmin = 1e8, ymin = 1e8, zmin = 1e8;
-	float xmax = -1e8, ymax = -1e8, zmax = -1e8;
+	float min_box[3] = { 1e8 ,1e8 ,1e8 };
+	float max_box[3] = { -1e8 ,-1e8 ,-1e8 };
 	for (size_t s = 0; s < shapes.size(); s++)
 	{
 		size_t index_offset = 0;
@@ -536,13 +606,13 @@ void split_obj(const std::string& file_dir, const std::string& file_name, const 
 				tinyobj::real_t vy = attrib.vertices[3 * idx.vertex_index + 1];
 				tinyobj::real_t vz = attrib.vertices[3 * idx.vertex_index + 2];
 
-				xmin = xmin < vx ? xmin : vx;
-				ymin = ymin < vy ? ymin : vy;
-				zmin = zmin < vz ? zmin : vz;
+				min_box[0] = min_box[0] < vx ? min_box[0] : vx;
+				min_box[1] = min_box[1] < vy ? min_box[1] : vy;
+				min_box[2] = min_box[2] < vz ? min_box[2] : vz;
 
-				xmax = xmax > vx ? xmax : vx;
-				ymax = ymax > vy ? ymax : vy;
-				zmax = zmax > vz ? zmax : vz;
+				max_box[0] = max_box[0] > vx ? max_box[0] : vx;
+				max_box[1] = max_box[1] > vy ? max_box[1] : vy;
+				max_box[2] = max_box[2] > vz ? max_box[2] : vz;
 			}
 			index_offset += 3;
 		}
@@ -550,7 +620,7 @@ void split_obj(const std::string& file_dir, const std::string& file_name, const 
 
 	// Construct height map
 	std::cout << "3/6 Construct height map" << std::endl;
-	cv::Mat img((int)((ymax - ymin) / resolution) + 1, (int)((xmax - xmin) / resolution) + 1, CV_32FC1,
+	cv::Mat img((int)((max_box[ref_axis2] - min_box[ref_axis2]) / resolution) + 1, (int)((max_box[ref_axis1] - min_box[ref_axis1]) / resolution) + 1, CV_32FC1,
 	            cv::Scalar(0.f));
 	std::vector<std::vector<std::vector<std::pair<size_t, size_t>>>> records(img.rows,
 	                                                                         std::vector<std::vector<std::pair<
@@ -568,22 +638,21 @@ void split_obj(const std::string& file_dir, const std::string& file_name, const 
 			tinyobj::index_t idx0 = shapes[s].mesh.indices[index_offset + 0];
 			tinyobj::index_t idx1 = shapes[s].mesh.indices[index_offset + 1];
 			tinyobj::index_t idx2 = shapes[s].mesh.indices[index_offset + 2];
-			const auto& vertex0_x = attrib.vertices[3 * idx0.vertex_index + 0];
-			const auto& vertex0_y = attrib.vertices[3 * idx0.vertex_index + 1];
-			const auto& vertex1_x = attrib.vertices[3 * idx1.vertex_index + 0];
-			const auto& vertex1_y = attrib.vertices[3 * idx1.vertex_index + 1];
-			const auto& vertex2_x = attrib.vertices[3 * idx2.vertex_index + 0];
-			const auto& vertex2_y = attrib.vertices[3 * idx2.vertex_index + 1];
-			int ymin_item = (std::min({vertex0_y, vertex1_y, vertex2_y}) - ymin) / resolution;
-			int xmin_item = (std::min({vertex0_x, vertex1_x, vertex2_x}) - xmin) / resolution;
-			int xmax_item = (std::max({vertex0_x, vertex1_x, vertex2_x}) - xmin) / resolution;
-			int ymax_item = (std::max({vertex0_y, vertex1_y, vertex2_y}) - ymin) / resolution;
+
+			float vertex0[3] = { attrib.vertices[3 * idx0.vertex_index + 0] ,attrib.vertices[3 * idx0.vertex_index + 1] ,attrib.vertices[3 * idx0.vertex_index + 2] };
+			float vertex1[3] = { attrib.vertices[3 * idx1.vertex_index + 0] ,attrib.vertices[3 * idx1.vertex_index + 1] ,attrib.vertices[3 * idx1.vertex_index + 2] };
+			float vertex2[3] = { attrib.vertices[3 * idx2.vertex_index + 0] ,attrib.vertices[3 * idx2.vertex_index + 1] ,attrib.vertices[3 * idx2.vertex_index + 2] };
+
+			int xmin_item = (std::min({ vertex0[ref_axis1], vertex1[ref_axis1], vertex2[ref_axis1] }) - min_box[ref_axis1]) / resolution;
+			int ymin_item = (std::min({ vertex0[ref_axis2], vertex1[ref_axis2], vertex2[ref_axis2] }) - min_box[ref_axis2]) / resolution;
+			int xmax_item = (std::max({ vertex0[ref_axis1], vertex1[ref_axis1], vertex2[ref_axis1] }) - min_box[ref_axis1]) / resolution;
+			int ymax_item = (std::max({ vertex0[ref_axis2], vertex1[ref_axis2], vertex2[ref_axis2] }) - min_box[ref_axis2]) / resolution;
 
 			typedef CGAL::Simple_cartesian<int> K;
 			CGAL::Triangle_2<K> t1(
-				CGAL::Point_2<K>((vertex0_x - xmin) / resolution, (vertex0_y - ymin) / resolution),
-				CGAL::Point_2<K>((vertex1_x - xmin) / resolution, (vertex1_y - ymin) / resolution),
-				CGAL::Point_2<K>((vertex2_x - xmin) / resolution, (vertex2_y - ymin) / resolution)
+				CGAL::Point_2<K>((vertex0[ref_axis1] - min_box[ref_axis1]) / resolution, (vertex0[ref_axis2] - min_box[ref_axis2]) / resolution),
+				CGAL::Point_2<K>((vertex1[ref_axis1] - min_box[ref_axis1]) / resolution, (vertex1[ref_axis2] - min_box[ref_axis2]) / resolution),
+				CGAL::Point_2<K>((vertex2[ref_axis1] - min_box[ref_axis1]) / resolution, (vertex2[ref_axis2] - min_box[ref_axis2]) / resolution)
 			);
 			for (int x = xmin_item; x < xmax_item + 1; ++x)
 				for (int y = ymin_item; y < ymax_item + 1; ++y)
@@ -597,7 +666,7 @@ void split_obj(const std::string& file_dir, const std::string& file_name, const 
 				}
 		}
 	}
-	cv::imwrite(file_dir + "/bird_view.jpg", img);
+	cv::imwrite(output_dir + "/bird_view.jpg", img);
 
 	// Travel to find connect component
 	std::cout << "4/6 Travel to find connect component" << std::endl;
@@ -668,8 +737,8 @@ void split_obj(const std::string& file_dir, const std::string& file_name, const 
 			std::min_element(buildings[building_idx].xs.begin(), buildings[building_idx].xs.end()));
 		int y_center = *std::max_element(buildings[building_idx].ys.begin(), buildings[building_idx].ys.end()) + (*
 			std::min_element(buildings[building_idx].ys.begin(), buildings[building_idx].ys.end()));
-		x_center = x_center / 2 * resolution + xmin;
-		y_center = y_center / 2 * resolution + ymin;
+		x_center = x_center / 2 * resolution + min_box[ref_axis1];
+		y_center = y_center / 2 * resolution + min_box[ref_axis2];
 
 		std::map<Eigen::VectorXf, int> vertex_already_assigned;
 
@@ -697,7 +766,7 @@ void split_obj(const std::string& file_dir, const std::string& file_name, const 
 		bool preserve_flag = false;
 		for (int i = 0; i < cur_attr.vertices.size() / 3; ++i)
 		{
-			float cur_z = cur_attr.vertices[i * 3 + 2];
+			float cur_z = cur_attr.vertices[i * 3 + split_axis];
 			if (cur_z > Z_THRESHOLD)
 			{
 				preserve_flag = true;
@@ -713,7 +782,7 @@ void split_obj(const std::string& file_dir, const std::string& file_name, const 
 		if (obj_max_builidng_num > 0 && saved_shapes.size() >= obj_max_builidng_num)
 		{
 			std::cout << "5.5/6 Save max num split obj" << std::endl;
-			merge_obj(file_dir + "/" + "total_split" + std::to_string(obj_num) + ".obj", saved_attrib, saved_shapes, materials, building_num - obj_max_builidng_num + 1);
+			merge_obj(output_dir + "/" + "total_split" + std::to_string(obj_num) + ".obj", saved_attrib, saved_shapes, materials, building_num - obj_max_builidng_num + 1);
 			std::cout << "----------Partial Save done----------" << std::endl << std::endl;
 			saved_shapes.clear();
 			saved_attrib.clear();
@@ -722,22 +791,22 @@ void split_obj(const std::string& file_dir, const std::string& file_name, const 
 
 		for (int i_vertex = 0; i_vertex < cur_attr.vertices.size(); i_vertex += 1)
 		{
-			if (i_vertex % 3 == 0)
+			if (i_vertex % 3 == ref_axis1)
 				cur_attr.vertices[i_vertex] -= x_center;
-			else if (i_vertex % 3 == 1)
+			else if (i_vertex % 3 == ref_axis2)
 				cur_attr.vertices[i_vertex] -= y_center;
 		}
 
-		std::ofstream f_out(file_dir + "/" + std::to_string(building_num) + ".txt");
+		std::ofstream f_out(output_dir + "/" + std::to_string(building_num) + ".txt");
 		f_out << x_center << "," << y_center << std::endl;
 		f_out.close();
 
-		write_obj(file_dir + "/" + std::to_string(building_num) + ".obj", cur_attr,
+		write_obj(output_dir + "/" + std::to_string(building_num) + ".obj", cur_attr,
 		          std::vector<tinyobj::shape_t>{cur_shape}, materials);
 		building_num += 1;
 	}
 	std::cout << "6/6 Save whole split obj" << std::endl;
-	merge_obj(file_dir + "/" + "total_split" + std::to_string(obj_num) + ".obj", saved_attrib, saved_shapes, materials, building_num - saved_attrib.size() + 1);
+	merge_obj(output_dir + "/" + "total_split" + std::to_string(obj_num) + ".obj", saved_attrib, saved_shapes, materials, building_num - saved_attrib.size() + 1);
 	std::cout << "----------Split obj done----------" << std::endl << std::endl;
 
 }
@@ -809,11 +878,54 @@ void rename_material(const std::string& file_dir, const std::string& file_name, 
 	return;
 }
 
-std::vector<tinyobj::shape_t> split_obj_according_to_footprint(const tinyobj::attrib_t& v_attribs, const std::vector<tinyobj::shape_t>& v_shapes, const std::vector<Proxy>& v_proxys,const float v_squared_threshold)
+std::vector<tinyobj::shape_t> split_obj_according_to_footprint(const tinyobj::attrib_t& v_attribs, const std::vector<tinyobj::shape_t>& v_shapes, const std::vector<Proxy>& v_proxys,const float v_edge_threshold)
 {
 	std::vector<tinyobj::shape_t> out_shapes(v_proxys.size());
 	tinyobj::shape_t ground_shape;
 
+	std::vector<Polygon_2> proxys;
+	//Dilate footprint
+	for (int i_proxy = 0; i_proxy < v_proxys.size(); i_proxy++) {
+		Proxy proxy = v_proxys[i_proxy];
+		
+		//if (!proxy.polygon.is_counterclockwise_oriented())
+		//{
+		//	std::cout << "Is not counterclockwise" << std::endl;
+		//	throw;
+		//}
+		Polygon_2 p;
+		auto start = proxy.polygon.vertices_circulator();
+		auto end = proxy.polygon.vertices_circulator();
+		
+		do
+		{
+			CGAL::Vector_2<K> seg_prev = *start-*(start-1);
+			CGAL::Vector_2<K> seg_next = *(start + 1) - *start;
+			
+			CGAL::Vector_2<K> normal;
+			if(seg_next.direction().counterclockwise_in_between(seg_prev.direction(),-seg_prev.direction()))
+			{
+				seg_prev /= (std::sqrt(seg_prev.squared_length())+1e-6);
+				seg_next /= (std::sqrt(seg_next.squared_length()) + 1e-6);
+				normal = (seg_prev - seg_next);
+			}
+			else
+			{
+				seg_prev /= (std::sqrt(seg_prev.squared_length()) + 1e-6);
+				seg_next /= (std::sqrt(seg_next.squared_length()) + 1e-6);
+				normal = (-seg_prev + seg_next);
+			}
+			normal /= std::sqrt((normal.squared_length()) + 1e-6);
+
+			Point_2 new_point = *start + normal * v_edge_threshold;
+			p.push_back(new_point);
+			//p.push_back(*start);
+		} while (++start != end);
+		proxys.push_back(p);
+		std::cout << p << std::endl;
+		std::cout << proxy.polygon << std::endl;
+	}
+	
 	for (int i_shape = 0; i_shape < v_shapes.size(); ++i_shape)
 	{
 		const tinyobj::mesh_t& shape = v_shapes[i_shape].mesh;
@@ -828,42 +940,43 @@ std::vector<tinyobj::shape_t> split_obj_according_to_footprint(const tinyobj::at
 			CGAL::Point_2<K> point2(v_attribs.vertices[3 * idx1.vertex_index + 0], v_attribs.vertices[3 * idx1.vertex_index + 1]);
 			CGAL::Point_2<K> point3(v_attribs.vertices[3 * idx2.vertex_index + 0], v_attribs.vertices[3 * idx2.vertex_index + 1]);
 
-			int preserved = -1;
-			bool close_to_boundary = -1;
+			std::vector<int> preserved;
+			//int preserved = -1;
 			for (int i_proxy = 0; i_proxy < v_proxys.size(); i_proxy++) {
-				const Proxy& proxy = v_proxys[i_proxy];
-				for (auto iter_edge = proxy.polygon.edges_begin(); iter_edge != proxy.polygon.edges_end(); ++iter_edge)
-				{
-					if (CGAL::squared_distance(point1, (*iter_edge)) < v_squared_threshold ||
-						CGAL::squared_distance(point2, (*iter_edge)) < v_squared_threshold ||
-						CGAL::squared_distance(point3, (*iter_edge)) < v_squared_threshold) {
-						close_to_boundary = i_proxy;
-						break;
-					}
-				}
+				//const Polygon_2& polygon = v_proxys[i_proxy].polygon;
+				const Polygon_2& polygon = proxys[i_proxy];
 				
-				if(proxy.polygon.bounded_side(point1) == CGAL::Bounded_side::ON_BOUNDED_SIDE||
-					proxy.polygon.bounded_side(point2) == CGAL::Bounded_side::ON_BOUNDED_SIDE||
-					proxy.polygon.bounded_side(point3) == CGAL::Bounded_side::ON_BOUNDED_SIDE)
+				if(polygon.bounded_side(point1) == CGAL::Bounded_side::ON_BOUNDED_SIDE||
+					polygon.bounded_side(point2) == CGAL::Bounded_side::ON_BOUNDED_SIDE||
+					polygon.bounded_side(point3) == CGAL::Bounded_side::ON_BOUNDED_SIDE)
 				{
-					preserved = i_proxy;
+					preserved.push_back(i_proxy);
+					//preserved = i_proxy;
 					break;
 				}
 			}
 
 			tinyobj::mesh_t* mesh;
 
-			if (preserved!=-1) 
-				mesh = &out_shapes[preserved].mesh;
-			//else if(close_to_boundary!=-1)
-			//	mesh = &out_shapes[close_to_boundary].mesh;
-			else
+			if (preserved.size()==0)
+			{
 				mesh = &ground_shape.mesh;
-			mesh->material_ids.push_back(shape.material_ids[face_id]);
-			mesh->num_face_vertices.push_back(shape.num_face_vertices[face_id]);
-			mesh->indices.push_back(shape.indices[3 * face_id + 0]);
-			mesh->indices.push_back(shape.indices[3 * face_id + 1]);
-			mesh->indices.push_back(shape.indices[3 * face_id + 2]);
+				mesh->material_ids.push_back(shape.material_ids[face_id]);
+				mesh->num_face_vertices.push_back(shape.num_face_vertices[face_id]);
+				mesh->indices.push_back(shape.indices[3 * face_id + 0]);
+				mesh->indices.push_back(shape.indices[3 * face_id + 1]);
+				mesh->indices.push_back(shape.indices[3 * face_id + 2]);
+			}
+			else
+				for(auto item:preserved)
+				{
+					mesh = &out_shapes[item].mesh;
+					mesh->material_ids.push_back(shape.material_ids[face_id]);
+					mesh->num_face_vertices.push_back(shape.num_face_vertices[face_id]);
+					mesh->indices.push_back(shape.indices[3 * face_id + 0]);
+					mesh->indices.push_back(shape.indices[3 * face_id + 1]);
+					mesh->indices.push_back(shape.indices[3 * face_id + 2]);
+				}
 		}
 	}
 	out_shapes.push_back(ground_shape);
