@@ -1,4 +1,6 @@
 #pragma once
+#ifndef COMMON_UTIL
+#define COMMON_UTIL
 #include<opencv2/opencv.hpp>
 #include<chrono>
 #include<iostream>
@@ -30,4 +32,11 @@ namespace std {
         }
     };
 
+    inline bool operator < (const cv::Vec3b& s1, const cv::Vec3b& s2)
+    {
+        return s1[0] < s2[0] || (s1[0] == s2[0] && s1[1] < s2[1]) ||(s1[0] == s2[0] && s1[1] == s2[1] && s1[2] < s2[2]);
+    }
+
 }  // namespace std
+
+#endif

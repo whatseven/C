@@ -70,8 +70,9 @@ void Airsim_tools::adjust_pose(const Pos_Pack& v_pos_pack){
     return;
 }
 
-void Airsim_tools::reset_color(std::function<bool(std::string)> v_func)
+std::map<cv::Vec3b, std::string> Airsim_tools::reset_color(std::function<bool(std::string)> v_func)
 {
+    std::map<cv::Vec3b, std::string> color_map;
     int num = 1;
     auto a = m_agent->simListSceneObjects();
     for (int i = 0; i < a.size(); i++)
@@ -79,9 +80,12 @@ void Airsim_tools::reset_color(std::function<bool(std::string)> v_func)
         bool result;
         if (v_func(a[i]))
         {
-            result = m_agent->simSetSegmentationObjectID(a[i], num++);
+            result = m_agent->simSetSegmentationObjectID(a[i], num);
+            cv::Vec3b color = m_color_map.at<cv::Vec3b>(num * 4);
+            color_map.insert(std::make_pair(color, a[i]));
             if (!result)
                 LOG(ERROR) << "Set " << a[i] << " color " << num << " failed";
+            num += 1;
         }
         else
         {
@@ -95,9 +99,11 @@ void Airsim_tools::reset_color(std::function<bool(std::string)> v_func)
             }
         }
     }
+    return color_map;
 }
 
-void Airsim_tools::reset_color(const std::string& v_key_words) {
+std::map<cv::Vec3b, std::string> Airsim_tools::reset_color(const std::string& v_key_words) {
+    std::map<cv::Vec3b, std::string> color_map;
     int num = 1;
     auto a = m_agent->simListSceneObjects();
     for(int i = 0; i < a.size(); i++)
@@ -108,9 +114,11 @@ void Airsim_tools::reset_color(const std::string& v_key_words) {
         bool result;
         if ((v_key_words.size() > 0 && a[i].find(v_key_words) != a[i].npos)|| v_key_words.size()==0)
         {
-            result=m_agent->simSetSegmentationObjectID(a[i], num++);
+            result=m_agent->simSetSegmentationObjectID(a[i], num);
+            color_map.insert(std::make_pair(m_color_map.at<cv::Vec3b>(num * 4), a[i]));
             if (!result)
                 LOG(ERROR) << "Set " << a[i] << " color " << num << " failed";
+            num += 1;
         }
         else
         {
@@ -124,7 +132,7 @@ void Airsim_tools::reset_color(const std::string& v_key_words) {
             }
         }
     }
-    return;
+    return color_map;
 }
 
 std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> demo_move_to_next(msr::airlib::MultirotorRpcLibClient& v_agent,

@@ -4,8 +4,14 @@
     "DRONE_START_X": 0,
     "DRONE_START_Y": 0,
     "DRONE_START_Z": 0,
+    "building_keyword": "",
 
     //For data collection
+    "COLLECTION_STEP_X": 500,
+    "COLLECTION_STEP_Y": 500,
+    "COLLECTION_STEP_Z": 5,
+    "COLLECTION_STEP_PITCH_DEGREE": 10,
+    "COLLECTION_STEP_YAW_DEGREE": 45,
     "MAP_START_UNREAL_X": 0,
     "MAP_START_UNREAL_Y": 0,
     "MAP_START_UNREAL_Z": 0,

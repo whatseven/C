@@ -147,6 +147,13 @@ public:
         return m_map_dilated.at<float>(m_y, m_x);
     }
 
+    bool in_bound(float x, float y) const
+    {
+        int m_y = (int)((y - m_start[1]) / m_resolution);
+        int m_x = (int)((x - m_start[0]) / m_resolution);
+        return 0 <= m_y && 0 <= m_x && m_y < m_map.rows&& m_x < m_map.cols;
+    }
+
     void update(const Eigen::AlignedBox3f& v_box)
     {
         int xmin = (v_box.min()[0] - m_start[0]) / m_resolution;

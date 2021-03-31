@@ -2,6 +2,7 @@
 #include<random>
 #include<algorithm>
 #include<iterator>
+#include <regex>
 #include <argparse/argparse.hpp>
 #include <glog/logging.h>
 #include <boost/format.hpp>
@@ -20,10 +21,8 @@
 #include <CGAL/Point_set_3/IO.h>
 
 using namespace std;
-int fieldRange = 600;
 
 MapConverter mapConverter;
-
 
 int main(int argc, char* argv[])
 {
@@ -64,14 +63,6 @@ int main(int argc, char* argv[])
 	}
 
 	// For unreal
-	const boost::filesystem::path color_map_path(args["color_map"].asString());
-	cv::Mat color_map = cv::imread(color_map_path.string());
-	if (color_map.size == 0)
-	{
-		LOG(ERROR) << "Cannot open color map " << color_map_path << std::endl;
-		return 0;
-	}
-
 	const Eigen::Vector3f DRONE_START(args["DRONE_START_X"].asFloat(), args["DRONE_START_Y"].asFloat(),
 	                                  args["DRONE_START_Z"].asFloat());
 	const Eigen::Vector3f map_start_unreal(args["MAP_START_UNREAL_X"].asFloat(), args["MAP_START_UNREAL_Y"].asFloat(),
@@ -82,10 +73,6 @@ int main(int argc, char* argv[])
 	                                     map_start_unreal.z() / 100.f);
 	const Eigen::Vector3f map_end_mesh(map_end_unreal.x() / 100.f, -map_start_unreal.y() / 100.f,
 	                                   map_end_unreal.z() / 100.f);
-	Height_map height_map(map_start_mesh, map_end_mesh,
-		args["heightmap_resolution"].asFloat(),
-		args["heightmap_dilate"].asFloat()
-	);
 
 	// For data
 	const boost::filesystem::path mesh_root(args["mesh_root"].asString());
@@ -95,6 +82,8 @@ int main(int argc, char* argv[])
 	Point_cloud point_cloud(true);
 	for (auto& item_point : mesh.points())
 		point_cloud.insert(item_point);
+	Height_map height_map(point_cloud, args["heightmap_resolution"].asFloat(), args["heightmap_dilate"].asFloat());
+	
 	/*
 	 * TODO Iterate the directory and read the individual points
 	 */
@@ -110,24 +99,70 @@ int main(int argc, char* argv[])
 	// Reset segmentation color, initialize map converter
 	Airsim_tools* airsim_client;
 	MapConverter map_converter;
+	std::map<cv::Vec3b, std::string> color_to_mesh_name_map;
 	{
 		map_converter.initDroneStart(DRONE_START);
 		airsim_client = new Airsim_tools(DRONE_START);
+		const boost::filesystem::path color_map_path(args["color_map"].asString());
+		airsim_client->m_color_map = cv::imread(color_map_path.string());
+		if (airsim_client->m_color_map.size == 0)
+		{
+			LOG(ERROR) << "Cannot open color map " << color_map_path << std::endl;
+			return 0;
+		}
+		cv::cvtColor(airsim_client->m_color_map, airsim_client->m_color_map, cv::COLOR_BGR2RGB);
 
-		/*
-		 * TODO Reset the color correctly
-		 */
-		airsim_client->reset_color("building");
-		//	airsim_client.m_agent->simSetSegmentationObjectID("BP_Sky_Sphere", 0);
+		std::string building_key_world = args["building_keyword"].asString();
+		if(building_key_world.size()==0)
+			color_to_mesh_name_map = airsim_client->reset_color([](std::string v_name)
+			{
+				std::regex rx("^[0-9]+$");
+				bool bl = std::regex_match(v_name.begin(), v_name.end(), rx);
+				return bl;
+			});
+		else
+			color_to_mesh_name_map = airsim_client->reset_color(building_key_world);
 		LOG(INFO) << "Initialization done";
 	}
 
 	/*
 	 * TODO Sample the environment uniformly and store
 	 */
-
-	for (;;)
+	std::vector<Pos_Pack> place_to_be_travel;
 	{
+		int delta_x = (map_end_unreal - map_start_unreal).x()/ args["COLLECTION_STEP_X"].asFloat();
+		int delta_y = (map_end_unreal - map_start_unreal).y()/ args["COLLECTION_STEP_Y"].asFloat();
+		int delta_z = (map_end_unreal - map_start_unreal).z()/ args["COLLECTION_STEP_Z"].asFloat();
+		
+		for (int id_x=0;id_x<delta_x;id_x+=1)
+			for (int id_y=0;id_y<delta_y;id_y+=1)
+				for (int id_z=0;id_z<delta_z;id_z+=1)
+				{
+					Eigen::Vector3f cur_pos_unreal = map_start_unreal + Eigen::Vector3f(
+						id_x * args["COLLECTION_STEP_X"].asFloat(),
+						id_y * args["COLLECTION_STEP_Y"].asFloat(),
+						id_z * args["COLLECTION_STEP_Z"].asFloat()
+					);
+
+					Pos_Pack pos_pack = mapConverter.get_pos_pack_from_unreal(cur_pos_unreal, 0, 0);
+					if(!height_map.in_bound(pos_pack.pos_mesh.x(), pos_pack.pos_mesh.y()))
+						continue;
+					if(height_map.in_bound(pos_pack.pos_mesh.x(), pos_pack.pos_mesh.y()) + 30> pos_pack.pos_mesh.z())
+						continue;
+
+					for (float pitch_degree = 0;pitch_degree < 60;pitch_degree += args["COLLECTION_STEP_PITCH_DEGREE"].asFloat())
+						for (float yaw_degree = 0;yaw_degree < 360;yaw_degree += args["COLLECTION_STEP_YAW_DEGREE"].asFloat())
+							place_to_be_travel.push_back(mapConverter.get_pos_pack_from_unreal(
+								cur_pos_unreal, 
+								yaw_degree / 180 * M_PI,
+								pitch_degree/180*M_PI));
+				}
+	}
+
+
+	for (const Pos_Pack& item_pos_pack:place_to_be_travel)
+	{
+		adjust_pose(*airsim_client->m_agent, item_pos_pack);
 		/*
 		 * TODO Calculate the initial 3d bbox and store
 		 */
