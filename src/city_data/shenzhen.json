@@ -1,0 +1,18 @@
+{
+    // For airsim
+    "color_map": "D:\\env\\AirSim\\Unreal\\Plugins\\AirSim\\Content\\HUDAssets\\seg_color_pallet.png",
+    "DRONE_START_X": 0,
+    "DRONE_START_Y": 0,
+    "DRONE_START_Z": 0,
+
+    //For data collection
+    "MAP_START_UNREAL_X": "",
+    "MAP_START_UNREAL_Y": "",
+    "MAP_START_UNREAL_Z": "",
+    "MAP_END_UNREAL_X": "",
+    "MAP_END_UNREAL_Y": "",
+    "MAP_END_UNREAL_Z": "",
+    "output_root": "D://test",
+    "mesh_root": "D:\\DATASET\\VirtualCity\\shenzhen_2021\\shenzhen_2021"
+
+}

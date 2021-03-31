@@ -727,6 +727,7 @@ void split_obj(const std::string& file_dir, const std::string& file_name, const 
 	for (int building_idx = 0; building_idx < buildings.size(); building_idx++)
 	{
 		tinyobj::attrib_t cur_attr = tinyobj::attrib_t(attrib);
+		std::vector<tinyobj::material_t> item_mtl(materials);
 		tinyobj::shape_t cur_shape;
 
 		int area_2d = buildings[building_idx].xs.size();
@@ -763,6 +764,7 @@ void split_obj(const std::string& file_dir, const std::string& file_name, const 
 
 		cur_shape.name = std::to_string(building_num);
 		clean_vertex(cur_attr, cur_shape);
+		clean_materials(cur_shape, item_mtl);
 		bool preserve_flag = false;
 		for (int i = 0; i < cur_attr.vertices.size() / 3; ++i)
 		{
