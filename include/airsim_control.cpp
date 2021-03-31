@@ -26,7 +26,7 @@ std::map<std::string, cv::Mat> Airsim_tools::get_images()
                     (unsigned*)image_info.image_data_uint8.data()).clone();
                 if (rgb.dims == 0)
                     return std::map<std::string, cv::Mat>();
-                //cv::cvtColor(rgb, rgb, CV_BGR2RGB);
+                cv::cvtColor(rgb, rgb, cv::COLOR_BGR2RGB);
                 images.insert(std::pair<std::string, cv::Mat>("rgb", rgb));
             }
             else if (image_info.image_type == ImageType::DepthPlanner) {
@@ -42,7 +42,7 @@ std::map<std::string, cv::Mat> Airsim_tools::get_images()
                     (unsigned*)image_info.image_data_uint8.data()).clone();
                 if (seg.dims == 0)
                     return std::map<std::string, cv::Mat>();
-                //cv::cvtColor(seg, seg, CV_BGR2RGB);
+                cv::cvtColor(seg, seg, cv::COLOR_BGR2RGB);
                 images.insert(std::pair<std::string, cv::Mat>("segmentation", seg));
             }
             else if (image_info.image_type == ImageType::DepthPerspective) {
