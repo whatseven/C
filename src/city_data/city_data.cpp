@@ -41,7 +41,6 @@ int main(int argc, char* argv[])
 			program.parse_args(argc, argv);
 			boost::filesystem::path config_file(program.get<std::string>("--config_file"));
 
-			LOG(INFO) << boost::filesystem::exists(config_file);
 			std::ifstream in(config_file.string());
 			if (!in.is_open())
 			{
@@ -84,8 +83,8 @@ int main(int argc, char* argv[])
 	const Eigen::Vector3f map_end_mesh(map_end_unreal.x() / 100.f, -map_start_unreal.y() / 100.f,
 	                                   map_end_unreal.z() / 100.f);
 	Height_map height_map(map_start_mesh, map_end_mesh,
-	                      args["heightmap_resolution"].asFloat(),
-	                      args["heightmap_dilate"].asFloat()
+		args["heightmap_resolution"].asFloat(),
+		args["heightmap_dilate"].asFloat()
 	);
 
 	// For data
@@ -94,7 +93,8 @@ int main(int argc, char* argv[])
 	Surface_mesh mesh = convert_obj_from_tinyobjloader_to_surface_mesh(
 		load_obj((mesh_root / "total_split.obj").string()));
 	Point_cloud point_cloud(true);
-	std::copy(mesh.points().begin(), mesh.points().end(), std::back_inserter(point_cloud.points().end()));
+	for (auto& item_point : mesh.points())
+		point_cloud.insert(item_point);
 	/*
 	 * TODO Iterate the directory and read the individual points
 	 */
@@ -126,23 +126,24 @@ int main(int argc, char* argv[])
 	 * TODO Sample the environment uniformly and store
 	 */
 
-	/*
-	 * TODO Calculate the initial 3d bbox and store
-	 */
+	for (;;)
+	{
+		/*
+		 * TODO Calculate the initial 3d bbox and store
+		 */
 
-	/*
-	 * TODO Collect 3d bounding box
-	 */
+		/*
+		 * TODO Collect 3d bounding box
+		 */
 
-	/*
-	* TODO Collect depth
-	*/
+		/*
+		* TODO Collect depth
+		*/
 
-	/*
-	* TODO Collect voxel, point cloud in camera space(visible and invisible) and sdf value
-	*/
-
-
+		/*
+		* TODO Collect voxel, point cloud in camera space(visible and invisible) and sdf value
+		*/
+	}
 
 
 	return 0;
