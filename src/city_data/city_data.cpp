@@ -6,11 +6,13 @@
 #include <glog/logging.h>
 #include <boost/format.hpp>
 #include <json/reader.h>
+#include <array>
 
 #include "airsim_control.h"
 #include "model_tools.h"
 #include "map_util.h"
 #include "common_util.h"
+#include "cgal_tools.h"
 
 #include "tqdm.h"
 
@@ -18,12 +20,42 @@
 #include <eigen3/Eigen/Dense>
 #include <eigen3/Eigen/Geometry>
 #include <CGAL/Point_set_3/IO.h>
+#include <boost/filesystem.hpp>
 
 using namespace std;
 int fieldRange = 600;
 
 MapConverter mapConverter;
 
+void BboxFit(std::string in_path, std::string out_path, std::map<std::string, Point_cloud>& model_point_clouds, std::map<std::string, std::vector<Point_3>>& model_bbox_corner_vertices)
+{
+	boost::filesystem::path myPath(in_path);
+	boost::filesystem::recursive_directory_iterator endIter;
+	for (boost::filesystem::recursive_directory_iterator iter(myPath); iter != endIter; iter++) {
+		if (iter->path().filename().extension().string() == ".obj")
+		{
+			std::vector<Point_3> cornerPoints;
+			std::array<Point_3, 8> obb_points;
+			std::vector<Point_3> vertices;
+			Surface_mesh mesh = convert_obj_from_tinyobjloader_to_surface_mesh(
+				load_obj(iter->path().string()));
+			Point_cloud point_cloud(true);
+			for (auto& item_point : mesh.points())
+				vertices.push_back(item_point);
+				//point_cloud.insert(item_point);
+
+			CGAL::oriented_bounding_box(vertices, obb_points);
+			model_point_clouds.insert(std::make_pair(iter->path().stem().string(), point_cloud));
+			model_bbox_corner_vertices.insert(std::make_pair(iter->path().stem().string(), cornerPoints));
+
+			//test
+			Surface_mesh obb_sm;
+			CGAL::make_hexahedron(cornerPoints[0], cornerPoints[1], cornerPoints[2], cornerPoints[3],
+				cornerPoints[4], cornerPoints[5], cornerPoints[6], cornerPoints[7], obb_sm);
+			ofstream((out_path / iter->path().stem()).string() + "_obb.off") << obb_sm;
+		}
+	}
+}
 
 int main(int argc, char* argv[])
 {
@@ -98,7 +130,10 @@ int main(int argc, char* argv[])
 	/*
 	 * TODO Iterate the directory and read the individual points
 	 */
+	std::map<string, Point_cloud> model_point_clouds;
+	std::map<string, std::vector<Point_3>> model_bbox_corner_vertices;
 
+	BboxFit(args["mesh_root"].asString(), args["output_root"].asString(), model_point_clouds, model_bbox_corner_vertices);
 
 	const boost::filesystem::path output_root_path(args["output_root"].asString());
 	//if (boost::filesystem::exists(output_root_path))
