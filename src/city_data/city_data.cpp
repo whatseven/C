@@ -274,6 +274,7 @@ int main(int argc, char* argv[])
 		/*
 		 * Collect point cloud
 		 */
+		// Use item_pos_pack.camera_matrix to transform the points into camera coordinates
 		for(const ImageCluster& item_cluster:clusters)
 		{
 			//(item_cluster.name+".obj")
@@ -286,7 +287,6 @@ int main(int argc, char* argv[])
 		/*
 		* Collect imgs
 		*/
-
 		cv::cvtColor(imgs.at("rgb"), imgs.at("rgb"), cv::COLOR_RGB2BGR);
 		cv::cvtColor(imgs.at("segmentation"), imgs.at("segmentation"), cv::COLOR_RGB2BGR);
 		cv::imwrite((output_root_path / "depth" / (std::to_string(cur_num) + ".tiff")).string(), imgs.at("depth_planar"));
