@@ -18,7 +18,7 @@ typedef K::Point_2 Point_2;
 typedef K::Point_3 Point_3;
 typedef CGAL::Polygon_2<K> Polygon_2;
 typedef CGAL::Triangle_3<K> Triangle_3;
-typedef CGAL::Point_2<K> Point_2;
+//typedef CGAL::Point_2<K> Point_2;
 //typedef CGAL::Point_3<K> Point_3;
 typedef CGAL::Direction_3<K> Direction_3;
 typedef CGAL::Vector_3<K> Vector_3;

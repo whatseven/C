@@ -1,20 +1,27 @@
 {
   // For airsim
-  "color_map": "D:\\env\\AirSim\\Unreal\\Plugins\\AirSim\\Content\\HUDAssets\\seg_color_pallet.png",
+  "color_map": "F:\\Unreal\\City\\Plugins\\AirSim\\Content\\HUDAssets\\seg_color_pallet.png",
   "DRONE_START_X": 0,
   "DRONE_START_Y": 0,
   "DRONE_START_Z": 0,
+  "building_keyword": "",
 
   //For data collection
-  "MAP_START_UNREAL_X": 0,
-  "MAP_START_UNREAL_Y": 0,
-  "MAP_START_UNREAL_Z": 0,
-  "MAP_END_UNREAL_X": 1,
-  "MAP_END_UNREAL_Y": 1,
-  "MAP_END_UNREAL_Z": 1,
+  "COLLECTION_STEP_X": 1500,
+  "COLLECTION_STEP_Y": 1500,
+  "COLLECTION_STEP_Z": 1000,
+  "COLLECTION_STEP_PITCH_DEGREE": 20,
+  "COLLECTION_STEP_YAW_DEGREE": 30,
+
+  "MAP_START_UNREAL_X": -21500.0,
+  "MAP_START_UNREAL_Y": -9700.0,
+  "MAP_START_UNREAL_Z": -5000,
+  "MAP_END_UNREAL_X": 22000.0,
+  "MAP_END_UNREAL_Y": 8000.0,
+  "MAP_END_UNREAL_Z": -2000,
   "output_root": "D:\\Unreal_model_split\\Shanghai_Bbox",
   "mesh_root": "D:\\Unreal_model_split\\Shanghai_split",
-  "heightmap_resolution": 500,
+  "heightmap_resolution": 5,
   "heightmap_dilate": 0
 
 }

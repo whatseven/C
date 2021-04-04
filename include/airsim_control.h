@@ -27,11 +27,12 @@ public:
 
     std::map<std::string, cv::Mat> get_images();
 	void adjust_pose(const Pos_Pack& v_pos_pack);
-	void reset_color(std::function<bool(std::string)> v_func);
-	void reset_color(const std::string& v_key_words="");
+	std::map<cv::Vec3b, std::string> reset_color(std::function<bool(std::string)> v_func);
+	std::map<cv::Vec3b, std::string> reset_color(const std::string& v_key_words="");
 
 	Eigen::Vector3f m_drone_start;
     msr::airlib::RpcLibClientBase* m_agent;
+    cv::Mat m_color_map;
 };
 
 void adjust_pose(msr::airlib::RpcLibClientBase& vAgent, const Pos_Pack& v_pos_pack);
