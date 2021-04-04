@@ -1,4 +1,8 @@
 #include<iostream>
+#include <vector>
+#include <array>
+#include <map>
+
 #include<random>
 #include<algorithm>
 #include<iterator>
@@ -6,7 +10,6 @@
 #include <glog/logging.h>
 #include <boost/format.hpp>
 #include <json/reader.h>
-#include <array>
 
 #include "airsim_control.h"
 #include "model_tools.h"
@@ -17,45 +20,61 @@
 #include "tqdm.h"
 
 #include<opencv2/opencv.hpp>
-#include <eigen3/Eigen/Dense>
-#include <eigen3/Eigen/Geometry>
 #include <CGAL/Point_set_3/IO.h>
 #include <boost/filesystem.hpp>
 
-using namespace std;
-int fieldRange = 600;
+void writeBbox(const std::string out_path, const std::vector<Point_3> cornerPoints)
+{
+	std::fstream outFile(out_path, std::ios::out);
+	for (int i = 0; i < 8; i++)
+	{
+		outFile << cornerPoints[i].x() << " " << cornerPoints[i].y() << " " << cornerPoints[i].z() << "\n";
+	}
+}
 
-MapConverter mapConverter;
-
-void BboxFit(std::string in_path, std::string out_path, std::map<std::string, Point_cloud>& model_point_clouds, std::map<std::string, std::vector<Point_3>>& model_bbox_corner_vertices)
+void BboxFit(std::string in_path, std::string out_path, std::map<string, Point_cloud>& model_point_clouds, std::map<string, std::vector<Point_3>>& model_bbox_corner_vertices)
 {
 	boost::filesystem::path myPath(in_path);
 	boost::filesystem::recursive_directory_iterator endIter;
 	for (boost::filesystem::recursive_directory_iterator iter(myPath); iter != endIter; iter++) {
-		if (iter->path().filename().extension().string() == ".obj")
+		if (iter->path().filename().extension().string() == ".obj" && (std::atoi(iter->path().stem().string().c_str()) || iter->path().stem().string() == "0"))
 		{
 			std::vector<Point_3> cornerPoints;
 			std::array<Point_3, 8> obb_points;
-			std::vector<Point_3> vertices;
+			std::vector<float> verticesZ;
+			std::vector<cv::Point2f> vertices2D;
+			cv::Point2f cornerPoints2D[4];
 			Surface_mesh mesh = convert_obj_from_tinyobjloader_to_surface_mesh(
 				load_obj(iter->path().string()));
 			Point_cloud point_cloud(true);
 			for (auto& item_point : mesh.points())
-				vertices.push_back(item_point);
-				//point_cloud.insert(item_point);
-
-			CGAL::oriented_bounding_box(vertices, obb_points);
+			{
+				verticesZ.push_back(item_point.z());
+				vertices2D.push_back(cv::Point2f(item_point.x(), item_point.y()));
+				point_cloud.insert(item_point);
+			}
+			cv::RotatedRect box = cv::minAreaRect(vertices2D);
+			float maxZ = *std::max_element(verticesZ.begin(), verticesZ.end());
+			float minZ = *std::min_element(verticesZ.begin(), verticesZ.end());
+			box.points(cornerPoints2D);
+			for (int i = 0; i < 4; i++)
+			{
+				float z = minZ;
+				for (int j = 0; j < 2; j++)
+				{
+					float x = cornerPoints2D[i].x;
+					float y = cornerPoints2D[i].y;
+					cornerPoints.push_back(Point_3(x, y, z));
+					z = maxZ;
+				}
+			}
 			model_point_clouds.insert(std::make_pair(iter->path().stem().string(), point_cloud));
 			model_bbox_corner_vertices.insert(std::make_pair(iter->path().stem().string(), cornerPoints));
-
-			//test
-			Surface_mesh obb_sm;
-			CGAL::make_hexahedron(cornerPoints[0], cornerPoints[1], cornerPoints[2], cornerPoints[3],
-				cornerPoints[4], cornerPoints[5], cornerPoints[6], cornerPoints[7], obb_sm);
-			ofstream((out_path / iter->path().stem()).string() + "_obb.off") << obb_sm;
+			writeBbox((out_path / iter->path().stem()).string() + ".xyz", cornerPoints);
 		}
 	}
 }
+
 
 int main(int argc, char* argv[])
 {
@@ -122,11 +141,11 @@ int main(int argc, char* argv[])
 	// For data
 	const boost::filesystem::path mesh_root(args["mesh_root"].asString());
 	LOG(INFO) << "Read mesh from " << mesh_root;
-	Surface_mesh mesh = convert_obj_from_tinyobjloader_to_surface_mesh(
-		load_obj((mesh_root / "total_split.obj").string()));
-	Point_cloud point_cloud(true);
-	for (auto& item_point : mesh.points())
-		point_cloud.insert(item_point);
+	//Surface_mesh mesh = convert_obj_from_tinyobjloader_to_surface_mesh(
+	//	load_obj((mesh_root / "total_split.obj").string()));
+	//Point_cloud point_cloud(true);
+	//for (auto& item_point : mesh.points())
+	//	point_cloud.insert(item_point);
 	/*
 	 * TODO Iterate the directory and read the individual points
 	 */

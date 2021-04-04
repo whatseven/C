@@ -37,7 +37,10 @@ if(${is_build_model})
     
 endif(${is_build_model})
 
-find_package(Eigen3 REQUIRED)
+find_package(Eigen3 CONFIG REQUIRED)
+if (EIGEN3_FOUND)   
+include( ${EIGEN3_USE_FILE} ) 
+endif()
 find_package(OpenCV CONFIG REQUIRED)
 find_package(argparse CONFIG REQUIRED)
 find_package(CGAL CONFIG REQUIRED)

@@ -1,20 +1,20 @@
 {
-    // For airsim
-    "color_map": "D:\\env\\AirSim\\Unreal\\Plugins\\AirSim\\Content\\HUDAssets\\seg_color_pallet.png",
-    "DRONE_START_X": 0,
-    "DRONE_START_Y": 0,
-    "DRONE_START_Z": 0,
+  // For airsim
+  "color_map": "D:\\env\\AirSim\\Unreal\\Plugins\\AirSim\\Content\\HUDAssets\\seg_color_pallet.png",
+  "DRONE_START_X": 0,
+  "DRONE_START_Y": 0,
+  "DRONE_START_Z": 0,
 
-    //For data collection
-    "MAP_START_UNREAL_X": 0,
-    "MAP_START_UNREAL_Y": 0,
-    "MAP_START_UNREAL_Z": 0,
-    "MAP_END_UNREAL_X": 1,
-    "MAP_END_UNREAL_Y": 1,
-    "MAP_END_UNREAL_Z": 1,
-    "output_root": "D://test",
-    "mesh_root": "D:\\DATASET\\VirtualCity\\shenzhen_2021\\shenzhen_2021",
-    "heightmap_resolution": 500,
-    "heightmap_dilate": 0
+  //For data collection
+  "MAP_START_UNREAL_X": 0,
+  "MAP_START_UNREAL_Y": 0,
+  "MAP_START_UNREAL_Z": 0,
+  "MAP_END_UNREAL_X": 1,
+  "MAP_END_UNREAL_Y": 1,
+  "MAP_END_UNREAL_Z": 1,
+  "output_root": "D:\\Unreal_model_split\\Shanghai_Bbox",
+  "mesh_root": "D:\\Unreal_model_split\\Shanghai_split",
+  "heightmap_resolution": 500,
+  "heightmap_dilate": 0
 
 }

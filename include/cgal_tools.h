@@ -8,7 +8,6 @@
 #include <CGAL/Surface_mesh.h>
 #include <CGAL/Point_set_3.h>
 #include <CGAL/Polygon_2.h>
-#include <CGAL/optimal_bounding_box.h>
 
 #include <eigen3/Eigen/Dense>
 #include <eigen3/Eigen/Geometry>
