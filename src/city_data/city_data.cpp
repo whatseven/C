@@ -24,13 +24,54 @@
 #include <CGAL/Point_set_3/IO.h>
 #include <boost/filesystem.hpp>
 
-void writeBbox(const std::string out_path, const std::vector<Point_3> cornerPoints)
+float calAngelWithX(Vector_3 in)
 {
-	std::fstream outFile(out_path, std::ios::out);
-	for (int i = 0; i < 8; i++)
+	float product = Vector_3(1, 0, 0) * in;
+	return std::acos(product / std::sqrt(in.squared_length()));
+}
+
+void rotatePitch(std::vector<Point_3>& cornerPoints, float pitch, Point_3 center)
+{
+	Vector_3 vertex_after;
+	for (auto& vertex : cornerPoints)
 	{
-		outFile << cornerPoints[i].x() << " " << cornerPoints[i].y() << " " << cornerPoints[i].z() << "\n";
+		vertex_after = vertex - center;
+		Eigen::Vector4f vertex_temp = Eigen::Vector4f(vertex_after.x(), vertex_after.y(), vertex_after.z(), 1);
+		vertex_temp = Eigen::AngleAxis(-pitch, Eigen::Vector3f::UnitX()) * vertex_temp;
+		vertex = Point_3(vertex_temp.x() + center.x(), vertex_temp.y() + center.y(), vertex_temp.z() + center.z());
 	}
+}
+
+void rotateYaw(std::vector<Point_3> cornerPoints, float yaw, Point_3 center, bool is_clockwise)
+{
+	Vector_3 vertex_after;
+	for (auto& vertex : cornerPoints)
+	{
+		vertex_after = vertex - center;
+		Eigen::Vector4f vertex_temp = Eigen::Vector4f(vertex_after.x(), vertex_after.y(), vertex_after.z(), 1);
+		if (is_clockwise)
+			vertex_temp = Eigen::AngleAxis(-yaw, Eigen::Vector3f::UnitX()) * vertex_temp;
+		else
+			vertex_temp = Eigen::AngleAxis(yaw, Eigen::Vector3f::UnitX()) * vertex_temp;
+		vertex = Point_3(vertex_temp.x() + center.x(), vertex_temp.y() + center.y(), vertex_temp.z() + center.z());
+	}
+}
+
+void writeBbox(const std::string out_path, std::vector<Point_3>& cornerPoints, CGAL::Bbox_2 Bbox2D)
+{
+	float nx, ny, nz, roll, pitch, yaw;
+	Point_3 center = cornerPoints[8];
+	pitch = 0;
+	yaw = calAngelWithX(cornerPoints[0] - cornerPoints[2]);
+	rotatePitch(cornerPoints, pitch, center);
+	Vector_3 cross_product = CGAL::cross_product(Vector_3(1, 0, 0), cornerPoints[0] - cornerPoints[2]);
+	if (cross_product.z() > 0)
+		yaw = -yaw;
+	nx = std::sqrt((cornerPoints[0] - cornerPoints[2]).squared_length());
+	ny = std::sqrt((cornerPoints[2] - cornerPoints[4]).squared_length());
+	nz = std::sqrt((cornerPoints[0] - cornerPoints[1]).squared_length());
+	std::fstream outFile(out_path, std::ios::out);
+	outFile << "Car 0 0 0 " <<Bbox2D.xmin()<<" " << Bbox2D.ymin() << " " << Bbox2D.xmax() << " " << Bbox2D.ymax() << " " << nx << " " << ny << " " << nz << " " << center.x() << " " << center.y() << " " << center.z() << " " << yaw << "\n";
 }
 
 struct ImageCluster
@@ -87,13 +128,23 @@ void BboxFit(std::string in_path, std::string out_path, std::map<string, Point_c
 	boost::filesystem::path myPath(in_path);
 	boost::filesystem::recursive_directory_iterator endIter;
 	for (boost::filesystem::recursive_directory_iterator iter(myPath); iter != endIter; iter++) {
-		if (iter->path().filename().extension().string() == ".obj" && (std::atoi(iter->path().stem().string().c_str()) || iter->path().stem().string() == "0"))
+		std::string v_name = iter->path().stem().string();
+		std::regex rx("^[0-9]+$");
+		bool bl = std::regex_match(v_name.begin(), v_name.end(), rx);
+		if (iter->path().filename().extension().string() == ".obj" && bl)
 		{
 			std::vector<Point_3> cornerPoints;
 			std::array<Point_3, 8> obb_points;
 			std::vector<float> verticesZ;
 			std::vector<cv::Point2f> vertices2D;
 			cv::Point2f cornerPoints2D[4];
+
+			std::fstream in_offset((myPath / iter->path().stem()).string() + ".txt", std::ios::in);
+			std::string offsets;
+			in_offset >> offsets;
+			int x_offset = atoi(offsets.substr(0, offsets.find(",")).c_str());
+			int y_offset = atoi(offsets.substr(offsets.find(",") + 1).c_str());
+
 			Surface_mesh mesh = convert_obj_from_tinyobjloader_to_surface_mesh(
 				load_obj(iter->path().string()));
 			Point_cloud point_cloud(true);
@@ -114,26 +165,129 @@ void BboxFit(std::string in_path, std::string out_path, std::map<string, Point_c
 				{
 					float x = cornerPoints2D[i].x;
 					float y = cornerPoints2D[i].y;
-					cornerPoints.push_back(Point_3(x, y, z));
+					cornerPoints.push_back(Point_3(x + x_offset, y + y_offset, z));
 					z = maxZ;
 				}
 			}
+			Point_3 center = Point_3(box.center.x, box.center.y, (maxZ + minZ) / 2);
+			cornerPoints.push_back(center);
 			model_point_clouds.insert(std::make_pair(iter->path().stem().string(), point_cloud));
 			model_bbox_corner_vertices.insert(std::make_pair(iter->path().stem().string(), cornerPoints));
-<<<<<<< HEAD
-			writeBbox((out_path / iter->path().stem()).string() + ".xyz", cornerPoints);
-=======
 
-			//test
-			Surface_mesh obb_sm;
-			CGAL::make_hexahedron(cornerPoints[0], cornerPoints[1], cornerPoints[2], cornerPoints[3],
-				cornerPoints[4], cornerPoints[5], cornerPoints[6], cornerPoints[7], obb_sm);
-			std::ofstream((out_path / iter->path().stem()).string() + "_obb.off") << obb_sm;
->>>>>>> ebfb3ea9f8e322c58cf4e5dd63f05c91e4642d9f
+			//writeBbox(((out_path + "\\origin_bbox") / iter->path().stem()).string() + ".xyz", cornerPoints, center);
 		}
 	}
 }
 
+void isInModel(Surface_mesh model, std::vector<Point_3> queryPoints, std::vector<bool>& voxel, std::vector<double>& sdf, const std::vector<char>& axis_seq)
+{
+	//std::vector<char> axis_seq = { 'z','y','x' };
+	std::vector<AABB_Point> vertices;
+	std::list<Triangle> faces;
+	for (face_descriptor face_id : model.faces())
+	{
+		halfedge_descriptor hi = model.halfedge(face_id);
+		for (halfedge_descriptor hf_id : model.halfedges_around_face(hi))
+		{
+			vertex_descriptor vi = model.target(hf_id);
+			vertices.push_back(AABB_Point(model.point(vi).x(), model.point(vi).y(), model.point(vi).z()));
+		}
+		faces.push_back(Triangle(vertices[0], vertices[1], vertices[2]));
+	}
+
+	std::vector<std::list<Triangle>::iterator> deletedIt;
+	for (auto it = faces.begin(); it != faces.end(); ++it)
+	{
+		if ((*it).is_degenerate())
+		{
+			deletedIt.push_back(it);
+		}
+	}
+	for (auto it : deletedIt)
+	{
+		faces.erase(it);
+	}
+	// Build tree
+	Tree_tri tree(faces.begin(), faces.end());
+	vector<vector<int>> pointData_vectors;
+	for (auto axis : axis_seq)
+	{
+		vector<int> pointData;
+		// Judgement
+		for (int i = 0; i < queryPoints.size(); i++)
+		{
+			vector<double> yCoords;
+			AABB_Point temp1, temp2;
+			if (axis == 'z')
+			{
+				temp1 = AABB_Point(queryPoints[i][0], queryPoints[i][1], -1000);
+				temp2 = AABB_Point(queryPoints[i][0], queryPoints[i][1], 1000);
+			}
+			else if (axis == 'y') {
+				temp1 = AABB_Point(queryPoints[i][0], -1000, queryPoints[i][2]);
+				temp2 = AABB_Point(queryPoints[i][0], 1000, queryPoints[i][2]);
+			}
+			else {
+				temp1 = AABB_Point(-1000, queryPoints[i][1], queryPoints[i][2]);
+				temp2 = AABB_Point(1000, queryPoints[i][1], queryPoints[i][2]);
+			}
+
+			Segment segment_query(temp1, temp2);
+			std::list<Segment_intersection> intersections;
+			tree.all_intersections(segment_query, std::back_inserter(intersections));
+			int loopNum = intersections.size();
+			for (int j = 0; j < loopNum; j++)
+			{
+				const AABB_Point* p = boost::get<AABB_Point>(&(intersections.front()->first));
+				if (p)
+				{
+					if (axis == 'z')
+						yCoords.push_back(p->z());
+					else if (axis == 'y')
+						yCoords.push_back(p->y());
+					else if (axis == 'x')
+						yCoords.push_back(p->x());
+				}
+				intersections.pop_front();
+			}
+			if (yCoords.size() > 0)
+			{
+				double yMax = *max_element(yCoords.begin(), yCoords.end());
+				double yMin = *min_element(yCoords.begin(), yCoords.end());
+				if (yMax == yMin) {
+					yMin = 0;
+				}
+				double yPoint;
+				if (axis == 'z')
+					yPoint = queryPoints[i].z();
+				else if (axis == 'y')
+					yPoint = queryPoints[i].y();
+				else
+					yPoint = queryPoints[i].x();
+				if (yPoint < yMax && yPoint > yMin)
+					pointData.push_back(1);
+				else
+					pointData.push_back(0);
+			}
+			else
+				pointData.push_back(0);
+		}
+		pointData_vectors.push_back(pointData);
+	}
+
+	for (int i = 0; i < queryPoints.size(); i++)
+	{
+		double distance = CGAL::to_double(tree.squared_distance(AABB_Point(queryPoints[i][0], queryPoints[i][1], queryPoints[i][2])));
+		bool pointData = true;
+		for (auto item_pointData_axis : pointData_vectors)
+		{
+			if (item_pointData_axis.at(i) == 0)
+				pointData = false;
+		}
+		voxel.push_back(pointData);
+		sdf.push_back(distance);
+	}
+}
 
 int main(int argc, char* argv[])
 {
@@ -188,30 +342,33 @@ int main(int argc, char* argv[])
 	// For data
 	const boost::filesystem::path mesh_root(args["mesh_root"].asString());
 	LOG(INFO) << "Read mesh from " << mesh_root;
-	/*Surface_mesh mesh = convert_obj_from_tinyobjloader_to_surface_mesh(
+	Surface_mesh mesh = convert_obj_from_tinyobjloader_to_surface_mesh(
 		load_obj((mesh_root / "total.obj").string(),true, mesh_root.parent_path().string()));
 	Point_cloud point_cloud(true);
 	for (auto& item_point : mesh.points())
 		point_cloud.insert(item_point);
 	Height_map height_map(point_cloud, args["heightmap_resolution"].asFloat(), args["heightmap_dilate"].asFloat());
-	*/
+	
+
+
+	const boost::filesystem::path output_root_path(args["output_root"].asString());
+
+	checkFolder(output_root_path);
+	//checkFolder(output_root_path / "3d_box");
+	checkFolder(output_root_path / "depth");
+	checkFolder(output_root_path / "rgb");
+	checkFolder(output_root_path / "segmentation");
+	checkFolder(output_root_path / "origin_bbox");
 
 	/*
 	 * TODO Iterate the directory and read the individual points
 	 */
+
 	std::map<string, Point_cloud> model_point_clouds;
 	std::map<string, std::vector<Point_3>> model_bbox_corner_vertices;
+	std::map<string, Point_3> model_bbox_center;
+	BboxFit(args["mesh_root"].asString(), args["output_root"].asString(), model_point_clouds, model_bbox_corner_vertices, model_bbox_center);
 
-	BboxFit(args["mesh_root"].asString(), args["output_root"].asString(), model_point_clouds, model_bbox_corner_vertices);
-
-	const boost::filesystem::path output_root_path(args["output_root"].asString());
-	//if (boost::filesystem::exists(output_root_path))
-	//	boost::filesystem::remove_all(output_root_path);
-	checkFolder(output_root_path);
-	checkFolder(output_root_path / "3d_box");
-	checkFolder(output_root_path / "depth");
-	checkFolder(output_root_path / "rgb");
-	checkFolder(output_root_path / "segmentation");
 
 	// Prepare environment
 	// Reset segmentation color, initialize map converter
@@ -284,6 +441,7 @@ int main(int argc, char* argv[])
 	LOG(INFO) << "Total generate " << place_to_be_travel.size() << " place to be traveled";
 	auto tqdm_bar = tqdm();
 	int cur_num = 0;
+	std::map<string, std::vector<Point_3>> camera_bbox_corner_vertices;
 	for (const Pos_Pack& item_pos_pack:place_to_be_travel)
 	{
 		airsim_client->adjust_pose(item_pos_pack);
@@ -295,12 +453,21 @@ int main(int argc, char* argv[])
 		 */
 		std::vector<ImageCluster> clusters = solveCluster(seg, color_to_mesh_name_map);
 		
-		
-
 		/*
 		 * TODO Collect 3d bounding box
 		 */
-
+		Eigen::Vector4f bbox_vertex_camera_coords;
+		std::vector<Point_3> bbox_vertices_camera_coords;
+		for (auto building : clusters)
+		{
+			for (auto bbox_vertex : model_bbox_corner_vertices[building.name])
+			{
+				bbox_vertex_camera_coords = item_pos_pack.camera_matrix * Eigen::Vector4f(bbox_vertex[0], bbox_vertex[1], bbox_vertex[2], 1);
+				bbox_vertices_camera_coords.push_back(Point_3(bbox_vertex_camera_coords.x(), bbox_vertex_camera_coords.y(), bbox_vertex_camera_coords.z()));
+			}
+			checkFolder(output_root_path / std::to_string(cur_num));
+			writeBbox(args["output_root"].asString() + "\\" + std::to_string(cur_num) + "\\" + building.name + ".xyz", bbox_vertices_camera_coords, building.box);
+		}
 		
 
 		/*
@@ -327,6 +494,7 @@ int main(int argc, char* argv[])
 		
 		tqdm_bar.progress(&item_pos_pack -&place_to_be_travel[0], place_to_be_travel.size());
 		cur_num += 1;
+
 	}
 
 

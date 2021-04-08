@@ -13,7 +13,6 @@
 
 typedef CGAL::Ray_3<K> Ray;
 
-
 typedef CGAL::AABB_face_graph_triangle_primitive<Surface_mesh, CGAL::Default, CGAL::Tag_false> Primitive;
 typedef CGAL::AABB_traits<K, Primitive> Traits;
 typedef CGAL::AABB_tree<Traits> Tree;
