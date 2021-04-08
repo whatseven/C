@@ -72,7 +72,8 @@ std::vector<ImageCluster> solveCluster(const cv::Mat& vSeg, const std::map<cv::V
 	return result;
 }
 
-void BboxFit(std::string in_path, std::string out_path, std::map<std::string, Point_cloud>& model_point_clouds, std::map<std::string, std::vector<Point_3>>& model_bbox_corner_vertices)
+void BboxFit(std::string in_path, std::string out_path, std::map<std::string, Point_cloud>& model_point_clouds, 
+	std::map<std::string, std::vector<Point_3>>& model_bbox_corner_vertices)
 {
 	boost::filesystem::path myPath(in_path);
 	boost::filesystem::recursive_directory_iterator endIter;
@@ -89,15 +90,15 @@ void BboxFit(std::string in_path, std::string out_path, std::map<std::string, Po
 				vertices.push_back(item_point);
 				//point_cloud.insert(item_point);
 
-			CGAL::oriented_bounding_box(vertices, obb_points);
-			model_point_clouds.insert(std::make_pair(iter->path().stem().string(), point_cloud));
-			model_bbox_corner_vertices.insert(std::make_pair(iter->path().stem().string(), cornerPoints));
+			//CGAL::oriented_bounding_box(vertices, obb_points);
+			//model_point_clouds.insert(std::make_pair(iter->path().stem().string(), point_cloud));
+			//model_bbox_corner_vertices.insert(std::make_pair(iter->path().stem().string(), cornerPoints));
 
 			//test
-			Surface_mesh obb_sm;
-			CGAL::make_hexahedron(cornerPoints[0], cornerPoints[1], cornerPoints[2], cornerPoints[3],
+			//Surface_mesh obb_sm;
+			//CGAL::make_hexahedron(cornerPoints[0], cornerPoints[1], cornerPoints[2], cornerPoints[3],
 				cornerPoints[4], cornerPoints[5], cornerPoints[6], cornerPoints[7], obb_sm);
-			std::ofstream((out_path / iter->path().stem()).string() + "_obb.off") << obb_sm;
+			//std::ofstream((out_path / iter->path().stem()).string() + "_obb.off") << obb_sm;
 		}
 	}
 }
@@ -170,7 +171,7 @@ int main(int argc, char* argv[])
 
 	
 
-	//BboxFit(args["mesh_root"].asString(), args["output_root"].asString(), model_point_clouds, model_bbox_corner_vertices);
+	BboxFit(args["mesh_root"].asString(), args["output_root"].asString(), model_point_clouds, model_bbox_corner_vertices);
 
 	const boost::filesystem::path output_root_path(args["output_root"].asString());
 	//if (boost::filesystem::exists(output_root_path))
