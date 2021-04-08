@@ -34,3 +34,6 @@ temp
 *.exe
 *.out
 *.app
+
+# Config File
+*.json
