@@ -148,19 +148,47 @@ std::pair<cv::RotatedRect,Point_2> get_bbox_3d(const Point_cloud& v_point_cloud)
 	return std::make_pair(box,Point_2(min_y, max_y));
 }
 
-void write_box_kitti(const std::vector<cv::RotatedRect>& v_boxes_3d, const std::vector<Point_2>& v_zes,
+void write_box_test(const std::vector<cv::RotatedRect>& v_boxes_3d, const std::vector<Point_2>& v_zes,
 	const std::vector <CGAL::Bbox_2>& v_boxes_2d,const boost::filesystem::path& v_path)
+{
+	cv::Point2f cornerPoints[4];
+	std::vector<cv::Point3f> cornerPoints3D;
+	std::ofstream f_out("./bbox_test.xyz");
+	for (const auto& v_box_3d : v_boxes_3d)
+	{
+		cornerPoints3D.clear();
+		int index = &v_box_3d - &v_boxes_3d[0];
+		v_box_3d.points(cornerPoints);
+		for (auto points : cornerPoints)
+		{
+			float y = v_zes[index].x();
+			for (int i = 0; i < 2; i++)
+			{
+				cornerPoints3D.push_back(cv::Point3f(points.x, y, points.y));
+				y = v_zes[index].y();
+			}
+		}
+	}
+	for (auto outPoints : cornerPoints3D)
+	{
+		f_out << outPoints.x << " " << outPoints.y << " " << outPoints.z << "\n";
+	}
+	f_out.close();
+}
+
+void write_box_kitti(const std::vector<cv::RotatedRect>& v_boxes_3d, const std::vector<Point_2>& v_zes,
+	const std::vector <CGAL::Bbox_2>& v_boxes_2d, const boost::filesystem::path& v_path)
 {
 	std::ofstream f_out(v_path.string());
 	for (const auto& v_box_3d : v_boxes_3d)
 	{
 		int index = &v_box_3d - &v_boxes_3d[0];
-		
+
 		f_out << (boost::format("Car 0 0 0 %d %d %d %d %f %f %f %f %f %f %f\n") %
 			v_boxes_2d[index].xmin() % v_boxes_2d[index].ymin() % v_boxes_2d[index].xmax() % v_boxes_2d[index].ymax() %
-			v_box_3d.size.width% v_box_3d.size.height % (v_zes[index].y() - v_zes[index].x()) %
-			v_box_3d.center.x% v_box_3d.center.y % ((v_zes[index].y() + v_zes[index].x()) / 2) % 
-			(v_box_3d.angle / 180.f * M_PI)).str();
+			(v_zes[index].y() - v_zes[index].x()) % v_box_3d.size.height % v_box_3d.size.width %
+			 v_box_3d.center.x % ((v_zes[index].y() + v_zes[index].x()) / 2) % v_box_3d.center.y %
+			(-v_box_3d.angle / 180.f * M_PI)).str();
 	}
 	f_out.close();
 }
@@ -540,6 +568,7 @@ int main(int argc, char* argv[])
 			boxes_2d.push_back(building.box);
 		}
 		write_box_kitti(boxes_3d, zses, boxes_2d,(root_current_frame / "label_2" / (std::to_string(cur_num)+".txt")).string());
+		//write_box_test(boxes_3d, zses, boxes_2d,(root_current_frame / "label_2" / (std::to_string(cur_num)+".xyz")).string());
 
 
 		/*
