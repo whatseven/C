@@ -1,4 +1,5 @@
 #include <argparse/argparse.hpp>
+#include <cpr/cpr.h>
 
 #include <CGAL/Point_set_3.h>
 #include <CGAL/Point_set_3/IO.h>
@@ -24,7 +25,6 @@
 #include "metrics.h"
 #include "trajectory.h"
 #include "common_util.h"
-#include <cpr/cpr.h>
 #include <opencv2/features2d.hpp>
 //#include "SLAM/include/vcc_zxm_mslam.h"
 
@@ -332,10 +332,11 @@ public:
 		std::vector<Next_target> untraveled_buildings;
 		for (int i_building = 0; i_building < v_buildings.size(); ++i_building) {
 			if (v_buildings[i_building].passed_trajectory.size() == 0 
-				&& (v_buildings[i_building].bounding_box_3d.center().block(0,0,2,1)-Eigen::Vector2f(sample_points[m_current_exploration_id].x(), sample_points[m_current_exploration_id].y())).norm()<DISTANCE_THRESHOLD/2)
+				//&& (v_buildings[i_building].bounding_box_3d.center().block(0,0,2,1)-Eigen::Vector2f(sample_points[m_current_exploration_id].x(), sample_points[m_current_exploration_id].y())).norm()<DISTANCE_THRESHOLD/2
+				)
 				untraveled_buildings.emplace_back(i_building, -1);
 		}
-		if(untraveled_buildings.size()==0)
+		if(untraveled_buildings.size()==0&& with_exploration)
 		{
 			for (int i_point = 0; i_point < sample_points.size(); ++i_point)
 				if (!already_explored[i_point])
