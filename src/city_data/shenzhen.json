@@ -19,7 +19,7 @@
   "MAP_END_UNREAL_X": 22000.0,
   "MAP_END_UNREAL_Y": 8000.0,
   "MAP_END_UNREAL_Z": -2000,
-  "output_root": "F:\\Unreal_model_split\\Shenzhen_dataset",
+  "output_root": "F:\\Unreal_model_split\\Shenzhen_dataset\\withAlpha",
   "mesh_root": "F:\\Unreal_model_split\\shenzhen_2021",
   "heightmap_resolution": 5,
   "heightmap_dilate": 0
