@@ -26,6 +26,9 @@
 
 #include <CGAL/Polygon_mesh_processing/transform.h>
 #include <CGAL/Aff_transformation_3.h>
+#include <CGAL/Alpha_shape_2.h>
+
+
 
 //
 //float calAngelWithX(Vector_3 in)
@@ -675,7 +678,14 @@ int main(int argc, char* argv[])
 		{
 			//(item_cluster.name+".obj")
 		}
+
+		//Sample surface points from mesh in camera coordinate
+
+		//Generate keypoints
 		
+		//Generate transform
+
+		//Generate voxel and sdf in normalized coordinates
 
 		/*
 		* Collect imgs

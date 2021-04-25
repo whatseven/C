@@ -181,12 +181,12 @@ public:
             }
 
         	//View points
-            //for (const auto& item_trajectory : m_trajectories) {
-            //    draw_cube(Eigen::AlignedBox3f(item_trajectory.first - Eigen::Vector3f(1.f, 1.f, 1.f), item_trajectory.first + Eigen::Vector3f(1.f, 1.f, 1.f)),
-            //        Eigen::Vector4f(0.f, 1.f, 0.f, 1.f));
-            //    Eigen::Vector3f look_at = item_trajectory.first + item_trajectory.second * 10;
-            //    draw_line(item_trajectory.first, look_at,2,Eigen::Vector4f(0,1,0,1));
-            //}
+            for (const auto& item_trajectory : m_trajectories) {
+                draw_cube(Eigen::AlignedBox3f(item_trajectory.first - Eigen::Vector3f(1.f, 1.f, 1.f), item_trajectory.first + Eigen::Vector3f(1.f, 1.f, 1.f)),
+                    Eigen::Vector4f(0.f, 1.f, 0.f, 1.f));
+                Eigen::Vector3f look_at = item_trajectory.first + item_trajectory.second * 10;
+                draw_line(item_trajectory.first, look_at,2,Eigen::Vector4f(0,1,0,1));
+            }
             m_trajectories_spline = m_trajectories;
         	//View spline
             for (const auto& item_trajectory: m_trajectories_spline) {
