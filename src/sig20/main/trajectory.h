@@ -160,8 +160,9 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> simplify_path_reduce_wa
 
 void write_wgs_path(const Json::Value& v_args,const std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>>& v_trajectories,const std::string& v_path) {
 	//Eigen::Vector2f origin_wgs(113.92332,22.64429); // Yingrenshi
-	Eigen::Vector2f origin_wgs(v_args["geo_origin"][0].asFloat(), v_args["geo_origin"][1].asFloat());
-	Eigen::Vector2f origin_xy=lonLat2Mercator(origin_wgs);
+	Eigen::Vector3f origin_wgs(v_args["geo_origin"][0].asFloat(), v_args["geo_origin"][1].asFloat(), 0.f);
+	//Eigen::Vector2f origin_xy=lonLat2Mercator(origin_wgs);
+	Eigen::Vector2f origin_xy(origin_wgs.x(), origin_wgs.y());
 	std::ofstream pose(v_path+"camera_wgs_0.txt");
 
 	for (int i_id = 0; i_id < v_trajectories.size(); i_id++) {
@@ -175,7 +176,7 @@ void write_wgs_path(const Json::Value& v_args,const std::vector<std::pair<Eigen:
 			180. / M_PI;
 		float yaw = -std::atan2f(direction[1], direction[0]) * 180. / M_PI + 90.f;
 
-		pose << (fmt % pos_wgs[0] % pos_wgs[1] % position[2] % yaw % pitch).str();
+		pose << (fmt % pos_wgs[0] % pos_wgs[1] % (position[2]+ origin_wgs.z()) % yaw % pitch).str();
 		if(i_id%180==179)
 		{
 			pose.close();
