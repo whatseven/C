@@ -94,16 +94,21 @@ struct ImageCluster
 	std::vector<int> ys;
 };
 
-std::vector<ImageCluster> solveCluster(const cv::Mat& vSeg, const std::map<cv::Vec3b, std::string> colorMap) {
+std::vector<ImageCluster> solveCluster(const cv::Mat& vSeg, const std::map<cv::Vec3b, std::string> colorMap, bool& isValid) {
 
+	isValid = true;
 	std::map<cv::Vec3b, int> currentColor;
 	std::vector<std::pair<std::vector<int>, std::vector<int>>> bbox;
 
+	int background_num = 0;
 	for (int y = 0; y < vSeg.size().height; y++) {
 		for (int x = 0; x < vSeg.size().width; x++) {
 			cv::Vec3b pixel = vSeg.at<cv::Vec3b>(y, x);
 			if (pixel == cv::Vec3b(55, 181, 57))
+			{
+				background_num++;
 				continue;
+			}
 
 			if (currentColor.find(pixel) == currentColor.end()) {
 				currentColor.insert(std::make_pair(pixel, bbox.size()));
@@ -114,11 +119,22 @@ std::vector<ImageCluster> solveCluster(const cv::Mat& vSeg, const std::map<cv::V
 			bbox[currentColor.at(pixel)].second.push_back(y);
 		}
 	}
+
 	std::vector<ImageCluster> result;
+	if (background_num > vSeg.size().height * vSeg.size().width * 0.8)
+	{
+		isValid = false;
+		return result;
+	}
+	
+	int small_building_num = 0;
 	for (auto colorIter = currentColor.begin(); colorIter != currentColor.end(); colorIter++) {
 		ImageCluster cluster;
-		if (bbox[colorIter->second].first.size() < 80 * 80)
+		if (bbox[colorIter->second].first.size() < 50 * 50)
+		{
+			small_building_num++;
 			continue;
+		}
 		cluster.box = CGAL::Bbox_2(
 			*std::min_element(bbox[colorIter->second].first.begin(), bbox[colorIter->second].first.end()),
 			*std::min_element(bbox[colorIter->second].second.begin(), bbox[colorIter->second].second.end()),
@@ -133,6 +149,8 @@ std::vector<ImageCluster> solveCluster(const cv::Mat& vSeg, const std::map<cv::V
 		cluster.ys = bbox[currentColor.at(colorIter->first)].second;
 		result.push_back(cluster);
 	}
+	if (small_building_num > 40)
+		isValid = false;
 	return result;
 }
 
@@ -209,9 +227,9 @@ void write_box_kitti(const std::vector<cv::RotatedRect>& v_boxes_3d, const std::
 			continue;
 		f_out << (boost::format("Car 0 0 %f %d %d %d %d %f %f %f %f %f %f %f\n") % alpha_angle %
 			v_boxes_2d[index].xmin() % v_boxes_2d[index].ymin() % v_boxes_2d[index].xmax() % v_boxes_2d[index].ymax() %
-			(v_zes[index].y() - v_zes[index].x()) % v_box_3d.size.width % v_box_3d.size.height  %
-			 v_box_3d.center.x % v_zes[index].y() % v_box_3d.center.y %
-			(-v_box_3d.angle / 180.f * M_PI)).str();
+			(v_zes[index].y() - v_zes[index].x()) % v_box_3d.size.width % v_box_3d.size.height %
+			v_box_3d.center.x % v_zes[index].y() % v_box_3d.center.y %
+			((-v_box_3d.angle + 90) / 180.f * M_PI)).str();
 	}
 	f_out.close();
 }
@@ -537,8 +555,14 @@ int main(int argc, char* argv[])
 		/*
 		 * Segment the image
 		 */
-		std::vector<ImageCluster> clusters = solveCluster(seg, color_to_mesh_name_map);
-
+		bool isValid;
+		std::vector<ImageCluster> clusters = solveCluster(seg, color_to_mesh_name_map, isValid);
+		if (!isValid)
+		{
+			cur_num += 1;
+			continue;
+		}
+			
 		/*
 		 * TODO: Check the validation of current frame
 		 */
@@ -697,12 +721,12 @@ int main(int argc, char* argv[])
 		cv::imwrite((root_current_frame / "image_2" / (std::string(filename_num - std::to_string(cur_num).length(), '0') + std::to_string(cur_num) + ".png")).string(), imgs.at("rgb"));
 		//cv::imwrite((root_current_frame / "image_2" / (std::to_string(cur_num) + ".png")).string(), imgs.at("segmentation"));
 		
-		//tqdm_bar.progress(&item_pos_pack -&place_to_be_travel[0], place_to_be_travel.size());
+		tqdm_bar.progress(&item_pos_pack -&place_to_be_travel[0], place_to_be_travel.size());
 		cur_num += 1;
 
-		tqdm_bar.progress(cur_num, 100);
-		if (cur_num > 100)
-			break;
+		//tqdm_bar.progress(cur_num, 100);
+		//if (cur_num > 100)
+		//	break;
 	}
 
 	return 0;

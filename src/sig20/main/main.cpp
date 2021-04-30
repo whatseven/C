@@ -2577,6 +2577,7 @@ int main(int argc, char** argv){
 			{
 				Trajectory_params params;
 				params.view_distance = args["BOUNDS_MIN"].asFloat();
+				params.split_flag = args["split_flag"].asBool();
 				params.z_down_bounds = args["Z_DOWN_BOUND"].asFloat();
 				params.z_up_bounds = args["Z_UP_BOUNDS"].asFloat();
 				params.with_continuous_height = args["with_continuous_height"].asBool();
