@@ -574,8 +574,9 @@ bool generate_next_view_curvature(const Trajectory_params& v_params,
 
 std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> find_short_cut(
 	const std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>>& v_trajectory,
-	const Height_map& v_height_map, const float Z_UP_BOUNDS,const Eigen::Vector3f& v_center)
+	const Height_map& v_height_map, const float Z_UP_BOUNDS,const Building& v_cur_building)
 {
+	Eigen::Vector3f center = v_cur_building.bounding_box_3d.center();
 	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> safe_trajectory;
 
 	for (auto item : v_trajectory) {
@@ -586,10 +587,10 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> find_short_cut(
 		}
 		
 		
-		if(safe_position.z() > 1 * item.first.z())
+		if(safe_position.z() > 1 * item.first.z()&& v_height_map.get_height(safe_position.x(), safe_position.y()) > v_cur_building.bounding_box_3d.max().z())
 		{
 			safe_position = item.first;
-			Eigen::Vector3f direction = v_center - safe_position;
+			Eigen::Vector3f direction = center - safe_position;
 			direction.z() = 0;
 			direction.normalize();
 			direction.z() = 1;
@@ -843,7 +844,7 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 		}
 		
 		if(v_params.with_erosion)
-			item_trajectory = find_short_cut(item_trajectory, v_height_map, v_z_up_bound, v_buildings[id_building].bounding_box_3d.center());
+			item_trajectory = find_short_cut(item_trajectory, v_height_map, v_z_up_bound, v_buildings[id_building]);
 		else
 			item_trajectory = ensure_safe_trajectory_and_calculate_direction(item_trajectory, v_height_map, v_z_up_bound);
 
