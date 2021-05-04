@@ -5,6 +5,7 @@
 #include <CGAL/random_selection.h>
 
 struct Building {
+	int parent = -1;
 	Eigen::AlignedBox3f bounding_box_3d;
 	Point_set points_camera_space;
 	Point_set points_world_space;

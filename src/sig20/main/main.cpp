@@ -1061,6 +1061,7 @@ public:
 	//const int CCPP_CELL_THRESHOLD = 50;
 	//const int CCPP_CELL_THRESHOLD = 70;
 	int CCPP_CELL_THRESHOLD;
+	int rotation_status = 0;
 	//const int CCPP_CELL_THRESHOLD = 10;
 
 	int m_current_ccpp_trajectory_id;
@@ -1249,7 +1250,7 @@ public:
 		// return trajectory
 		//debug_img(std::vector<cv::Mat>{map});
 		m_current_building_id = untraveled_buildings[id_building];
-		m_motion_status = Motion_status::exploration;
+		m_motion_status = Motion_status::reconstruction_in_exploration;
 		return;
 	}
 
@@ -1389,22 +1390,47 @@ public:
 							return (v_cur_pos.pos_mesh - a1.first).norm() < (v_cur_pos.pos_mesh - a2.first).norm();
 						}) - start_points.begin();
 
-						m_exploration_point.emplace(
-							start_points[nearest_id].first + DISTANCE_THRESHOLD * 0.2 * 0 * start_points[nearest_id].second,
-							Eigen::Vector3f(0, 1, -std::tan(64.f / 180 * M_PI)).normalized()
-						);
-						m_exploration_point.emplace(
-							start_points[nearest_id].first + DISTANCE_THRESHOLD * 0.2 * 1 * start_points[nearest_id].second,
-							Eigen::Vector3f(1, 0, -std::tan(64.f / 180 * M_PI)).normalized()
-						);
-						m_exploration_point.emplace(
-							start_points[nearest_id].first + DISTANCE_THRESHOLD * 0.2 * 2 * start_points[nearest_id].second,
-							Eigen::Vector3f(0, -1, -std::tan(64.f / 180 * M_PI)).normalized()
-						);
-						m_exploration_point.emplace(
-							start_points[nearest_id].first + DISTANCE_THRESHOLD * 0.2 * 3 * start_points[nearest_id].second,
-							Eigen::Vector3f(-1, 0, -std::tan(64.f / 180 * M_PI)).normalized()
-						);
+						if (rotation_status == 0)
+						{
+							m_exploration_point.emplace(
+								start_points[nearest_id].first + DISTANCE_THRESHOLD * 0.2 * 0 * start_points[nearest_id].second,
+								Eigen::Vector3f(0, 1, -std::tan(64.f / 180 * M_PI)).normalized()
+							);
+							m_exploration_point.emplace(
+								start_points[nearest_id].first + DISTANCE_THRESHOLD * 0.2 * 1 * start_points[nearest_id].second,
+								Eigen::Vector3f(1, 0, -std::tan(64.f / 180 * M_PI)).normalized()
+							);
+							m_exploration_point.emplace(
+								start_points[nearest_id].first + DISTANCE_THRESHOLD * 0.2 * 2 * start_points[nearest_id].second,
+								Eigen::Vector3f(0, -1, -std::tan(64.f / 180 * M_PI)).normalized()
+							);
+							m_exploration_point.emplace(
+								start_points[nearest_id].first + DISTANCE_THRESHOLD * 0.2 * 3 * start_points[nearest_id].second,
+								Eigen::Vector3f(-1, 0, -std::tan(64.f / 180 * M_PI)).normalized()
+							);
+							rotation_status = 1;
+						}
+						else
+						{
+							m_exploration_point.emplace(
+								start_points[nearest_id].first + DISTANCE_THRESHOLD * 0.2 * 0 * start_points[nearest_id].second,
+								Eigen::Vector3f(0, 1, -std::tan(64.f / 180 * M_PI)).normalized()
+							);
+							m_exploration_point.emplace(
+								start_points[nearest_id].first + DISTANCE_THRESHOLD * 0.2 * 1 * start_points[nearest_id].second,
+								Eigen::Vector3f(-1, 0, -std::tan(64.f / 180 * M_PI)).normalized()
+							);
+							m_exploration_point.emplace(
+								start_points[nearest_id].first + DISTANCE_THRESHOLD * 0.2 * 2 * start_points[nearest_id].second,
+								Eigen::Vector3f(0, -1, -std::tan(64.f / 180 * M_PI)).normalized()
+							);
+							m_exploration_point.emplace(
+								start_points[nearest_id].first + DISTANCE_THRESHOLD * 0.2 * 3 * start_points[nearest_id].second,
+								Eigen::Vector3f(1, 0, -std::tan(64.f / 180 * M_PI)).normalized()
+							);
+							rotation_status = 0;
+						}
+						
 						
 						/*m_exploration_point.emplace(
 							Eigen::Vector3f(
@@ -1468,7 +1494,15 @@ public:
 					bool untraveled = true;
 					for (auto item_passed_trajectory_iter = passed_trajectory.begin(); item_passed_trajectory_iter < passed_trajectory.end(); ++item_passed_trajectory_iter) {
 						auto item_passed_trajectory = *item_passed_trajectory_iter;
-						if ((item_passed_trajectory.first - item_new_trajectory.first).norm() < v_threshold) {
+						//Eigen::Vector3f vector1 = item_passed_trajectory.second - item_passed_trajectory.first;
+						//Eigen::Vector3f vector2 = item_new_trajectory.second - item_new_trajectory.first;
+						float dot_product = item_passed_trajectory.second.dot(item_new_trajectory.second);
+						if (dot_product > 1)
+							dot_product = 1;
+						float angle = std::acos(dot_product) / M_PI * 180;
+						if (angle >= 180)
+							angle = 0;
+						if ((item_passed_trajectory.first - item_new_trajectory.first).norm() < v_threshold && angle < 5) {
 							untraveled = false;
 							start_pos_id = unpassed_trajectory.size();
 							if ((item_passed_trajectory_iter - passed_trajectory.begin()) == passed_trajectory.size() - 1)
@@ -2619,6 +2653,7 @@ int main(int argc, char** argv){
 			{
 				Trajectory_params params;
 				params.view_distance = args["BOUNDS_MIN"].asFloat();
+				params.split_flag = args["split_flag"].asBool();
 				params.z_down_bounds = args["Z_DOWN_BOUND"].asFloat();
 				params.z_up_bounds = args["Z_UP_BOUNDS"].asFloat();
 				params.with_continuous_height = args["with_continuous_height"].asBool();
@@ -2636,7 +2671,7 @@ int main(int argc, char** argv){
 			// Determine next position
 			{
 				next_pos_direction = next_best_target->determine_next_target(cur_frame_id, current_pos,
-					total_buildings, with_exploration,  overlap_step / 2);
+					total_buildings, with_exploration,  overlap_step /  2);
 				LOG(INFO) << "Determine next position ??";
 			}
 			// End
