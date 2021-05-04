@@ -519,218 +519,6 @@ public:
 
 };
 
-class Next_best_target_order_reconstruction :public Next_best_target {
-public:
-	int m_current_exploration_id = -1;
-	cv::Vec3b color_unobserved, color_free, color_occupied;
-
-	std::vector<bool> already_explored;
-
-	std::queue<std::pair<Eigen::Vector3f, Eigen::Vector3f>> m_exploration_point;
-
-	Next_best_target_order_reconstruction(const Eigen::Vector3f& v_map_start_mesh, const Eigen::Vector3f& v_map_end_mesh, float v_ccpp_cell_distance)
-		:Next_best_target(v_map_start_mesh, v_map_end_mesh, v_ccpp_cell_distance) {
-		color_unobserved = region_viz_color[0];
-		color_free = region_viz_color[1];
-		color_occupied = region_viz_color[2];
-		already_explored.resize(region_status.size(), false);
-	}
-
-	void get_next_target(int frame_id, const Pos_Pack& v_cur_pos, const std::vector<Building>& v_buildings, bool with_exploration) override {
-		// Find next building in current cell
-		std::vector<Next_target> untraveled_buildings;
-		for (int i_building = 0; i_building < v_buildings.size(); ++i_building) {
-			if (v_buildings[i_building].passed_trajectory.size() == 0
-				//&& (v_buildings[i_building].bounding_box_3d.center().block(0,0,2,1)-Eigen::Vector2f(sample_points[m_current_exploration_id].x(), sample_points[m_current_exploration_id].y())).norm()<DISTANCE_THRESHOLD/2
-				)
-				untraveled_buildings.emplace_back(i_building, -1);
-		}
-		if (untraveled_buildings.size() == 0 && with_exploration)
-		{
-			for (int i_point = 0; i_point < sample_points.size(); ++i_point)
-				if (!already_explored[i_point])
-					//if (region_status[i_point]==color_unobserved)
-					untraveled_buildings.emplace_back(-1, i_point);
-		}
-
-		if (untraveled_buildings.size() == 0) {
-			m_motion_status = Motion_status::done;
-			return;
-		}
-
-		int next_target_id = std::min_element(untraveled_buildings.begin(),
-			untraveled_buildings.end(),
-			[&v_cur_pos, &v_buildings, this](const Next_target& b1, const Next_target& b2) {
-				float distance1, distance2;
-				if (b1.origin_index_in_building_vector != -1)
-				{
-					int id_trajectory = v_buildings[b1.origin_index_in_building_vector].find_nearest_trajectory_2d(v_cur_pos.pos_mesh);
-					Eigen::Vector3f pos = v_buildings[b1.origin_index_in_building_vector].trajectory[id_trajectory].first;
-					Eigen::Vector2f pos_2(pos.x(), pos.y());
-					distance1 = (pos_2 - Eigen::Vector2f(v_cur_pos.pos_mesh.x(), v_cur_pos.pos_mesh.y())).norm();
-				}
-				else
-				{
-					distance1 = (Eigen::Vector2f(v_cur_pos.pos_mesh.x(), v_cur_pos.pos_mesh.y()) - Eigen::Vector2f(sample_points[b1.origin_index_in_untraveled_pointset].x(), sample_points[b1.origin_index_in_untraveled_pointset].y())).norm();
-				}
-				if (b2.origin_index_in_building_vector != -1)
-				{
-					int id_trajectory = v_buildings[b2.origin_index_in_building_vector].find_nearest_trajectory_2d(v_cur_pos.pos_mesh);
-					Eigen::Vector3f pos = v_buildings[b2.origin_index_in_building_vector].trajectory[id_trajectory].first;
-					Eigen::Vector2f pos_2(pos.x(), pos.y());
-					distance2 = (pos_2 - Eigen::Vector2f(v_cur_pos.pos_mesh.x(), v_cur_pos.pos_mesh.y())).norm();
-				}
-				else
-					distance2 = (Eigen::Vector2f(v_cur_pos.pos_mesh.x(), v_cur_pos.pos_mesh.y()) - Eigen::Vector2f(sample_points[b2.origin_index_in_untraveled_pointset].x(), sample_points[b2.origin_index_in_untraveled_pointset].y())).norm();
-
-				return  distance1 < distance2;
-			}) - untraveled_buildings.begin();
-
-			if (!with_exploration) {
-				m_motion_status = Motion_status::reconstruction;
-				m_current_building_id = untraveled_buildings[0].origin_index_in_building_vector;
-				return;
-			}
-
-			if (untraveled_buildings[next_target_id].origin_index_in_building_vector == -1) {
-				m_motion_status = Motion_status::exploration;
-				m_current_exploration_id = untraveled_buildings[next_target_id].origin_index_in_untraveled_pointset;
-
-				/*m_exploration_point.emplace(
-					Eigen::Vector3f(
-						sample_points[m_current_exploration_id].x() - DISTANCE_THRESHOLD * 0.3,
-						sample_points[m_current_exploration_id].y(),
-						100),
-					Eigen::Vector3f(0, 1, -std::tan(64.f / 180 * M_PI)).normalized()
-				);
-				m_exploration_point.emplace(
-					Eigen::Vector3f(
-						sample_points[m_current_exploration_id].x() - DISTANCE_THRESHOLD * 0.1,
-						sample_points[m_current_exploration_id].y(),
-						100),
-					Eigen::Vector3f(1, 0, -std::tan(64.f / 180 * M_PI)).normalized()
-				);
-				m_exploration_point.emplace(
-					Eigen::Vector3f(
-						sample_points[m_current_exploration_id].x() + DISTANCE_THRESHOLD * 0.1,
-						sample_points[m_current_exploration_id].y(),
-						100),
-					Eigen::Vector3f(0, -1, -std::tan(64.f / 180 * M_PI)).normalized()
-				);
-				m_exploration_point.emplace(
-					Eigen::Vector3f(
-						sample_points[m_current_exploration_id].x() + DISTANCE_THRESHOLD * 0.3,
-						sample_points[m_current_exploration_id].y(),
-						100),
-					Eigen::Vector3f(-1, 0, -std::tan(64.f / 180 * M_PI)).normalized()
-				);*/
-				m_exploration_point.emplace(
-					Eigen::Vector3f(
-						sample_points[m_current_exploration_id].x(),
-						sample_points[m_current_exploration_id].y(),
-						100),
-					Eigen::Vector3f(-1, 0, -std::tan(64.f / 180 * M_PI)).normalized()
-				);
-
-			}
-			else {
-				m_motion_status = Motion_status::reconstruction;
-				m_current_building_id = untraveled_buildings[next_target_id].origin_index_in_building_vector;
-			}
-			return;
-	}
-
-	void update_uncertainty(const Pos_Pack& v_cur_pos, const std::vector<Building>& v_buildings) override {
-		Eigen::Vector2f cur_point_cgal(v_cur_pos.pos_mesh.x(), v_cur_pos.pos_mesh.y());
-		int nearest_region_id = std::min_element(sample_points.begin(), sample_points.end(),
-			[&cur_point_cgal](const CGAL::Point_2<K>& p1, const CGAL::Point_2<K>& p2) {
-				return std::pow(p1.x() - cur_point_cgal.x(), 2) + std::pow(p1.y() - cur_point_cgal.y(), 2) < std::pow(p2.x() - cur_point_cgal.x(), 2) + std::pow(p2.y() - cur_point_cgal.y(), 2);
-			}) - sample_points.begin();
-			region_status[nearest_region_id] = color_free;
-			if (m_motion_status == Motion_status::exploration)
-				already_explored[nearest_region_id] = true;
-
-			for (int i_point = 0; i_point < region_status.size(); i_point++) {
-				if (region_status[i_point] != color_unobserved)
-					continue;
-				const Eigen::Vector2f p(sample_points[i_point].x(), sample_points[i_point].y());
-
-				for (const auto& item_building : v_buildings) {
-					Eigen::AlignedBox2f box(Eigen::Vector2f(item_building.bounding_box_3d.min().x(), item_building.bounding_box_3d.min().y()),
-						Eigen::Vector2f(item_building.bounding_box_3d.max().x(), item_building.bounding_box_3d.max().y()));
-					if (p.x() > item_building.bounding_box_3d.min().x() && p.x() < item_building.bounding_box_3d.max().x() &&
-						p.y() > item_building.bounding_box_3d.min().y() && p.y() < item_building.bounding_box_3d.max().y()) {
-						region_status[i_point] = color_occupied;
-						break;
-					}
-				}
-				continue;
-			}
-	}
-
-	std::pair<Eigen::Vector3f, Eigen::Vector3f> determine_next_target(int v_frame_id, const Pos_Pack& v_cur_pos, std::vector<Building>& v_buildings, bool with_exploration, float v_threshold) override {
-		std::pair<Eigen::Vector3f, Eigen::Vector3f> next_pos;
-
-		if (m_motion_status == Motion_status::initialization) {
-			get_next_target(v_frame_id, v_cur_pos, v_buildings, with_exploration);
-			LOG(INFO) << "Initialization target !";
-		}
-
-		if (m_motion_status == Motion_status::exploration) {
-			if (m_exploration_point.size() > 0)
-			{
-				auto item = m_exploration_point.front();
-				m_exploration_point.pop();
-				return item;
-			}
-			else
-			{
-				already_explored[m_current_exploration_id] = true;
-				get_next_target(v_frame_id, v_cur_pos, v_buildings, with_exploration);
-				return determine_next_target(v_frame_id, v_cur_pos, v_buildings, with_exploration, v_threshold);
-			}
-
-		}
-		if (m_motion_status == Motion_status::reconstruction) {
-			const int& cur_building_id = m_current_building_id;
-			std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> unpassed_trajectory;
-			std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>>& passed_trajectory = v_buildings[cur_building_id].passed_trajectory;
-			int start_pos_id = 0;
-			std::copy_if(v_buildings[cur_building_id].trajectory.begin(), v_buildings[cur_building_id].trajectory.end(),
-				std::back_inserter(unpassed_trajectory),
-				[&passed_trajectory, v_threshold, &unpassed_trajectory, &start_pos_id](const auto& item_new_trajectory) {
-					bool untraveled = true;
-					for (auto item_passed_trajectory_iter = passed_trajectory.begin(); item_passed_trajectory_iter < passed_trajectory.end(); ++item_passed_trajectory_iter) {
-						auto item_passed_trajectory = *item_passed_trajectory_iter;
-						if ((item_passed_trajectory.first - item_new_trajectory.first).norm() < v_threshold) {
-							untraveled = false;
-							start_pos_id = unpassed_trajectory.size();
-							if ((item_passed_trajectory_iter - passed_trajectory.begin()) == passed_trajectory.size() - 1)
-								start_pos_id = 0;
-						}
-					}
-					return untraveled;
-				});
-
-			if (unpassed_trajectory.size() == 0) {
-				//debug_img(std::vector<cv::Mat>{cv::Mat(1, 1, CV_8UC1)});
-				//m_motion_status = Motion_status::exploration;
-				get_next_target(v_frame_id, v_cur_pos, v_buildings, with_exploration);
-				LOG(INFO) << "Change target !";
-				return determine_next_target(v_frame_id, v_cur_pos, v_buildings, with_exploration, v_threshold);
-			}
-			else {
-				if (start_pos_id >= unpassed_trajectory.size())
-					start_pos_id = 0;
-				next_pos = unpassed_trajectory.at(start_pos_id);
-				passed_trajectory.push_back(next_pos);
-				return next_pos;
-			}
-		}
-	}
-
-};
-
 class Next_best_target_reconstruction_only :public Next_best_target {
 public:
 	int m_current_exploration_id = -1;
@@ -1273,6 +1061,7 @@ public:
 	//const int CCPP_CELL_THRESHOLD = 50;
 	//const int CCPP_CELL_THRESHOLD = 70;
 	int CCPP_CELL_THRESHOLD;
+	int rotation_status = 0;
 	//const int CCPP_CELL_THRESHOLD = 10;
 
 	int m_current_ccpp_trajectory_id;
@@ -1461,7 +1250,7 @@ public:
 		// return trajectory
 		//debug_img(std::vector<cv::Mat>{map});
 		m_current_building_id = untraveled_buildings[id_building];
-		m_motion_status = Motion_status::exploration;
+		m_motion_status = Motion_status::reconstruction_in_exploration;
 		return;
 	}
 
@@ -1601,22 +1390,47 @@ public:
 							return (v_cur_pos.pos_mesh - a1.first).norm() < (v_cur_pos.pos_mesh - a2.first).norm();
 						}) - start_points.begin();
 
-						m_exploration_point.emplace(
-							start_points[nearest_id].first + DISTANCE_THRESHOLD * 0.2 * 0 * start_points[nearest_id].second,
-							Eigen::Vector3f(0, 1, -std::tan(64.f / 180 * M_PI)).normalized()
-						);
-						m_exploration_point.emplace(
-							start_points[nearest_id].first + DISTANCE_THRESHOLD * 0.2 * 1 * start_points[nearest_id].second,
-							Eigen::Vector3f(1, 0, -std::tan(64.f / 180 * M_PI)).normalized()
-						);
-						m_exploration_point.emplace(
-							start_points[nearest_id].first + DISTANCE_THRESHOLD * 0.2 * 2 * start_points[nearest_id].second,
-							Eigen::Vector3f(0, -1, -std::tan(64.f / 180 * M_PI)).normalized()
-						);
-						m_exploration_point.emplace(
-							start_points[nearest_id].first + DISTANCE_THRESHOLD * 0.2 * 3 * start_points[nearest_id].second,
-							Eigen::Vector3f(-1, 0, -std::tan(64.f / 180 * M_PI)).normalized()
-						);
+						if (rotation_status == 0)
+						{
+							m_exploration_point.emplace(
+								start_points[nearest_id].first + DISTANCE_THRESHOLD * 0.2 * 0 * start_points[nearest_id].second,
+								Eigen::Vector3f(0, 1, -std::tan(64.f / 180 * M_PI)).normalized()
+							);
+							m_exploration_point.emplace(
+								start_points[nearest_id].first + DISTANCE_THRESHOLD * 0.2 * 1 * start_points[nearest_id].second,
+								Eigen::Vector3f(1, 0, -std::tan(64.f / 180 * M_PI)).normalized()
+							);
+							m_exploration_point.emplace(
+								start_points[nearest_id].first + DISTANCE_THRESHOLD * 0.2 * 2 * start_points[nearest_id].second,
+								Eigen::Vector3f(0, -1, -std::tan(64.f / 180 * M_PI)).normalized()
+							);
+							m_exploration_point.emplace(
+								start_points[nearest_id].first + DISTANCE_THRESHOLD * 0.2 * 3 * start_points[nearest_id].second,
+								Eigen::Vector3f(-1, 0, -std::tan(64.f / 180 * M_PI)).normalized()
+							);
+							rotation_status = 1;
+						}
+						else
+						{
+							m_exploration_point.emplace(
+								start_points[nearest_id].first + DISTANCE_THRESHOLD * 0.2 * 0 * start_points[nearest_id].second,
+								Eigen::Vector3f(0, 1, -std::tan(64.f / 180 * M_PI)).normalized()
+							);
+							m_exploration_point.emplace(
+								start_points[nearest_id].first + DISTANCE_THRESHOLD * 0.2 * 1 * start_points[nearest_id].second,
+								Eigen::Vector3f(-1, 0, -std::tan(64.f / 180 * M_PI)).normalized()
+							);
+							m_exploration_point.emplace(
+								start_points[nearest_id].first + DISTANCE_THRESHOLD * 0.2 * 2 * start_points[nearest_id].second,
+								Eigen::Vector3f(0, -1, -std::tan(64.f / 180 * M_PI)).normalized()
+							);
+							m_exploration_point.emplace(
+								start_points[nearest_id].first + DISTANCE_THRESHOLD * 0.2 * 3 * start_points[nearest_id].second,
+								Eigen::Vector3f(1, 0, -std::tan(64.f / 180 * M_PI)).normalized()
+							);
+							rotation_status = 0;
+						}
+						
 						
 						/*m_exploration_point.emplace(
 							Eigen::Vector3f(
@@ -1673,32 +1487,76 @@ public:
 			const int& cur_building_id = m_current_building_id;
 			std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> unpassed_trajectory;
 			std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>>& passed_trajectory = v_buildings[cur_building_id].passed_trajectory;
+			int start_pos_id = 0;
 			std::copy_if(v_buildings[cur_building_id].trajectory.begin(), v_buildings[cur_building_id].trajectory.end(),
 				std::back_inserter(unpassed_trajectory),
-				[&passed_trajectory, v_threshold](const auto& item_new_trajectory) {
-				bool untraveled = true;
-				for (const auto& item_passed_trajectory : passed_trajectory)
-					if ((item_passed_trajectory.first - item_new_trajectory.first).norm() < v_threshold) {
-						untraveled = false;
+				[&passed_trajectory, v_threshold, &unpassed_trajectory, &start_pos_id](const auto& item_new_trajectory) {
+					bool untraveled = true;
+					for (auto item_passed_trajectory_iter = passed_trajectory.begin(); item_passed_trajectory_iter < passed_trajectory.end(); ++item_passed_trajectory_iter) {
+						auto item_passed_trajectory = *item_passed_trajectory_iter;
+						//Eigen::Vector3f vector1 = item_passed_trajectory.second - item_passed_trajectory.first;
+						//Eigen::Vector3f vector2 = item_new_trajectory.second - item_new_trajectory.first;
+						float dot_product = item_passed_trajectory.second.dot(item_new_trajectory.second);
+						if (dot_product > 1)
+							dot_product = 1;
+						float angle = std::acos(dot_product) / M_PI * 180;
+						if (angle >= 180)
+							angle = 0;
+						if ((item_passed_trajectory.first - item_new_trajectory.first).norm() < v_threshold && angle < 5) {
+							untraveled = false;
+							start_pos_id = unpassed_trajectory.size();
+							if ((item_passed_trajectory_iter - passed_trajectory.begin()) == passed_trajectory.size() - 1)
+								start_pos_id = 0;
+						}
 					}
-				return untraveled;
-			});
+					return untraveled;
+				});
 
 			if (unpassed_trajectory.size() == 0) {
-				//debug_img(std::vector<cv::Mat>{cv::Mat(1,1,CV_8UC1)});
+				//debug_img(std::vector<cv::Mat>{cv::Mat(1, 1, CV_8UC1)});
 				m_motion_status = Motion_status::exploration;
 				next_pos = determine_next_target(v_frame_id, v_cur_pos, v_buildings, with_exploration, v_threshold);
+				//get_next_target(v_frame_id, v_cur_pos, v_buildings, with_exploration);
+				//LOG(INFO) << "Change target !";
+				//return determine_next_target(v_frame_id, v_cur_pos, v_buildings, with_exploration, v_threshold);
 			}
-			else
-			{
-				auto it_min_distance = std::min_element(
-					unpassed_trajectory.begin(), unpassed_trajectory.end(),
-					[&v_cur_pos](const auto& t1, const auto& t2) {
-					return (t1.first - v_cur_pos.pos_mesh).norm() < (t2.first - v_cur_pos.pos_mesh).norm();
-				});
-				next_pos = *it_min_distance;
+			else {
+				if (start_pos_id >= unpassed_trajectory.size())
+					start_pos_id = 0;
+				next_pos = unpassed_trajectory.at(start_pos_id);
 				passed_trajectory.push_back(next_pos);
+				return next_pos;
 			}
+			
+			//const int& cur_building_id = m_current_building_id;
+			//std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> unpassed_trajectory;
+			//std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>>& passed_trajectory = v_buildings[cur_building_id].passed_trajectory;
+			//std::copy_if(v_buildings[cur_building_id].trajectory.begin(), v_buildings[cur_building_id].trajectory.end(),
+			//	std::back_inserter(unpassed_trajectory),
+			//	[&passed_trajectory, v_threshold](const auto& item_new_trajectory) {
+			//	bool untraveled = true;
+			//	for (const auto& item_passed_trajectory : passed_trajectory)
+			//		if ((item_passed_trajectory.first - item_new_trajectory.first).norm() < v_threshold) {
+			//			untraveled = false;
+			//		}
+			//	return untraveled;
+			//});
+
+			//if (unpassed_trajectory.size() == 0) {
+			//	//debug_img(std::vector<cv::Mat>{cv::Mat(1,1,CV_8UC1)});
+			//	m_motion_status = Motion_status::exploration;
+			//	next_pos = determine_next_target(v_frame_id, v_cur_pos, v_buildings, with_exploration, v_threshold);
+			//}
+			//else
+			//{
+			//	auto it_min_distance = std::min_element(
+			//		unpassed_trajectory.begin(), unpassed_trajectory.end(),
+			//		[&v_cur_pos](const auto& t1, const auto& t2) {
+			//		return (t1.first - v_cur_pos.pos_mesh).norm() < (t2.first - v_cur_pos.pos_mesh).norm();
+			//	});
+			//	next_pos = *it_min_distance;
+			//	passed_trajectory.push_back(next_pos);
+			//}
 		}
 		return next_pos;
 	}
@@ -1880,6 +1738,223 @@ public:
 			}
 		}
 	}
+
+};
+
+
+class Next_best_target_order_reconstruction :public Next_best_target_topology_exploration {
+public:
+	Next_best_target_order_reconstruction(const Eigen::Vector3f& v_map_start_mesh, const Eigen::Vector3f& v_map_end_mesh,
+		int v_CCPP_CELL_THRESHOLD, const Polygon_2& m_boundary, float v_ccpp_cell_distance)
+	:Next_best_target_topology_exploration(v_map_start_mesh, v_map_end_mesh, v_CCPP_CELL_THRESHOLD, m_boundary, v_ccpp_cell_distance){}
+	
+	//int m_current_exploration_id = -1;
+	//cv::Vec3b color_unobserved, color_free, color_occupied;
+
+	//std::vector<bool> already_explored;
+
+	//std::queue<std::pair<Eigen::Vector3f, Eigen::Vector3f>> m_exploration_point;
+
+	//Next_best_target_order_reconstruction(const Eigen::Vector3f& v_map_start_mesh, const Eigen::Vector3f& v_map_end_mesh, float v_ccpp_cell_distance)
+	//	:Next_best_target(v_map_start_mesh, v_map_end_mesh, v_ccpp_cell_distance) {
+	//	color_unobserved = region_viz_color[0];
+	//	color_free = region_viz_color[1];
+	//	color_occupied = region_viz_color[2];
+	//	already_explored.resize(region_status.size(), false);
+	//}
+
+	//void get_next_target(int frame_id, const Pos_Pack& v_cur_pos, const std::vector<Building>& v_buildings, bool with_exploration) override {
+	//	// Find next building in current cell
+	//	std::vector<Next_target> untraveled_buildings;
+	//	for (int i_building = 0; i_building < v_buildings.size(); ++i_building) {
+	//		if (v_buildings[i_building].passed_trajectory.size() == 0
+	//			//&& (v_buildings[i_building].bounding_box_3d.center().block(0,0,2,1)-Eigen::Vector2f(sample_points[m_current_exploration_id].x(), sample_points[m_current_exploration_id].y())).norm()<DISTANCE_THRESHOLD/2
+	//			)
+	//			untraveled_buildings.emplace_back(i_building, -1);
+	//	}
+	//	if (untraveled_buildings.size() == 0 && with_exploration)
+	//	{
+	//		for (int i_point = 0; i_point < sample_points.size(); ++i_point)
+	//			if (!already_explored[i_point])
+	//				//if (region_status[i_point]==color_unobserved)
+	//				untraveled_buildings.emplace_back(-1, i_point);
+	//	}
+
+	//	if (untraveled_buildings.size() == 0) {
+	//		m_motion_status = Motion_status::done;
+	//		return;
+	//	}
+
+	//	int next_target_id = std::min_element(untraveled_buildings.begin(),
+	//		untraveled_buildings.end(),
+	//		[&v_cur_pos, &v_buildings, this](const Next_target& b1, const Next_target& b2) {
+	//			float distance1, distance2;
+	//			if (b1.origin_index_in_building_vector != -1)
+	//			{
+	//				int id_trajectory = v_buildings[b1.origin_index_in_building_vector].find_nearest_trajectory_2d(v_cur_pos.pos_mesh);
+	//				Eigen::Vector3f pos = v_buildings[b1.origin_index_in_building_vector].trajectory[id_trajectory].first;
+	//				Eigen::Vector2f pos_2(pos.x(), pos.y());
+	//				distance1 = (pos_2 - Eigen::Vector2f(v_cur_pos.pos_mesh.x(), v_cur_pos.pos_mesh.y())).norm();
+	//			}
+	//			else
+	//			{
+	//				distance1 = (Eigen::Vector2f(v_cur_pos.pos_mesh.x(), v_cur_pos.pos_mesh.y()) - Eigen::Vector2f(sample_points[b1.origin_index_in_untraveled_pointset].x(), sample_points[b1.origin_index_in_untraveled_pointset].y())).norm();
+	//			}
+	//			if (b2.origin_index_in_building_vector != -1)
+	//			{
+	//				int id_trajectory = v_buildings[b2.origin_index_in_building_vector].find_nearest_trajectory_2d(v_cur_pos.pos_mesh);
+	//				Eigen::Vector3f pos = v_buildings[b2.origin_index_in_building_vector].trajectory[id_trajectory].first;
+	//				Eigen::Vector2f pos_2(pos.x(), pos.y());
+	//				distance2 = (pos_2 - Eigen::Vector2f(v_cur_pos.pos_mesh.x(), v_cur_pos.pos_mesh.y())).norm();
+	//			}
+	//			else
+	//				distance2 = (Eigen::Vector2f(v_cur_pos.pos_mesh.x(), v_cur_pos.pos_mesh.y()) - Eigen::Vector2f(sample_points[b2.origin_index_in_untraveled_pointset].x(), sample_points[b2.origin_index_in_untraveled_pointset].y())).norm();
+
+	//			return  distance1 < distance2;
+	//		}) - untraveled_buildings.begin();
+
+	//		if (!with_exploration) {
+	//			m_motion_status = Motion_status::reconstruction;
+	//			m_current_building_id = untraveled_buildings[0].origin_index_in_building_vector;
+	//			return;
+	//		}
+
+	//		if (untraveled_buildings[next_target_id].origin_index_in_building_vector == -1) {
+	//			m_motion_status = Motion_status::exploration;
+	//			m_current_exploration_id = untraveled_buildings[next_target_id].origin_index_in_untraveled_pointset;
+
+	//			/*m_exploration_point.emplace(
+	//				Eigen::Vector3f(
+	//					sample_points[m_current_exploration_id].x() - DISTANCE_THRESHOLD * 0.3,
+	//					sample_points[m_current_exploration_id].y(),
+	//					100),
+	//				Eigen::Vector3f(0, 1, -std::tan(64.f / 180 * M_PI)).normalized()
+	//			);
+	//			m_exploration_point.emplace(
+	//				Eigen::Vector3f(
+	//					sample_points[m_current_exploration_id].x() - DISTANCE_THRESHOLD * 0.1,
+	//					sample_points[m_current_exploration_id].y(),
+	//					100),
+	//				Eigen::Vector3f(1, 0, -std::tan(64.f / 180 * M_PI)).normalized()
+	//			);
+	//			m_exploration_point.emplace(
+	//				Eigen::Vector3f(
+	//					sample_points[m_current_exploration_id].x() + DISTANCE_THRESHOLD * 0.1,
+	//					sample_points[m_current_exploration_id].y(),
+	//					100),
+	//				Eigen::Vector3f(0, -1, -std::tan(64.f / 180 * M_PI)).normalized()
+	//			);
+	//			m_exploration_point.emplace(
+	//				Eigen::Vector3f(
+	//					sample_points[m_current_exploration_id].x() + DISTANCE_THRESHOLD * 0.3,
+	//					sample_points[m_current_exploration_id].y(),
+	//					100),
+	//				Eigen::Vector3f(-1, 0, -std::tan(64.f / 180 * M_PI)).normalized()
+	//			);*/
+	//			m_exploration_point.emplace(
+	//				Eigen::Vector3f(
+	//					sample_points[m_current_exploration_id].x(),
+	//					sample_points[m_current_exploration_id].y(),
+	//					100),
+	//				Eigen::Vector3f(-1, 0, -std::tan(64.f / 180 * M_PI)).normalized()
+	//			);
+
+	//		}
+	//		else {
+	//			m_motion_status = Motion_status::reconstruction;
+	//			m_current_building_id = untraveled_buildings[next_target_id].origin_index_in_building_vector;
+	//		}
+	//		return;
+	//}
+
+	//void update_uncertainty(const Pos_Pack& v_cur_pos, const std::vector<Building>& v_buildings) override {
+	//	Eigen::Vector2f cur_point_cgal(v_cur_pos.pos_mesh.x(), v_cur_pos.pos_mesh.y());
+	//	int nearest_region_id = std::min_element(sample_points.begin(), sample_points.end(),
+	//		[&cur_point_cgal](const CGAL::Point_2<K>& p1, const CGAL::Point_2<K>& p2) {
+	//			return std::pow(p1.x() - cur_point_cgal.x(), 2) + std::pow(p1.y() - cur_point_cgal.y(), 2) < std::pow(p2.x() - cur_point_cgal.x(), 2) + std::pow(p2.y() - cur_point_cgal.y(), 2);
+	//		}) - sample_points.begin();
+	//		region_status[nearest_region_id] = color_free;
+	//		if (m_motion_status == Motion_status::exploration)
+	//			already_explored[nearest_region_id] = true;
+
+	//		for (int i_point = 0; i_point < region_status.size(); i_point++) {
+	//			if (region_status[i_point] != color_unobserved)
+	//				continue;
+	//			const Eigen::Vector2f p(sample_points[i_point].x(), sample_points[i_point].y());
+
+	//			for (const auto& item_building : v_buildings) {
+	//				Eigen::AlignedBox2f box(Eigen::Vector2f(item_building.bounding_box_3d.min().x(), item_building.bounding_box_3d.min().y()),
+	//					Eigen::Vector2f(item_building.bounding_box_3d.max().x(), item_building.bounding_box_3d.max().y()));
+	//				if (p.x() > item_building.bounding_box_3d.min().x() && p.x() < item_building.bounding_box_3d.max().x() &&
+	//					p.y() > item_building.bounding_box_3d.min().y() && p.y() < item_building.bounding_box_3d.max().y()) {
+	//					region_status[i_point] = color_occupied;
+	//					break;
+	//				}
+	//			}
+	//			continue;
+	//		}
+	//}
+
+	//std::pair<Eigen::Vector3f, Eigen::Vector3f> determine_next_target(int v_frame_id, const Pos_Pack& v_cur_pos, std::vector<Building>& v_buildings, bool with_exploration, float v_threshold) override {
+	//	std::pair<Eigen::Vector3f, Eigen::Vector3f> next_pos;
+
+	//	if (m_motion_status == Motion_status::initialization) {
+	//		get_next_target(v_frame_id, v_cur_pos, v_buildings, with_exploration);
+	//		LOG(INFO) << "Initialization target !";
+	//	}
+
+	//	if (m_motion_status == Motion_status::exploration) {
+	//		if (m_exploration_point.size() > 0)
+	//		{
+	//			auto item = m_exploration_point.front();
+	//			m_exploration_point.pop();
+	//			return item;
+	//		}
+	//		else
+	//		{
+	//			already_explored[m_current_exploration_id] = true;
+	//			get_next_target(v_frame_id, v_cur_pos, v_buildings, with_exploration);
+	//			return determine_next_target(v_frame_id, v_cur_pos, v_buildings, with_exploration, v_threshold);
+	//		}
+
+	//	}
+	//	if (m_motion_status == Motion_status::reconstruction) {
+	//		const int& cur_building_id = m_current_building_id;
+	//		std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> unpassed_trajectory;
+	//		std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>>& passed_trajectory = v_buildings[cur_building_id].passed_trajectory;
+	//		int start_pos_id = 0;
+	//		std::copy_if(v_buildings[cur_building_id].trajectory.begin(), v_buildings[cur_building_id].trajectory.end(),
+	//			std::back_inserter(unpassed_trajectory),
+	//			[&passed_trajectory, v_threshold, &unpassed_trajectory, &start_pos_id](const auto& item_new_trajectory) {
+	//				bool untraveled = true;
+	//				for (auto item_passed_trajectory_iter = passed_trajectory.begin(); item_passed_trajectory_iter < passed_trajectory.end(); ++item_passed_trajectory_iter) {
+	//					auto item_passed_trajectory = *item_passed_trajectory_iter;
+	//					if ((item_passed_trajectory.first - item_new_trajectory.first).norm() < v_threshold) {
+	//						untraveled = false;
+	//						start_pos_id = unpassed_trajectory.size();
+	//						if ((item_passed_trajectory_iter - passed_trajectory.begin()) == passed_trajectory.size() - 1)
+	//							start_pos_id = 0;
+	//					}
+	//				}
+	//				return untraveled;
+	//			});
+
+	//		if (unpassed_trajectory.size() == 0) {
+	//			//debug_img(std::vector<cv::Mat>{cv::Mat(1, 1, CV_8UC1)});
+	//			//m_motion_status = Motion_status::exploration;
+	//			get_next_target(v_frame_id, v_cur_pos, v_buildings, with_exploration);
+	//			LOG(INFO) << "Change target !";
+	//			return determine_next_target(v_frame_id, v_cur_pos, v_buildings, with_exploration, v_threshold);
+	//		}
+	//		else {
+	//			if (start_pos_id >= unpassed_trajectory.size())
+	//				start_pos_id = 0;
+	//			next_pos = unpassed_trajectory.at(start_pos_id);
+	//			passed_trajectory.push_back(next_pos);
+	//			return next_pos;
+	//		}
+	//	}
+	//}
 
 };
 
@@ -2538,7 +2613,8 @@ int main(int argc, char** argv){
 	else if (args["nbv_target"] == "Min_distance")
 		next_best_target = new Next_best_target_min_distance_ccpp(map_start_mesh, map_end_mesh, args["ccpp_cell_distance"].asFloat());
 	else if (args["nbv_target"] == "Order_reconstruction")
-		next_best_target = new Next_best_target_order_reconstruction(map_start_mesh, map_end_mesh, args["ccpp_cell_distance"].asFloat());
+		next_best_target = new Next_best_target_order_reconstruction(map_start_mesh, map_end_mesh,
+			args["CCPP_CELL_THRESHOLD"].asInt(), mapper->m_boundary, args["ccpp_cell_distance"].asFloat());
 	else if (args["nbv_target"] == "Random_min_distance")
 		next_best_target = new Next_best_target_random_min_distance(map_start_mesh, map_end_mesh, args["ccpp_cell_distance"].asFloat());
 	else if (args["nbv_target"] == "Min_max_information")
@@ -2595,7 +2671,7 @@ int main(int argc, char** argv){
 			// Determine next position
 			{
 				next_pos_direction = next_best_target->determine_next_target(cur_frame_id, current_pos,
-					total_buildings, with_exploration, args["with_exploration"].asBool() ? args["step"].asFloat() - .5f : overlap_step / 2);
+					total_buildings, with_exploration,  overlap_step /  2);
 				LOG(INFO) << "Determine next position ??";
 			}
 			// End
@@ -2737,7 +2813,6 @@ int main(int argc, char** argv){
 		
 	}
 	total_passed_trajectory.pop_back();
-	debug_img(std::vector<cv::Mat>{height_map.m_map_dilated});
 
 	write_unreal_path(total_passed_trajectory, "camera_after_transaction.log");
 	write_normal_path(total_passed_trajectory, "camera_normal.log");
@@ -2790,6 +2865,8 @@ int main(int argc, char** argv){
 	LOG(ERROR) <<"Max_turn: "<< max_turn;
 	LOG(ERROR) << "Write trajectory done!";
 	height_map.save_height_map_tiff("height_map.tiff");
+	debug_img(std::vector<cv::Mat>{height_map.m_map_dilated});
+	
 	{
 		viz->lock();
 		viz->m_buildings = total_buildings;

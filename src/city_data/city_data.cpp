@@ -130,11 +130,16 @@ std::vector<ImageCluster> solveCluster(const cv::Mat& vSeg, const std::map<cv::V
 	int small_building_num = 0;
 	for (auto colorIter = currentColor.begin(); colorIter != currentColor.end(); colorIter++) {
 		ImageCluster cluster;
-		if (bbox[colorIter->second].first.size() < 50 * 50)
+		if (bbox[colorIter->second].first.size() < 30 * 30)
 		{
 			small_building_num++;
 			continue;
 		}
+		//if (bbox[colorIter->second].first.size() < 30 * 30)
+		//{
+		//	isValid = false;
+		//	break;
+		//}
 		cluster.box = CGAL::Bbox_2(
 			*std::min_element(bbox[colorIter->second].first.begin(), bbox[colorIter->second].first.end()),
 			*std::min_element(bbox[colorIter->second].second.begin(), bbox[colorIter->second].second.end()),
@@ -525,7 +530,7 @@ int main(int argc, char* argv[])
 					if(height_map.get_height(pos_pack.pos_mesh.x(), pos_pack.pos_mesh.y()) + 30 > pos_pack.pos_mesh.z())
 						continue;
 
-					for (float pitch_degree = 45;pitch_degree <= 45;pitch_degree += args["COLLECTION_STEP_PITCH_DEGREE"].asFloat())
+					for (float pitch_degree = 63;pitch_degree <= 63;pitch_degree += args["COLLECTION_STEP_PITCH_DEGREE"].asFloat())
 						for (float yaw_degree = 0;yaw_degree <= 360;yaw_degree += args["COLLECTION_STEP_YAW_DEGREE"].asFloat())
 							place_to_be_travel.push_back(map_converter.get_pos_pack_from_unreal(
 								cur_pos_unreal, 

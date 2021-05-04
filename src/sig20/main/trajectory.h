@@ -160,8 +160,9 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> simplify_path_reduce_wa
 
 void write_wgs_path(const Json::Value& v_args,const std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>>& v_trajectories,const std::string& v_path) {
 	//Eigen::Vector2f origin_wgs(113.92332,22.64429); // Yingrenshi
-	Eigen::Vector2f origin_wgs(v_args["geo_origin"][0].asFloat(), v_args["geo_origin"][1].asFloat());
-	Eigen::Vector2f origin_xy=lonLat2Mercator(origin_wgs);
+	Eigen::Vector3f origin_wgs(v_args["geo_origin"][0].asFloat(), v_args["geo_origin"][1].asFloat(), 0.f);
+	//Eigen::Vector2f origin_xy=lonLat2Mercator(origin_wgs);
+	Eigen::Vector2f origin_xy(origin_wgs.x(), origin_wgs.y());
 	std::ofstream pose(v_path+"camera_wgs_0.txt");
 
 	for (int i_id = 0; i_id < v_trajectories.size(); i_id++) {
@@ -175,7 +176,7 @@ void write_wgs_path(const Json::Value& v_args,const std::vector<std::pair<Eigen:
 			180. / M_PI;
 		float yaw = -std::atan2f(direction[1], direction[0]) * 180. / M_PI + 90.f;
 
-		pose << (fmt % pos_wgs[0] % pos_wgs[1] % position[2] % yaw % pitch).str();
+		pose << (fmt % pos_wgs[0] % pos_wgs[1] % (position[2]+ origin_wgs.z()) % yaw % pitch).str();
 		if(i_id%180==179)
 		{
 			pose.close();
@@ -573,8 +574,9 @@ bool generate_next_view_curvature(const Trajectory_params& v_params,
 
 std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> find_short_cut(
 	const std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>>& v_trajectory,
-	const Height_map& v_height_map, const float Z_UP_BOUNDS,const Eigen::Vector3f& v_center)
+	const Height_map& v_height_map, const float Z_UP_BOUNDS,const Building& v_cur_building)
 {
+	Eigen::Vector3f center = v_cur_building.bounding_box_3d.center();
 	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> safe_trajectory;
 
 	for (auto item : v_trajectory) {
@@ -585,10 +587,10 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> find_short_cut(
 		}
 		
 		
-		if(safe_position.z() > 1 * item.first.z())
+		if(safe_position.z() > 1 * item.first.z()&& v_height_map.get_height(safe_position.x(), safe_position.y()) > v_cur_building.bounding_box_3d.max().z())
 		{
 			safe_position = item.first;
-			Eigen::Vector3f direction = v_center - safe_position;
+			Eigen::Vector3f direction = center - safe_position;
 			direction.z() = 0;
 			direction.normalize();
 			direction.z() = 1;
@@ -617,7 +619,7 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 	if (v_params.split_flag)
 	{
 		//float min_distance = (v_params.z_up_bounds * tan((v_params.fov / 2 + 60.f) / 180.f * M_PI) - 35) / 3 * 4;
-		float min_distance = 70;
+		float min_distance = 65;
 		for (auto item_building : v_buildings)
 		{
 			int split_width_num = int((item_building.bounding_box_3d.max().x() - item_building.bounding_box_3d.min().x()) / min_distance + 0.5);
@@ -888,24 +890,25 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 		}
 		
 		if(v_params.with_erosion)
-			item_trajectory = find_short_cut(item_trajectory, v_height_map, v_z_up_bound, splited_buildings[id_building].bounding_box_3d.center());
+			item_trajectory = find_short_cut(item_trajectory, v_height_map, v_z_up_bound, v_buildings[id_building]);
 		else
 			item_trajectory = ensure_safe_trajectory_and_calculate_direction(item_trajectory, v_height_map, v_z_up_bound);
 
-		// Remove duplication
-		std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> clean_trajectory;
-		std::copy_if(item_trajectory.begin(), item_trajectory.end(),
-			std::back_inserter(clean_trajectory),
-			[&item_trajectory, overlap_step, &clean_trajectory](const auto& item_new_trajectory) {
-				bool untraveled = true;
-				for (const auto& item_passed_trajectory : clean_trajectory)
-					if ((item_passed_trajectory.first - item_new_trajectory.first).norm() < overlap_step / 2) {
-						untraveled = false;
-					}
-				return untraveled;
-			});
+		//// Remove duplication
+		//std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> clean_trajectory;
+		//std::copy_if(item_trajectory.begin(), item_trajectory.end(),
+		//	std::back_inserter(clean_trajectory),
+		//	[&item_trajectory, overlap_step, &clean_trajectory](const auto& item_new_trajectory) {
+		//		bool untraveled = true;
+		//		for (const auto& item_passed_trajectory : clean_trajectory)
+		//			if ((item_passed_trajectory.first - item_new_trajectory.first).norm() < overlap_step / 2) {
+		//				untraveled = false;
+		//			}
+		//		return untraveled;
+		//	});
+		//splited_buildings[id_building].trajectory = clean_trajectory;
 
-		splited_buildings[id_building].trajectory = clean_trajectory;
+		splited_buildings[id_building].trajectory = item_trajectory;
 		v_buildings = splited_buildings;
 		total_trajectory.insert(total_trajectory.end(), item_trajectory.begin(), item_trajectory.end());
 	}
