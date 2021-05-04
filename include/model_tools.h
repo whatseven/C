@@ -63,8 +63,8 @@ void clean_materials(tinyobj::shape_t& shape, std::vector<tinyobj::material_t>& 
 Get split mesh with a big whole mesh
 */
 void merge_obj(const std::string& v_file,
-    const std::vector<tinyobj::attrib_t>& v_attribs, const std::vector<tinyobj::shape_t>& saved_shapes,
-    const std::vector<tinyobj::_material_t>& materials,
+    const std::vector<tinyobj::attrib_t>& v_attribs, const std::vector<std::vector<tinyobj::shape_t>>& saved_shapes,
+    const std::vector < std::vector<tinyobj::_material_t>>& materials,
     const int start_id = 0);
 
 // @brief: Split the whole obj into small object and store them separatly. 

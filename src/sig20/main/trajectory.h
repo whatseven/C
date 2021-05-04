@@ -31,6 +31,15 @@ Eigen::Vector2f mercator2lonLat(const Eigen::Vector2f& mercator) {
 	return lonLat;
 }
 
+Eigen::Vector3f wgs2cgcs2000(const Eigen::Vector3f& v_wgs) {
+	Eigen::Matrix3f converter;
+	converter << 0.999997079, 3.47778126e-7, -2.6082455e-7, 3.21041821e-8, 1, 2.14655547e-8, 2.13904843e-7, -3.436997e-8, 1;
+
+	Eigen::Vector3f cgcs2000 = converter * v_wgs;
+	return cgcs2000;
+}
+
+
 void write_unreal_path(const std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>>& v_trajectories,
                        const std::string& v_path)
 {
@@ -324,10 +333,9 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> read_smith_trajectory(c
 	return o_trajectories;
 }
 
-
-std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> read_wgs84_trajectory(const std::string& v_path)
+std::vector<std::pair<Eigen::Vector3f, Eigen::Vector2f>> read_wgs84_trajectory(const std::string& v_path)
 {
-	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> o_trajectories;
+	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector2f>> o_trajectories;
 	std::ifstream pose(v_path);
 	if (!pose.is_open()) throw "File not opened";
 
@@ -346,23 +354,13 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> read_wgs84_trajectory(c
 		float pitch = std::atof(tokens[4].c_str());
 		float yaw = std::atof(tokens[3].c_str());
 
-		float dz = std::sin(pitch / 180.f * M_PI);
-		float dxdy = std::cos(pitch / 180.f * M_PI);
-		float dy = std::cos(yaw / 180.f * M_PI) * dxdy;
-		float dx = std::sin(yaw / 180.f * M_PI) * dxdy;
-
-		float wsg_x = std::atof(tokens[0].c_str());
-		float wsg_y = std::atof(tokens[1].c_str());
+		float longitude = std::atof(tokens[0].c_str());
+		float latitude = std::atof(tokens[1].c_str());
 		float z = std::atof(tokens[2].c_str());
 
-		float x = wsg_x * 20037508.34f / 180.f - 12766000;
-		float y = log(tan((90 + wsg_y) * M_PI / 360.f)) / (M_PI / 180.f) * 20037508.34f / 180.f - 2590000;
-
-		Eigen::Vector3f direction(dx, dy, dz);
-
 		o_trajectories.push_back(std::make_pair(
-			Eigen::Vector3f(x, y, z),
-			direction.normalized()
+			Eigen::Vector3f(longitude, latitude, z),
+			Eigen::Vector2f(pitch,yaw)
 		));
 	}
 	while (!pose.eof());
