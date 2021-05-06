@@ -17,6 +17,8 @@
 #include <eigen3/Eigen/Geometry>
 #include <eigen3/Eigen/Sparse>
 
+#include <opencv2/opencv.hpp>
+
 typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
 typedef K::Point_2 Point_2;
 typedef K::Point_3 Point_3;
@@ -45,6 +47,36 @@ typedef CGAL::AABB_traits<K2, Primitive_tri> AABB_triangle_traits;
 typedef CGAL::AABB_tree<AABB_triangle_traits> Tree_tri;
 typedef boost::optional<Tree_tri::Intersection_and_primitive_id<Segment>::Type > Segment_intersection;
 
+struct Rotated_box
+{
+	cv::RotatedRect cv_box;
+	Eigen::AlignedBox3f box;
+	float angle;
+	Rotated_box(){};
+	Rotated_box(const Eigen::AlignedBox3f& v_box):box(v_box),angle(0.f)
+	{
+		cv_box = cv::RotatedRect(cv::Point2f(v_box.center().x(), v_box.center().y()), cv::Size2f(v_box.sizes().x(), v_box.sizes().y()),0.f);
+	}
+
+	bool inside_2d(const Eigen::Vector3f& v_point) const
+	{
+		Eigen::Vector2f point(v_point.x(), v_point.y());
+		float s = std::sin(-angle);
+		float c = std::cos(-angle);
+
+		// set origin to rect center
+		Eigen::Vector2f newPoint = point - Eigen::Vector2f(box.center().x(), box.center().y());
+		// rotate
+		newPoint = Eigen::Vector2f(newPoint.x() * c - newPoint.y() * s, newPoint.x() * s + newPoint.y() * c);
+		// put origin back
+		newPoint = newPoint + Eigen::Vector2f(box.center().x(), box.center().y());
+		if (newPoint.x() >= box.min().x() && newPoint.x() <= box.max().x() && newPoint.y() >= box.min().y() && newPoint.y() <= box.max().y())
+			return true;
+		else
+			return false;
+	}
+	
+};
 
 // @brief: 
 // @notice: Currently only transfer vertices to the cgal Surface mesh
@@ -54,5 +86,6 @@ Surface_mesh convert_obj_from_tinyobjloader_to_surface_mesh(
 	const std::tuple<tinyobj::attrib_t, std::vector<tinyobj::shape_t>, std::vector<tinyobj::material_t>> v_obj_in);
 
 Eigen::AlignedBox3f get_bounding_box(const Point_set& v_point_set);
+Rotated_box get_bounding_box_rotated(const Point_set& v_point_set);
 
 #endif // CGAL_TOOLS_H

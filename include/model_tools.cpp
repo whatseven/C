@@ -1160,6 +1160,35 @@ Surface_mesh get_box_mesh(const std::vector<Eigen::AlignedBox3f>& v_boxes)
 	return mesh;
 }
 
+Surface_mesh get_rotated_box_mesh(const std::vector<Rotated_box>& v_boxes)
+{
+	Surface_mesh mesh;
+
+	for (const auto& item : v_boxes)
+	{
+		cv::Point2f cv_points[4];
+		item.cv_box.points(cv_points);
+		auto v0 = mesh.add_vertex(Point_3(cv_points[0].x, cv_points[0].y, item.box.min().z()));
+		auto v1 = mesh.add_vertex(Point_3(cv_points[1].x, cv_points[1].y, item.box.min().z()));
+		auto v2 = mesh.add_vertex(Point_3(cv_points[2].x, cv_points[2].y, item.box.min().z()));
+		auto v3 = mesh.add_vertex(Point_3(cv_points[3].x, cv_points[3].y, item.box.min().z()));
+		
+		auto v4 = mesh.add_vertex(Point_3(cv_points[0].x, cv_points[0].y, item.box.max().z()));
+		auto v5 = mesh.add_vertex(Point_3(cv_points[1].x, cv_points[1].y, item.box.max().z()));
+		auto v6 = mesh.add_vertex(Point_3(cv_points[2].x, cv_points[2].y, item.box.max().z()));
+		auto v7 = mesh.add_vertex(Point_3(cv_points[3].x, cv_points[3].y, item.box.max().z()));
+
+		mesh.add_face(v0, v1, v2, v3);
+		mesh.add_face(v4, v7, v6, v5);
+		mesh.add_face(v0, v4, v5, v1);
+		mesh.add_face(v3, v2, v6, v7);
+		mesh.add_face(v0, v3, v7, v4);
+		mesh.add_face(v1, v5, v6, v2);
+	}
+	return mesh;
+}
+
+
 void get_box_mesh_with_colors(const std::vector<Eigen::AlignedBox3f>& v_boxes,
 	const std::vector<cv::Vec3b>& v_colors,const std::string& v_name) {
 	std::ofstream f(v_name);

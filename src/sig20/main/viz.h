@@ -62,48 +62,97 @@ public:
         pangolin::glDrawLine(v_min.x(), v_min.y(), v_min.z(), v_max.x(), v_max.y(), v_max.z());
 	}
 	
-	void draw_cube(const Eigen::AlignedBox<float, 3>& box,const Eigen::Vector4f& v_color=Eigen::Vector4f(1.f,0.f,0.f,1.f))
+	void draw_cube(const Rotated_box& box,const Eigen::Vector4f& v_color=Eigen::Vector4f(1.f,0.f,0.f,1.f))
 	{
-        const Eigen::Matrix<float, 3, 1> l = box.min().template cast<float>();
-        const Eigen::Matrix<float, 3, 1> h = box.max().template cast<float>();
-        const GLfloat verts[] = {
-            l[0],l[1],h[2],  h[0],l[1],h[2],  l[0],h[1],h[2],  h[0],h[1],h[2],  // FRONT
-            l[0],l[1],l[2],  l[0],h[1],l[2],  h[0],l[1],l[2],  h[0],h[1],l[2],  // BACK
-            l[0],l[1],h[2],  l[0],h[1],h[2],  l[0],l[1],l[2],  l[0],h[1],l[2],  // LEFT
-            h[0],l[1],l[2],  h[0],h[1],l[2],  h[0],l[1],h[2],  h[0],h[1],h[2],  // RIGHT
-            l[0],h[1],h[2],  h[0],h[1],h[2],  l[0],h[1],l[2],  h[0],h[1],l[2],  // TOP
-            l[0],l[1],h[2],  l[0],l[1],l[2],  h[0],l[1],h[2],  h[0],l[1],l[2]   // BOTTOM
+        cv::Point2f points[4];
+        box.cv_box.points(points);
+        const Eigen::Vector3f lt(points[0].x, points[0].y, box.box.min().z());
+        const Eigen::Vector3f lb(points[1].x, points[1].y, box.box.min().z());
+        const Eigen::Vector3f rt(points[2].x, points[2].y, box.box.max().z());
+        const Eigen::Vector3f rb(points[3].x, points[3].y, box.box.max().z());
+        //const GLfloat verts[] = {
+        //    lt[0],l[1],h[2],  h[0],l[1],h[2],  l[0],h[1],h[2],  h[0],h[1],h[2],  // FRONT
+        //    l[0],l[1],l[2],  l[0],h[1],l[2],  h[0],l[1],l[2],  h[0],h[1],l[2],  // BACK
+        //    l[0],l[1],h[2],  l[0],h[1],h[2],  l[0],l[1],l[2],  l[0],h[1],l[2],  // LEFT
+        //    h[0],l[1],l[2],  h[0],h[1],l[2],  h[0],l[1],h[2],  h[0],h[1],h[2],  // RIGHT
+        //    l[0],h[1],h[2],  h[0],h[1],h[2],  l[0],h[1],l[2],  h[0],h[1],l[2],  // TOP
+        //    l[0],l[1],h[2],  l[0],l[1],l[2],  h[0],l[1],h[2],  h[0],l[1],l[2]   // BOTTOM
+        //};
+
+        const std::vector<Eigen::Vector3f> cube_vertices_vector{
+            Eigen::Vector3f(points[0].x, points[0].y, box.box.max().z()),     // 0 Front-top-left
+            Eigen::Vector3f(points[1].x, points[1].y, box.box.max().z()),      // 1 Front-top-right
+            Eigen::Vector3f(points[0].x, points[0].y, box.box.min().z()),    // 2 Front-bottom-left
+            Eigen::Vector3f(points[1].x, points[1].y, box.box.min().z()),     // 3 Front-bottom-right
+            Eigen::Vector3f(points[2].x, points[2].y, box.box.min().z()),    // 4 Back-bottom-right
+            Eigen::Vector3f(points[1].x, points[1].y, box.box.max().z()),      // 5 Front-top-right
+            Eigen::Vector3f(points[2].x, points[2].y, box.box.max().z()),     // 6 Back-top-right
+            Eigen::Vector3f(points[0].x, points[0].y, box.box.max().z()),     // 7  Front-top-left
+            Eigen::Vector3f(points[3].x, points[3].y, box.box.max().z()),    // 8 Back-top-left
+            Eigen::Vector3f(points[0].x, points[0].y, box.box.min().z()),    // 9 Front-bottom-left
+            Eigen::Vector3f(points[3].x, points[3].y, box.box.min().z()),   // 10 Back-bottom-left
+            Eigen::Vector3f(points[2].x, points[2].y, box.box.min().z()),    // 11 Back-bottom-right
+            Eigen::Vector3f(points[3].x, points[3].y, box.box.max().z()),    // 12 Back-top-left
+            Eigen::Vector3f(points[2].x, points[2].y, box.box.max().z())      // 13 Back-top-right
         };
+		
+        GLfloat verts[42];
+        int idx = 0;
+		for(const auto& item:cube_vertices_vector)
+		{
+            verts[3 * idx + 0] = item.x();
+            verts[3 * idx + 1] = item.y();
+            verts[3 * idx + 2] = item.z();
+            idx += 1;
+		}
 
         glVertexPointer(3, GL_FLOAT, 0, verts);
         glEnableClientState(GL_VERTEX_ARRAY);
-
+		
         glColor4f(v_color[0], v_color[1], v_color[2], v_color[3]);
-        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-        glDrawArrays(GL_TRIANGLE_STRIP, 4, 4);
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 12);
+		
+        //glColor4f(v_color[0], v_color[1], v_color[2], v_color[3]);
+        //glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+        //glDrawArrays(GL_TRIANGLE_STRIP, 4, 4);
 
-        glColor4f(v_color[0], v_color[1], v_color[2], v_color[3]);
-        glDrawArrays(GL_TRIANGLE_STRIP, 8, 4);
-        glDrawArrays(GL_TRIANGLE_STRIP, 12, 4);
+        //glColor4f(v_color[0], v_color[1], v_color[2], v_color[3]);
+        //glDrawArrays(GL_TRIANGLE_STRIP, 8, 4);
+        //glDrawArrays(GL_TRIANGLE_STRIP, 12, 4);
 
-        glColor4f(v_color[0], v_color[1], v_color[2], v_color[3]);
-        glDrawArrays(GL_TRIANGLE_STRIP, 16, 4);
-        glDrawArrays(GL_TRIANGLE_STRIP, 20, 4);
+        //glColor4f(v_color[0], v_color[1], v_color[2], v_color[3]);
+        //glDrawArrays(GL_TRIANGLE_STRIP, 16, 4);
+        //glDrawArrays(GL_TRIANGLE_STRIP, 20, 4);
 
         glDisableClientState(GL_VERTEX_ARRAY);
 
-        draw_line(Eigen::Vector3f(l[0], l[1], l[2]), Eigen::Vector3f(l[0],l[1],h[2]),2,Eigen::Vector4f(0,0,0,1));
-        draw_line(Eigen::Vector3f(l[0], l[1], l[2]), Eigen::Vector3f(l[0],h[1],l[2]), 2, Eigen::Vector4f(0, 0, 0, 1));
-        draw_line(Eigen::Vector3f(l[0], l[1], l[2]), Eigen::Vector3f(h[0],l[1],l[2]), 2, Eigen::Vector4f(0, 0, 0, 1));
-        draw_line(Eigen::Vector3f(l[0], h[1], l[2]), Eigen::Vector3f(h[0],h[1],l[2]), 2, Eigen::Vector4f(0, 0, 0, 1));
-        draw_line(Eigen::Vector3f(l[0], h[1], l[2]), Eigen::Vector3f(l[0],h[1],h[2]), 2, Eigen::Vector4f(0, 0, 0, 1));
-        draw_line(Eigen::Vector3f(l[0], h[1], h[2]), Eigen::Vector3f(h[0],h[1],h[2]), 2, Eigen::Vector4f(0, 0, 0, 1));
-        draw_line(Eigen::Vector3f(l[0], h[1], h[2]), Eigen::Vector3f(l[0],l[1],h[2]), 2, Eigen::Vector4f(0, 0, 0, 1));
-        draw_line(Eigen::Vector3f(h[0], l[1], l[2]), Eigen::Vector3f(h[0], h[1], l[2]), 2, Eigen::Vector4f(0, 0, 0, 1));
-        draw_line(Eigen::Vector3f(h[0], l[1], l[2]), Eigen::Vector3f(h[0], l[1], h[2]), 2, Eigen::Vector4f(0, 0, 0, 1));
-        draw_line(Eigen::Vector3f(h[0], h[1], h[2]), Eigen::Vector3f(h[0], l[1], h[2]), 2, Eigen::Vector4f(0, 0, 0, 1));
-        draw_line(Eigen::Vector3f(h[0], h[1], h[2]), Eigen::Vector3f(h[0], h[1], l[2]), 2, Eigen::Vector4f(0, 0, 0, 1));
-        draw_line(Eigen::Vector3f(l[0], l[1], h[2]), Eigen::Vector3f(h[0], l[1], h[2]), 2, Eigen::Vector4f(0, 0, 0, 1));
+        draw_line(cube_vertices_vector[0], cube_vertices_vector[1],2,Eigen::Vector4f(0,0,0,1));
+        draw_line(cube_vertices_vector[2], cube_vertices_vector[3], 2, Eigen::Vector4f(0, 0, 0, 1));
+        draw_line(cube_vertices_vector[4], cube_vertices_vector[10], 2, Eigen::Vector4f(0, 0, 0, 1));
+        draw_line(cube_vertices_vector[6], cube_vertices_vector[8], 2, Eigen::Vector4f(0, 0, 0, 1));
+		
+        draw_line(cube_vertices_vector[0], cube_vertices_vector[2],2,Eigen::Vector4f(0,0,0,1));
+        draw_line(cube_vertices_vector[1], cube_vertices_vector[3],2,Eigen::Vector4f(0,0,0,1));
+        draw_line(cube_vertices_vector[4], cube_vertices_vector[6],2,Eigen::Vector4f(0,0,0,1));
+        draw_line(cube_vertices_vector[8], cube_vertices_vector[10],2,Eigen::Vector4f(0,0,0,1));
+
+        draw_line(cube_vertices_vector[0], cube_vertices_vector[8], 2, Eigen::Vector4f(0, 0, 0, 1));
+        draw_line(cube_vertices_vector[1], cube_vertices_vector[6], 2, Eigen::Vector4f(0, 0, 0, 1));
+        draw_line(cube_vertices_vector[3], cube_vertices_vector[4], 2, Eigen::Vector4f(0, 0, 0, 1));
+        draw_line(cube_vertices_vector[2], cube_vertices_vector[10], 2, Eigen::Vector4f(0, 0, 0, 1));
+
+		
+        //draw_line(Eigen::Vector3f(l[0], l[1], l[2]), Eigen::Vector3f(l[0],h[1],l[2]), 2, Eigen::Vector4f(0, 0, 0, 1));
+        //draw_line(Eigen::Vector3f(l[0], l[1], l[2]), Eigen::Vector3f(h[0],l[1],l[2]), 2, Eigen::Vector4f(0, 0, 0, 1));
+        //draw_line(Eigen::Vector3f(l[0], h[1], l[2]), Eigen::Vector3f(h[0],h[1],l[2]), 2, Eigen::Vector4f(0, 0, 0, 1));
+        //draw_line(Eigen::Vector3f(l[0], h[1], l[2]), Eigen::Vector3f(l[0],h[1],h[2]), 2, Eigen::Vector4f(0, 0, 0, 1));
+        //draw_line(Eigen::Vector3f(l[0], h[1], h[2]), Eigen::Vector3f(h[0],h[1],h[2]), 2, Eigen::Vector4f(0, 0, 0, 1));
+        //draw_line(Eigen::Vector3f(l[0], h[1], h[2]), Eigen::Vector3f(l[0],l[1],h[2]), 2, Eigen::Vector4f(0, 0, 0, 1));
+        //draw_line(Eigen::Vector3f(h[0], l[1], l[2]), Eigen::Vector3f(h[0], h[1], l[2]), 2, Eigen::Vector4f(0, 0, 0, 1));
+        //draw_line(Eigen::Vector3f(h[0], l[1], l[2]), Eigen::Vector3f(h[0], l[1], h[2]), 2, Eigen::Vector4f(0, 0, 0, 1));
+        //draw_line(Eigen::Vector3f(h[0], h[1], h[2]), Eigen::Vector3f(h[0], l[1], h[2]), 2, Eigen::Vector4f(0, 0, 0, 1));
+        //draw_line(Eigen::Vector3f(h[0], h[1], h[2]), Eigen::Vector3f(h[0], h[1], l[2]), 2, Eigen::Vector4f(0, 0, 0, 1));
+        //draw_line(Eigen::Vector3f(l[0], l[1], h[2]), Eigen::Vector3f(h[0], l[1], h[2]), 2, Eigen::Vector4f(0, 0, 0, 1));
     }
 
     void run() {

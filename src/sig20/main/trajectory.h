@@ -576,7 +576,7 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> find_short_cut(
 	const std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>>& v_trajectory,
 	const Height_map& v_height_map, const float Z_UP_BOUNDS,const Building& v_cur_building)
 {
-	Eigen::Vector3f center = v_cur_building.bounding_box_3d.center();
+	Eigen::Vector3f center = v_cur_building.bounding_box_3d.box.center();
 	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> safe_trajectory;
 
 	for (auto item : v_trajectory) {
@@ -587,7 +587,7 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> find_short_cut(
 		}
 		
 		
-		if(safe_position.z() > 1 * item.first.z() && v_height_map.get_height(safe_position.x(), safe_position.y()) > v_cur_building.bounding_box_3d.max().z())
+		if(safe_position.z() > 1 * item.first.z() && v_height_map.get_height(safe_position.x(), safe_position.y()) > v_cur_building.bounding_box_3d.box.max().z())
 		{
 			safe_position = item.first;
 			Eigen::Vector3f direction = center - safe_position;
@@ -599,7 +599,7 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> find_short_cut(
 				safe_position += direction * 1;
 
 				// Abort if the viewpoint is on above the roof
-				if (v_height_map.get_undilated_height(safe_position.x(), safe_position.y()) == v_cur_building.bounding_box_3d.max().z())
+				if (v_height_map.get_undilated_height(safe_position.x(), safe_position.y()) == v_cur_building.bounding_box_3d.box.max().z())
 				{
 					safe_position -= direction * 1;
 					break;
@@ -626,7 +626,7 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 	if (v_params.split_flag)
 	{
 		//float min_distance = (v_params.z_up_bounds * tan((v_params.fov / 2 + 60.f) / 180.f * M_PI) - 35) / 3 * 4;
-		float min_distance = 65;
+		/*float min_distance = 65;
 		for (auto item_building : v_buildings)
 		{
 			int split_width_num = int((item_building.bounding_box_3d.max().x() - item_building.bounding_box_3d.min().x()) / min_distance + 0.5);
@@ -662,7 +662,9 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 				}
 			}
 			parent_num += 1;
-		}
+		}*/
+		splited_buildings = v_buildings;
+
 	}
 	else
 		splited_buildings = v_buildings;
@@ -671,12 +673,12 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 	for (int id_building = 0; id_building < splited_buildings.size(); ++id_building) {
 		std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> item_trajectory;
 
-		float xmin = splited_buildings[id_building].bounding_box_3d.min().x();
-		float ymin = splited_buildings[id_building].bounding_box_3d.min().y();
-		float zmin = splited_buildings[id_building].bounding_box_3d.min().z();
-		float xmax = splited_buildings[id_building].bounding_box_3d.max().x();
-		float ymax = splited_buildings[id_building].bounding_box_3d.max().y();
-		float zmax = splited_buildings[id_building].bounding_box_3d.max().z();
+		float xmin = splited_buildings[id_building].bounding_box_3d.box.min().x();
+		float ymin = splited_buildings[id_building].bounding_box_3d.box.min().y();
+		float zmin = splited_buildings[id_building].bounding_box_3d.box.min().z();
+		float xmax = splited_buildings[id_building].bounding_box_3d.box.max().x();
+		float ymax = splited_buildings[id_building].bounding_box_3d.box.max().y();
+		float zmax = splited_buildings[id_building].bounding_box_3d.box.max().z();
 
 		bool double_flag = v_params.double_flag;
 
@@ -684,11 +686,11 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 		// Detect if it needs drop
 		int num_pass = 1;
 		{
-			Eigen::Vector3f cur_pos(xmin + v_params.view_distance, ymin + v_params.view_distance, zmax + v_params.z_up_bounds);
-			Eigen::Vector3f focus_point((xmax + xmin) / 2, (ymax + ymin) / 2, zmax/2.f);
-			Eigen::Vector3f view_dir = (focus_point - cur_pos).normalized();
-			Eigen::Vector3f ground_pos(xmin, ymin, 0);
-			Eigen::Vector3f view_dir_camera_to_ground = (ground_pos - cur_pos).normalized();
+			//Eigen::Vector3f cur_pos(xmin + v_params.view_distance, ymin + v_params.view_distance, zmax + v_params.z_up_bounds);
+			//Eigen::Vector3f focus_point((xmax + xmin) / 2, (ymax + ymin) / 2, zmax/2.f);
+			//Eigen::Vector3f view_dir = (focus_point - cur_pos).normalized();
+			//Eigen::Vector3f ground_pos(xmin, ymin, 0);
+			//Eigen::Vector3f view_dir_camera_to_ground = (ground_pos - cur_pos).normalized();
 			if (double_flag) {
 				//if (view_dir.dot(view_dir_camera_to_ground) < std::cos(v_params.fov / 180.f * M_PI / 2)) {
 					float surface_distance_one_view;
@@ -705,8 +707,7 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 		
 		for (int i_pass = 0; i_pass < num_pass; ++i_pass) {
 			Eigen::Vector3f cur_pos(xmin - v_params.view_distance, ymin - v_params.view_distance, zmax + v_params.z_up_bounds);
-			Eigen::Vector3f focus_point((xmin + xmax) / 2,
-				(ymin + ymax) / 2, 0);
+			Eigen::Vector3f focus_point;
 
 			cur_pos.z() = zmax + v_params.z_up_bounds - (zmax + v_params.z_up_bounds) / num_pass * i_pass;
 
@@ -894,6 +895,15 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 				if (item.first.z() < v_params.z_down_bounds)
 					item.first.z() = v_params.z_down_bounds;
 			}
+		}
+
+		Eigen::Isometry3f transform = Eigen::Isometry3f::Identity();
+		transform.translate(splited_buildings[id_building].bounding_box_3d.box.center());
+		transform.rotate(Eigen::AngleAxisf(splited_buildings[id_building].bounding_box_3d.angle, Eigen::Vector3f::UnitZ()));
+		transform.translate(-splited_buildings[id_building].bounding_box_3d.box.center());
+		for (int i=0;i< item_trajectory.size();++i)
+		{
+			item_trajectory[i].first = transform * item_trajectory[i].first;
 		}
 		
 		if(v_params.with_erosion)
