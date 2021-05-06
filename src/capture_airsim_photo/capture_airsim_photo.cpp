@@ -67,9 +67,18 @@ int main(int argc,char* argv[])
 			continue;
 		}
 	}
+
+	fs::path root("./output");
+	checkFolder(root);
 	
 	std::pair<Eigen::Vector3f, Eigen::Vector2f> cur_view = trajectory[0];
 	int id_view = 1;
+	cv::VideoWriter video_writer((root / "viz.mp4").string(), cv::VideoWriter::fourcc('x', '2', '6', '4'), 10, cv::Size(400, 400));
+	if (!video_writer.isOpened())
+	{
+		LOG(ERROR) << "Cannot open video";
+		return 0;
+	}
 	while (id_view!= trajectory.size())
 	{
 		while ((cur_view.first - trajectory[id_view].first).norm() > 3)
@@ -91,18 +100,31 @@ int main(int argc,char* argv[])
 				cv::Mat rgb = cv::Mat(response[0].height, response[0].width, CV_8UC3,
 					(unsigned*)response[0].image_data_uint8.data()).clone();
 				cv::cvtColor(rgb, rgb, cv::COLOR_BGR2RGB);
-				
+				cv::resize(rgb, rgb, cv::Size(400, 400));
+				video_writer.write(rgb);
 			}
 			std::cout << boost::format("%f, %f, %f, %f, %f") % pos_pack.pos_mesh.x() % pos_pack.pos_mesh.y() % pos_pack.pos_mesh.z() % pos_pack.pitch % pos_pack.yaw << std::endl;
 
 			Eigen::Vector3f direction = trajectory[id_view].first - cur_view.first;
 			cur_view.first += direction.normalized() * 5;
 
+			int step = direction.norm() / 5;
+			float delta_pitch = trajectory[id_view].second[0] - cur_view.second[0];
+			float delta_yaw;
+
+			// Bug, have no idea how to simulate the actual rotation of the drone
+			if (trajectory[id_view].second[1] > cur_view.second[1])
+				delta_yaw = trajectory[id_view].second[1] - cur_view.second[1];
+			else
+				delta_yaw = trajectory[id_view].second[1] - cur_view.second[1];
+			
+			cur_view.second.x() += delta_pitch / (float)step;
+			cur_view.second.y() += delta_yaw / (float)step;
 		}
 		cur_view = trajectory[id_view];
 		id_view += 1;
 	}
-	
+	video_writer.release();
 		
 	
 	return 0;

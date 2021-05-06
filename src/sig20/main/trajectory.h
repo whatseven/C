@@ -172,7 +172,7 @@ void write_wgs_path(const Json::Value& v_args,const std::vector<std::pair<Eigen:
 	Eigen::Vector3f origin_wgs(v_args["geo_origin"][0].asFloat(), v_args["geo_origin"][1].asFloat(), 0.f);
 	//Eigen::Vector2f origin_xy=lonLat2Mercator(origin_wgs);
 	Eigen::Vector2f origin_xy(origin_wgs.x(), origin_wgs.y());
-	std::ofstream pose(v_path+"camera_wgs_0.txt");
+	std::ofstream pose(v_path+"camera_wgs.txt");
 
 	for (int i_id = 0; i_id < v_trajectories.size(); i_id++) {
 		const Eigen::Vector3f& position = v_trajectories[i_id].first;
@@ -184,13 +184,15 @@ void write_wgs_path(const Json::Value& v_args,const std::vector<std::pair<Eigen:
 		float pitch = std::atan2f(direction[2], std::sqrtf(direction[0] * direction[0] + direction[1] * direction[1])) *
 			180. / M_PI;
 		float yaw = -std::atan2f(direction[1], direction[0]) * 180. / M_PI + 90.f;
+		if (yaw > 180.f)
+			yaw -= 360.f;
 
 		pose << (fmt % pos_wgs[0] % pos_wgs[1] % (position[2]+ origin_wgs.z()) % yaw % pitch).str();
-		if(i_id%180==179)
-		{
-			pose.close();
-			pose = std::ofstream(v_path + "camera_wgs_" + std::to_string(i_id / 180 + 1) + ".txt");
-		}
+		//if(i_id%180==179)
+		//{
+		//	pose.close();
+		//	pose = std::ofstream(v_path + "camera_wgs_" + std::to_string(i_id / 180 + 1) + ".txt");
+		//}
 	}
 	pose.close();
 }
@@ -585,7 +587,7 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> find_short_cut(
 		}
 		
 		
-		if(safe_position.z() > 1 * item.first.z()&& v_height_map.get_height(safe_position.x(), safe_position.y()) > v_cur_building.bounding_box_3d.max().z())
+		if(safe_position.z() > 1 * item.first.z() && v_height_map.get_height(safe_position.x(), safe_position.y()) > v_cur_building.bounding_box_3d.max().z())
 		{
 			safe_position = item.first;
 			Eigen::Vector3f direction = center - safe_position;
@@ -593,8 +595,15 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> find_short_cut(
 			direction.normalize();
 			direction.z() = 1;
 
-			while (v_height_map.get_height(safe_position.x(), safe_position.y()) + Z_UP_BOUNDS > safe_position.z()) {
+			while (v_height_map.get_undilated_height(safe_position.x(), safe_position.y()) + Z_UP_BOUNDS > safe_position.z()) {
 				safe_position += direction * 1;
+
+				// Abort if the viewpoint is on above the roof
+				if (v_height_map.get_undilated_height(safe_position.x(), safe_position.y()) == v_cur_building.bounding_box_3d.max().z())
+				{
+					safe_position -= direction * 1;
+					break;
+				}
 			}
 		}
 

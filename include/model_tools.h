@@ -147,6 +147,15 @@ public:
         return m_map_dilated.at<float>(m_y, m_x);
     }
 
+    float get_undilated_height(float x, float y) const
+    {
+        int m_y = (int)((y - m_start[1]) / m_resolution);
+        int m_x = (int)((x - m_start[0]) / m_resolution);
+        if (!(0 <= m_y && 0 <= m_x && m_y < m_map.rows && m_x < m_map.cols))
+            return std::numeric_limits<float>::lowest();
+        return m_map.at<float>(m_y, m_x);
+    }
+
     bool in_bound(float x, float y) const
     {
         int m_y = (int)((y - m_start[1]) / m_resolution);

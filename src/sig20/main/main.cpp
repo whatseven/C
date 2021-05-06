@@ -2852,8 +2852,8 @@ int main(int argc, char** argv){
 	if(args["output_waypoint"].asBool())
 	{
 		
-		safe_global_trajectory = simplify_path_reduce_waypoints(ensure_global_safe(
-			total_passed_trajectory, height_map, args["Z_UP_BOUNDS"].asFloat(),mapper->m_boundary));
+		safe_global_trajectory = ensure_global_safe(
+			total_passed_trajectory, height_map, args["Z_UP_BOUNDS"].asFloat(),mapper->m_boundary);
 		write_wgs_path(args,ensure_three_meter_dji(safe_global_trajectory), "./log/wgs_log/");
 		LOG(ERROR) << "Total waypoint length: " << evaluate_length(safe_global_trajectory);
 	}
