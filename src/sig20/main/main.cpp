@@ -2661,7 +2661,6 @@ int main(int argc, char** argv){
 				params.fov = args["fov"].asFloat();
 				params.vertical_overlap = args["vertical_overlap"].asFloat();
 				params.horizontal_overlap = args["horizontal_overlap"].asFloat();
-				params.pitch_in_degree = args["pitch_in_degree"].asInt();
 				current_trajectory = generate_trajectory(params, total_buildings, height_map, params.z_up_bounds);
 				overlap_step = params.view_distance * std::tan(params.fov / 180.f * M_PI / 2) * 2 * (1. - params.horizontal_overlap);
 				LOG(INFO) << "New trajectory ??!";
