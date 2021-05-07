@@ -616,6 +616,10 @@ public:
 			CV_8UC1, cv::Scalar(255));
 		Eigen::Vector3f t1 = (v_cur_pos - m_map_start) / DISTANCE_THRESHOLD;
 		Eigen::Vector3f t2 = (m_map_end - m_map_start) / DISTANCE_THRESHOLD;
+		if (std::abs(int(t2.x()) - int(t1.x())) % 2 == 1)
+			t2[0] += 1;
+		if (std::abs(int(t2.y()) - int(t1.y())) % 2 == 1)
+			t2[1] += 1;
 		Eigen::Vector2i start_pos_on_map(t1.x(), t1.y());
 		Eigen::Vector2i end_pos_on_map(t2.x(), t2.y());
 		cv::Mat start_end = ccpp_map.clone();
@@ -623,7 +627,7 @@ public:
 		start_end.at<cv::uint8_t>(end_pos_on_map.y(), end_pos_on_map.x()) = 255;
 
 		std::vector<Eigen::Vector2i> map_trajectory = perform_ccpp(start_end,
-			start_pos_on_map, end_pos_on_map, 0);
+			start_pos_on_map, end_pos_on_map, 1);
 		cv::Mat viz_ccpp = ccpp_map.clone();
 
 		float iter_trajectory = 0;
@@ -2607,6 +2611,7 @@ int main(int argc, char** argv){
 	float max_turn = 0.f;
 	int building_num_record = -1;
 	int current_building_num= 0;
+	float vertical_step, horizontal_step, split_min_distance;
 	bool is_interpolated = false;
 	std::pair<Eigen::Vector3f, Eigen::Vector3f> next_pos_direction;
 	//total_passed_trajectory.push_back(std::make_pair(current_pos.pos_mesh, Eigen::Vector3f(0,0,-1)));
@@ -2637,7 +2642,8 @@ int main(int argc, char** argv){
 				params.fov = args["fov"].asFloat();
 				params.vertical_overlap = args["vertical_overlap"].asFloat();
 				params.horizontal_overlap = args["horizontal_overlap"].asFloat();
-				current_trajectory = generate_trajectory(params, total_buildings, height_map, params.z_up_bounds);
+				params.split_overlap = args["split_overlap"].asFloat();
+				current_trajectory = generate_trajectory(params, total_buildings, height_map, params.z_up_bounds, vertical_step, horizontal_step, split_min_distance);
 				overlap_step = params.view_distance * std::tan(params.fov / 180.f * M_PI / 2) * 2 * (1. - params.horizontal_overlap);
 				LOG(INFO) << "New trajectory ??!";
 			}
@@ -2851,6 +2857,9 @@ int main(int argc, char** argv){
 	LOG(ERROR) <<"Total exploration length: "<< exploration_length;
 	LOG(ERROR) <<"Total reconstruction length: "<< reconstruction_length;
 	LOG(ERROR) <<"Max_turn: "<< max_turn;
+	LOG(ERROR) << "Vertical step: " << vertical_step;
+	LOG(ERROR) << "Horizontal step: " << horizontal_step;
+	LOG(ERROR) << "Split minimum distance: " << split_min_distance;
 	LOG(ERROR) << "Write trajectory done!";
 	height_map.save_height_map_tiff("height_map.tiff");
 	debug_img(std::vector<cv::Mat>{height_map.m_map_dilated});

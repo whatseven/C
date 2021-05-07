@@ -507,6 +507,7 @@ struct Trajectory_params
 	float fov; //Small one in degree
 	float vertical_overlap;
 	float horizontal_overlap;
+	float split_overlap;
 };
 /*
 bool generate_next_view_curvature(const Trajectory_params& v_params,
@@ -620,7 +621,7 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> find_short_cut(
 }
 
 std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(const Trajectory_params& v_params,
-	std::vector<Building>& v_buildings, const Height_map& v_height_map,const float v_z_up_bound)
+	std::vector<Building>& v_buildings, const Height_map& v_height_map, const float v_z_up_bound, float& vertical_step, float& horizontal_step, float& split_min_distance)
 {
 	// Split building when it cannot be covered by one round flight
 	std::vector<Building> splited_buildings;
@@ -628,7 +629,8 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 	if (v_params.split_flag)
 	{
 		//float min_distance = (v_params.z_up_bounds * tan((v_params.fov / 2 + 60.f) / 180.f * M_PI) - 35) / 3 * 4;
-		float min_distance = 65;
+		float min_distance = 160 / (1 + v_params.split_overlap);
+		split_min_distance = min_distance;
 		for (auto& item_building : v_buildings)
 		{
 			int split_width_num = int((item_building.bounding_box_3d.box.max().x() - item_building.bounding_box_3d.box.min().x()) / min_distance + 0.5);
@@ -712,6 +714,7 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 		bool double_flag = v_params.double_flag;
 
 		float overlap_step = v_params.view_distance * std::tan(v_params.fov / 180.f * M_PI / 2) * 2 * (1. - v_params.horizontal_overlap);
+		horizontal_step = overlap_step;
 		// Detect if it needs drop
 		int num_pass = 1;
 		{
@@ -727,7 +730,8 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 						surface_distance_one_view = std::tan((30 + v_params.fov / 2) / 180.f * M_PI) * v_params.view_distance - std::tan((30 - v_params.fov / 2) / 180.f * M_PI) * v_params.view_distance;
 					else
 						surface_distance_one_view = std::tan((30 + v_params.fov / 2) / 180.f * M_PI) * v_params.view_distance + std::tan((v_params.fov / 2 - 30) / 180.f * M_PI) * v_params.view_distance;
-					num_pass = (zmax + v_params.z_up_bounds) / (surface_distance_one_view * (1 - v_params.vertical_overlap));
+					vertical_step = surface_distance_one_view * (1 - v_params.vertical_overlap);
+					num_pass = (zmax + v_params.z_up_bounds) / vertical_step;
 					num_pass += 1;
 				//}
 			}
