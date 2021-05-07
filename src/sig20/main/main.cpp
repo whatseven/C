@@ -1385,47 +1385,22 @@ public:
 							return (v_cur_pos.pos_mesh - a1.first).norm() < (v_cur_pos.pos_mesh - a2.first).norm();
 						}) - start_points.begin();
 
-						if (rotation_status == 0)
-						{
-							m_exploration_point.emplace(
-								start_points[nearest_id].first + DISTANCE_THRESHOLD * 0.2 * 0 * start_points[nearest_id].second,
-								Eigen::Vector3f(0, 1, -std::tan(64.f / 180 * M_PI)).normalized()
-							);
-							m_exploration_point.emplace(
-								start_points[nearest_id].first + DISTANCE_THRESHOLD * 0.2 * 1 * start_points[nearest_id].second,
-								Eigen::Vector3f(1, 0, -std::tan(64.f / 180 * M_PI)).normalized()
-							);
-							m_exploration_point.emplace(
-								start_points[nearest_id].first + DISTANCE_THRESHOLD * 0.2 * 2 * start_points[nearest_id].second,
-								Eigen::Vector3f(0, -1, -std::tan(64.f / 180 * M_PI)).normalized()
-							);
-							m_exploration_point.emplace(
-								start_points[nearest_id].first + DISTANCE_THRESHOLD * 0.2 * 3 * start_points[nearest_id].second,
-								Eigen::Vector3f(-1, 0, -std::tan(64.f / 180 * M_PI)).normalized()
-							);
-							rotation_status = 1;
-						}
-						else
-						{
-							m_exploration_point.emplace(
-								start_points[nearest_id].first + DISTANCE_THRESHOLD * 0.2 * 0 * start_points[nearest_id].second,
-								Eigen::Vector3f(0, 1, -std::tan(64.f / 180 * M_PI)).normalized()
-							);
-							m_exploration_point.emplace(
-								start_points[nearest_id].first + DISTANCE_THRESHOLD * 0.2 * 1 * start_points[nearest_id].second,
-								Eigen::Vector3f(-1, 0, -std::tan(64.f / 180 * M_PI)).normalized()
-							);
-							m_exploration_point.emplace(
-								start_points[nearest_id].first + DISTANCE_THRESHOLD * 0.2 * 2 * start_points[nearest_id].second,
-								Eigen::Vector3f(0, -1, -std::tan(64.f / 180 * M_PI)).normalized()
-							);
-							m_exploration_point.emplace(
-								start_points[nearest_id].first + DISTANCE_THRESHOLD * 0.2 * 3 * start_points[nearest_id].second,
-								Eigen::Vector3f(1, 0, -std::tan(64.f / 180 * M_PI)).normalized()
-							);
-							rotation_status = 0;
-						}
-						
+						m_exploration_point.emplace(
+							start_points[nearest_id].first + DISTANCE_THRESHOLD * 0.25 * 0 * start_points[nearest_id].second,
+							start_points[nearest_id].first + DISTANCE_THRESHOLD * 0.25 * 0 * start_points[nearest_id].second +
+							Eigen::Vector3f(-0.5, -0.5 * 1.732, -std::tan(64.f / 180 * M_PI)).normalized()
+						);
+						m_exploration_point.emplace(
+							start_points[nearest_id].first + DISTANCE_THRESHOLD * 0.25 * 1 * start_points[nearest_id].second,
+							start_points[nearest_id].first + DISTANCE_THRESHOLD * 0.25 * 1 * start_points[nearest_id].second + 
+							Eigen::Vector3f(1, 0, -std::tan(64.f / 180 * M_PI)).normalized()
+						);
+						m_exploration_point.emplace(
+							start_points[nearest_id].first + DISTANCE_THRESHOLD * 0.25 * 2 * start_points[nearest_id].second,
+							start_points[nearest_id].first + DISTANCE_THRESHOLD * 0.25 * 2 * start_points[nearest_id].second + 
+							Eigen::Vector3f(-0.5, 0.5 * 1.732, -std::tan(64.f / 180 * M_PI)).normalized()
+						);
+					
 						
 						/*m_exploration_point.emplace(
 							Eigen::Vector3f(
@@ -2815,6 +2790,15 @@ int main(int argc, char** argv){
 		
 	}
 	total_passed_trajectory.pop_back();
+
+	// Change focus point into direction
+	for (auto& item : total_passed_trajectory)
+	{
+		item.second = (item.second - item.first);
+		if (item.second.z() > 0)
+			item.second.z() = 0;
+		item.second = item.second.normalized();
+	}
 
 	write_unreal_path(total_passed_trajectory, "camera_after_transaction.log");
 	write_normal_path(total_passed_trajectory, "camera_normal.log");

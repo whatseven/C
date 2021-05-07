@@ -433,10 +433,7 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> ensure_three_meter_dji(
 		if (item.first.z() > 120)
 			item.first.z() = 119;
 
-		item.second = (item.second - item.first);
-		if (item.second.z() > 0)
-			item.second.z() = 0;
-		item.second = item.second.normalized();
+		
 		if(!duplicated)
 			safe_trajectory.push_back(item);
 	}
