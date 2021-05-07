@@ -63,8 +63,8 @@ void clean_materials(tinyobj::shape_t& shape, std::vector<tinyobj::material_t>& 
 Get split mesh with a big whole mesh
 */
 void merge_obj(const std::string& v_file,
-    const std::vector<tinyobj::attrib_t>& v_attribs, const std::vector<tinyobj::shape_t>& saved_shapes,
-    const std::vector<tinyobj::_material_t>& materials,
+    const std::vector<tinyobj::attrib_t>& v_attribs, const std::vector<std::vector<tinyobj::shape_t>>& saved_shapes,
+    const std::vector < std::vector<tinyobj::_material_t>>& materials,
     const int start_id = 0);
 
 // @brief: Split the whole obj into small object and store them separatly. 
@@ -147,6 +147,15 @@ public:
         return m_map_dilated.at<float>(m_y, m_x);
     }
 
+    float get_undilated_height(float x, float y) const
+    {
+        int m_y = (int)((y - m_start[1]) / m_resolution);
+        int m_x = (int)((x - m_start[0]) / m_resolution);
+        if (!(0 <= m_y && 0 <= m_x && m_y < m_map.rows && m_x < m_map.cols))
+            return std::numeric_limits<float>::lowest();
+        return m_map.at<float>(m_y, m_x);
+    }
+
     bool in_bound(float x, float y) const
     {
         int m_y = (int)((y - m_start[1]) / m_resolution);
@@ -154,19 +163,33 @@ public:
         return 0 <= m_y && 0 <= m_x && m_y < m_map.rows&& m_x < m_map.cols;
     }
 
-    void update(const Eigen::AlignedBox3f& v_box)
+    void update(const Rotated_box& v_box)
     {
-        int xmin = (v_box.min()[0] - m_start[0]) / m_resolution;
-        int ymin = (v_box.min()[1] - m_start[1]) / m_resolution;
-    	int xmax = (v_box.max()[0] - m_start[0]) / m_resolution+1;
-        int ymax = (v_box.max()[1] - m_start[1]) / m_resolution+1;
+        cv::Point2f points[4];
+        v_box.cv_box.points(points);
+
+        auto xmin_point = std::min_element(points, points + 4, [](const cv::Point2f& item1, const cv::Point2f& item2) {return item1.x < item2.x;});
+        auto ymin_point = std::min_element(points, points + 4, [](const cv::Point2f& item1, const cv::Point2f& item2) {return item1.y < item2.y;});
+        auto xmax_point = std::max_element(points, points + 4, [](const cv::Point2f& item1, const cv::Point2f& item2) {return item1.x < item2.x;});
+        auto ymax_point = std::max_element(points, points + 4, [](const cv::Point2f& item1, const cv::Point2f& item2) {return item1.y < item2.y;});
+
+    	int xmin = ((*xmin_point).x - m_start[0]) / m_resolution;
+        int ymin = ((*ymin_point).y - m_start[1]) / m_resolution;
+        int xmax = ((*xmax_point).x - m_start[0]) / m_resolution+1;
+        int ymax = ((*ymax_point).y - m_start[1]) / m_resolution+1;
         xmin = std::max(xmin, 0);
         xmax = std::min(xmax, m_map.cols-1);
         ymin = std::max(ymin, 0);
         ymax = std::min(ymax, m_map.rows-1);
         for (int y = ymin; y <= ymax; ++y)
             for (int x = xmin; x <= xmax; ++x)
-                m_map.at<float>(y, x) = m_map.at<float>(y, x) > v_box.max()[2] ? m_map.at<float>(y, x) : v_box.max()[2];
+            {
+                Eigen::Vector3f point(Eigen::Vector3f(x, y,0) * m_resolution + Eigen::Vector3f(m_start.x(), m_start.y(),0));
+
+                if (v_box.inside_2d(point))
+                    m_map.at<float>(y, x) = m_map.at<float>(y, x) > v_box.box.max()[2] ? m_map.at<float>(y, x) : v_box.box.max()[2];
+            }
+                
         if(m_dilate!=0)
     		cv::dilate(m_map, m_map_dilated, cv::getStructuringElement(cv::MorphShapes::MORPH_RECT, cv::Size(m_dilate, m_dilate)),cv::Point(-1,-1),3);
         else
@@ -203,6 +226,8 @@ float point_box_distance_eigen(const Eigen::Vector2f& v_pos, const Eigen::Aligne
 bool inside_box(const Eigen::Vector2f& v_pos, const Eigen::AlignedBox2f& v_box);
 
 CGAL::Surface_mesh<Point_3> get_box_mesh(const std::vector<Eigen::AlignedBox3f>& v_boxes);
+Surface_mesh get_rotated_box_mesh(const std::vector<Rotated_box>& v_boxes);
+
 void get_box_mesh_with_colors(const std::vector<Eigen::AlignedBox3f>& v_boxes,
     const std::vector<cv::Vec3b>& v_colors, const std::string& v_name);
 #endif // MODEL_TOOLS_H

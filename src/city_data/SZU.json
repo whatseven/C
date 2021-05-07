@@ -7,6 +7,7 @@
   "building_keyword": "",
 
   //For data collection
+
   "COLLECTION_STEP_X": 3000,
   "COLLECTION_STEP_Y": 3000,
   "COLLECTION_STEP_Z": 4000,
@@ -24,6 +25,7 @@
   "MAP_END_UNREAL_Z": 14000.0,
   "output_root": "F:\\Unreal_model_split\\Shenzhen_dataset\\SZU",
   "mesh_root": "F:\\DataSet\\Shenzhen\\SZU_split_latest\\split",
+
   "heightmap_resolution": 5,
   "heightmap_dilate": 0
 

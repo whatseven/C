@@ -45,6 +45,13 @@ std::tuple<tinyobj::attrib_t, std::vector<tinyobj::shape_t>, std::vector<tinyobj
 		std::cout << "Read with " << attrib.vertices.size() / 3 << " vertices," << attrib.normals.size() / 3 << " normals," <<
 			num_face << " faces" << std::endl;
 	}
+	for (auto & item_material : materials)
+	{
+		if(item_material.diffuse_texname!="")
+		{
+			item_material.diffuse_texname = (boost::filesystem::path(v_mtl_dir) / item_material.diffuse_texname).string();
+		}
+	}
 	return {attrib, shapes, materials};
 }
 
@@ -466,9 +473,9 @@ Get split mesh with a big whole mesh
 */
 
 void merge_obj(const std::string& v_file,
-               const std::vector<tinyobj::attrib_t>& v_attribs, const std::vector<tinyobj::shape_t>& saved_shapes,
-               const std::vector<tinyobj::_material_t>& materials,
-			   const int start_id)
+				const std::vector<tinyobj::attrib_t>& v_attribs, const std::vector<std::vector<tinyobj::shape_t>>& saved_shapes,
+				const std::vector < std::vector<tinyobj::_material_t>>& materials,
+			    const int start_id)
 {
 	FILE* fp = fopen(v_file.c_str(), "w");
 	if (!fp)
@@ -481,12 +488,12 @@ void merge_obj(const std::string& v_file,
 	std::string basename = output_file.filename().stem().string() + ".mtl";
 	std::string material_filename = (output_file.parent_path() / basename).string();
 
-	int prev_material_id = -1;
 
 	fprintf(fp, "mtllib %s\n\n", basename.c_str());
 	
 	size_t vertex_already_assigned = 0;
 	size_t tex_already_assigned = 0;
+	std::vector<tinyobj::material_t> total_mtls;
 	for (int i_mesh = 0; i_mesh < v_attribs.size(); i_mesh += 1)
 	{
 		const auto& attributes = v_attribs[i_mesh];
@@ -531,35 +538,72 @@ void merge_obj(const std::string& v_file,
 		fprintf(fp, "g %s\n", std::to_string(i_mesh + start_id).c_str());
 
 		// face
-		int face_index = 0;
-		for (size_t k = 0; k < shapes.mesh.indices.size(); k += shapes.mesh.num_face_vertices[face_index++])
+		int prev_material_id = -1;
+		for(int i_shape=0;i_shape< shapes.size();i_shape++)
 		{
-			// Check Materials
-			int material_id = shapes.mesh.material_ids[face_index];
-			if (material_id != prev_material_id)
+			const auto& shape = shapes[i_shape];
+			int face_index = 0;
+			for (size_t k = 0; k < shape.mesh.indices.size(); k += shape.mesh.num_face_vertices[face_index++])
 			{
-				std::string material_name = materials[material_id].name;
-				fprintf(fp, "usemtl %s\n", material_name.c_str());
-				prev_material_id = material_id;
-			}
+				// Check Materials
+				int material_id = shape.mesh.material_ids[face_index];
+				if (material_id != prev_material_id)
+				{
+					std::string material_name = materials[i_mesh][material_id].name;
+					fprintf(fp, "usemtl %s\n", material_name.c_str());
+					prev_material_id = material_id;
+				}
 
-			unsigned char v_per_f = shapes.mesh.num_face_vertices[face_index];
-			// Imperformant, but if you want to have variable vertices per face, you need some kind of a dynamic loop.
-			fprintf(fp, "f");
-			for (int l = 0; l < v_per_f; l++)
-			{
-				const tinyobj::index_t& ref = shapes.mesh.indices[k + l];
-				// v0/t0/vn0
-				fprintf(fp, " %d/%d/%d", ref.vertex_index + 1 + vertex_already_assigned,
-				        ref.texcoord_index + 1 + tex_already_assigned, ref.normal_index + 1 + vertex_already_assigned);
+				unsigned char v_per_f = shape.mesh.num_face_vertices[face_index];
+				// Imperformant, but if you want to have variable vertices per face, you need some kind of a dynamic loop.
+				fprintf(fp, "f");
+				for (int l = 0; l < v_per_f; l++)
+				{
+					const tinyobj::index_t& ref = shape.mesh.indices[k + l];
+					// v0/t0/vn0
+					fprintf(fp, " %d/%d/%d", ref.vertex_index + 1 + vertex_already_assigned,
+						ref.texcoord_index + 1 + tex_already_assigned, ref.normal_index + 1 + vertex_already_assigned);
+				}
+				fprintf(fp, "\n");
 			}
-			fprintf(fp, "\n");
 		}
+		
 		vertex_already_assigned += attributes.vertices.size() / 3;
 		tex_already_assigned += attributes.texcoords.size() / 2;
+		std::copy(materials[i_mesh].begin(), materials[i_mesh].end(), std::back_inserter(total_mtls));
 	}
 	fclose(fp);
-	bool ret = WriteMat(material_filename, materials);
+
+	// Copy texture
+	boost::filesystem::path tex_root = output_file.parent_path() / "mtl";
+	if (!boost::filesystem::exists(tex_root))
+		boost::filesystem::create_directories(tex_root);
+	for (auto& item_mtl : total_mtls)
+	{
+		if(item_mtl.diffuse_texname!="")
+		{
+			boost::filesystem::path new_path = tex_root / boost::filesystem::path(item_mtl.diffuse_texname).filename();
+			boost::filesystem::copy_file(item_mtl.diffuse_texname,
+				new_path,boost::filesystem::copy_option::overwrite_if_exists);
+			item_mtl.diffuse_texname = new_path.string();
+		}
+		if (item_mtl.specular_texname != "")
+		{
+			boost::filesystem::path new_path = tex_root / boost::filesystem::path(item_mtl.specular_texname).filename();
+			boost::filesystem::copy_file(item_mtl.specular_texname,
+				new_path, boost::filesystem::copy_option::overwrite_if_exists);
+			item_mtl.specular_texname = new_path.string();
+		}
+		if (item_mtl.normal_texname != "")
+		{
+			boost::filesystem::path new_path = tex_root / boost::filesystem::path(item_mtl.normal_texname).filename();
+			boost::filesystem::copy_file(item_mtl.normal_texname,
+				new_path, boost::filesystem::copy_option::overwrite_if_exists);
+			item_mtl.normal_texname = new_path.string();
+		}
+	}
+	bool ret = WriteMat(material_filename, total_mtls);
+
 }
 
 void split_obj(const std::string& file_dir, const std::string& file_name, const float resolution,const float v_filter_height, const int obj_max_builidng_num,
@@ -784,7 +828,10 @@ void split_obj(const std::string& file_dir, const std::string& file_name, const 
 		if (obj_max_builidng_num > 0 && saved_shapes.size() >= obj_max_builidng_num)
 		{
 			std::cout << "5.5/6 Save max num split obj" << std::endl;
-			merge_obj(output_dir + "/" + "total_split" + std::to_string(obj_num) + ".obj", saved_attrib, saved_shapes, materials, building_num - obj_max_builidng_num + 1);
+			merge_obj(output_dir + "/" + "total_split" + std::to_string(obj_num) + ".obj", saved_attrib, 
+				std::vector < std::vector<tinyobj::shape_t>>{ saved_shapes },
+				std::vector < std::vector<tinyobj::material_t>>{ materials},
+				building_num - obj_max_builidng_num + 1);
 			std::cout << "----------Partial Save done----------" << std::endl << std::endl;
 			saved_shapes.clear();
 			saved_attrib.clear();
@@ -808,7 +855,10 @@ void split_obj(const std::string& file_dir, const std::string& file_name, const 
 		building_num += 1;
 	}
 	std::cout << "6/6 Save whole split obj" << std::endl;
-	merge_obj(output_dir + "/" + "total_split" + std::to_string(obj_num) + ".obj", saved_attrib, saved_shapes, materials, building_num - saved_attrib.size() + 1);
+	merge_obj(output_dir + "/" + "total_split" + std::to_string(obj_num) + ".obj", saved_attrib, 
+		std::vector < std::vector<tinyobj::shape_t>>{ saved_shapes },
+		std::vector < std::vector<tinyobj::material_t>>{ materials},
+		building_num - saved_attrib.size() + 1);
 	std::cout << "----------Split obj done----------" << std::endl << std::endl;
 
 }
@@ -1109,6 +1159,35 @@ Surface_mesh get_box_mesh(const std::vector<Eigen::AlignedBox3f>& v_boxes)
 	}
 	return mesh;
 }
+
+Surface_mesh get_rotated_box_mesh(const std::vector<Rotated_box>& v_boxes)
+{
+	Surface_mesh mesh;
+
+	for (const auto& item : v_boxes)
+	{
+		cv::Point2f cv_points[4];
+		item.cv_box.points(cv_points);
+		auto v0 = mesh.add_vertex(Point_3(cv_points[0].x, cv_points[0].y, item.box.min().z()));
+		auto v1 = mesh.add_vertex(Point_3(cv_points[1].x, cv_points[1].y, item.box.min().z()));
+		auto v2 = mesh.add_vertex(Point_3(cv_points[2].x, cv_points[2].y, item.box.min().z()));
+		auto v3 = mesh.add_vertex(Point_3(cv_points[3].x, cv_points[3].y, item.box.min().z()));
+		
+		auto v4 = mesh.add_vertex(Point_3(cv_points[0].x, cv_points[0].y, item.box.max().z()));
+		auto v5 = mesh.add_vertex(Point_3(cv_points[1].x, cv_points[1].y, item.box.max().z()));
+		auto v6 = mesh.add_vertex(Point_3(cv_points[2].x, cv_points[2].y, item.box.max().z()));
+		auto v7 = mesh.add_vertex(Point_3(cv_points[3].x, cv_points[3].y, item.box.max().z()));
+
+		mesh.add_face(v0, v1, v2, v3);
+		mesh.add_face(v4, v7, v6, v5);
+		mesh.add_face(v0, v4, v5, v1);
+		mesh.add_face(v3, v2, v6, v7);
+		mesh.add_face(v0, v3, v7, v4);
+		mesh.add_face(v1, v5, v6, v2);
+	}
+	return mesh;
+}
+
 
 void get_box_mesh_with_colors(const std::vector<Eigen::AlignedBox3f>& v_boxes,
 	const std::vector<cv::Vec3b>& v_colors,const std::string& v_name) {

@@ -1,5 +1,7 @@
 #include "cgal_tools.h"
 
+#include <opencv2/opencv.hpp>
+
 // @brief: 
 // @notice: Currently only transfer vertices to the cgal Surface mesh
 // @param: `attrib_t, shape_t, material_t`
@@ -57,4 +59,37 @@ Eigen::AlignedBox3f get_bounding_box(const Point_set& v_point_set)
 
 
     return Eigen::AlignedBox3f(Eigen::Vector3f(xmin, ymin, zmin), Eigen::Vector3f(xmax, ymax, zmax));
+}
+
+Rotated_box get_bounding_box_rotated(const Point_set& v_point_set)
+{
+    float xmin = 1e8, ymin = 1e8, zmin = 1e8;
+    float xmax = -1e8, ymax = -1e8, zmax = -1e8;
+
+    std::vector<cv::Point2f> points;
+	
+    for (Point_set::Index idx : v_point_set)
+    {
+        float vx = v_point_set.point(idx).x();
+        float vy = v_point_set.point(idx).y();
+        float vz = v_point_set.point(idx).z();
+        xmin = xmin < vx ? xmin : vx;
+        ymin = ymin < vy ? ymin : vy;
+        zmin = zmin < vz ? zmin : vz;
+
+        xmax = xmax > vx ? xmax : vx;
+        ymax = ymax > vy ? ymax : vy;
+        zmax = zmax > vz ? zmax : vz;
+        points.emplace_back(vx, vy);
+    }
+
+    cv::RotatedRect rotated_rect = cv::minAreaRect(points);
+    
+    Rotated_box box(Eigen::AlignedBox3f(
+        Eigen::Vector3f(rotated_rect.center.x - rotated_rect.size.width / 2, rotated_rect.center.y - rotated_rect.size.height / 2, zmin),
+        Eigen::Vector3f(rotated_rect.center.x + rotated_rect.size.width / 2, rotated_rect.center.y + rotated_rect.size.height / 2, zmax)));
+
+    box.angle = rotated_rect.angle/180.f * 3.1415926f;
+    box.cv_box = rotated_rect;
+    return box;
 }

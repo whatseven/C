@@ -447,10 +447,8 @@ public:
 			const Eigen::Vector2f p(sample_points[i_point].x(), sample_points[i_point].y());
 
 			for (const auto& item_building : v_buildings) {
-				Eigen::AlignedBox2f box(Eigen::Vector2f(item_building.bounding_box_3d.min().x(), item_building.bounding_box_3d.min().y()),
-					Eigen::Vector2f(item_building.bounding_box_3d.max().x(), item_building.bounding_box_3d.max().y()));
-				if (p.x() > item_building.bounding_box_3d.min().x() && p.x() < item_building.bounding_box_3d.max().x() &&
-					p.y() > item_building.bounding_box_3d.min().y() && p.y() < item_building.bounding_box_3d.max().y()) {
+				Eigen::Vector3f point(p.x(), p.y(), 0.f);
+				if (item_building.bounding_box_3d.inside_2d(point)) {
 					region_status[i_point] = color_occupied;
 					break;
 				}
@@ -795,13 +793,13 @@ public:
 			[&v_cur_pos, &v_buildings, this](const Next_target& b1, const Next_target& b2) {
 			float distance1, distance2;
 			if (b1.origin_index_in_building_vector != -1) {
-				distance1 = (v_buildings[b1.origin_index_in_building_vector].bounding_box_3d.center().block(0,0,2,1) - Eigen::Vector2f(v_cur_pos.pos_mesh.x(), v_cur_pos.pos_mesh.y())).norm();
+				distance1 = (v_buildings[b1.origin_index_in_building_vector].bounding_box_3d.box.center().block(0,0,2,1) - Eigen::Vector2f(v_cur_pos.pos_mesh.x(), v_cur_pos.pos_mesh.y())).norm();
 			}
 			else {
 				distance1 = (Eigen::Vector2f(v_cur_pos.pos_mesh.x(), v_cur_pos.pos_mesh.y()) - Eigen::Vector2f(sample_points[b1.origin_index_in_untraveled_pointset].x(), sample_points[b1.origin_index_in_untraveled_pointset].y())).norm();
 			}
 			if (b2.origin_index_in_building_vector != -1) {
-				distance2 = (v_buildings[b2.origin_index_in_building_vector].bounding_box_3d.center().block(0, 0, 2, 1) - Eigen::Vector2f(v_cur_pos.pos_mesh.x(), v_cur_pos.pos_mesh.y())).norm();
+				distance2 = (v_buildings[b2.origin_index_in_building_vector].bounding_box_3d.box.center().block(0, 0, 2, 1) - Eigen::Vector2f(v_cur_pos.pos_mesh.x(), v_cur_pos.pos_mesh.y())).norm();
 			}
 			else
 				distance2 = (Eigen::Vector2f(v_cur_pos.pos_mesh.x(), v_cur_pos.pos_mesh.y()) - Eigen::Vector2f(sample_points[b2.origin_index_in_untraveled_pointset].x(), sample_points[b2.origin_index_in_untraveled_pointset].y())).norm();
@@ -843,10 +841,8 @@ public:
 			const Eigen::Vector2f p(sample_points[i_point].x(), sample_points[i_point].y());
 
 			for (const auto& item_building : v_buildings) {
-				Eigen::AlignedBox2f box(Eigen::Vector2f(item_building.bounding_box_3d.min().x(), item_building.bounding_box_3d.min().y()),
-					Eigen::Vector2f(item_building.bounding_box_3d.max().x(), item_building.bounding_box_3d.max().y()));
-				if (p.x() > item_building.bounding_box_3d.min().x() && p.x() < item_building.bounding_box_3d.max().x() &&
-					p.y() > item_building.bounding_box_3d.min().y() && p.y() < item_building.bounding_box_3d.max().y()) {
+				Eigen::Vector3f point(p.x(), p.y(), 0.f);
+				if (item_building.bounding_box_3d.inside_2d(point)) {
 					region_status[i_point] = color_occupied;
 					break;
 				}
@@ -950,13 +946,13 @@ public:
 			[&v_cur_pos, &v_buildings, this](const Next_target& b1, const Next_target& b2) {
 			float distance1, distance2;
 			if (b1.origin_index_in_building_vector != -1) {
-				distance1 = (v_buildings[b1.origin_index_in_building_vector].bounding_box_3d.center().block(0, 0, 2, 1) - Eigen::Vector2f(v_cur_pos.pos_mesh.x(), v_cur_pos.pos_mesh.y())).norm();
+				distance1 = (v_buildings[b1.origin_index_in_building_vector].bounding_box_3d.box.center().block(0, 0, 2, 1) - Eigen::Vector2f(v_cur_pos.pos_mesh.x(), v_cur_pos.pos_mesh.y())).norm();
 			}
 			else {
 				distance1 = (Eigen::Vector2f(v_cur_pos.pos_mesh.x(), v_cur_pos.pos_mesh.y()) - Eigen::Vector2f(sample_points[b1.origin_index_in_untraveled_pointset].x(), sample_points[b1.origin_index_in_untraveled_pointset].y())).norm();
 			}
 			if (b2.origin_index_in_building_vector != -1) {
-				distance2 = (v_buildings[b2.origin_index_in_building_vector].bounding_box_3d.center().block(0, 0, 2, 1) - Eigen::Vector2f(v_cur_pos.pos_mesh.x(), v_cur_pos.pos_mesh.y())).norm();
+				distance2 = (v_buildings[b2.origin_index_in_building_vector].bounding_box_3d.box.center().block(0, 0, 2, 1) - Eigen::Vector2f(v_cur_pos.pos_mesh.x(), v_cur_pos.pos_mesh.y())).norm();
 			}
 			else
 				distance2 = (Eigen::Vector2f(v_cur_pos.pos_mesh.x(), v_cur_pos.pos_mesh.y()) - Eigen::Vector2f(sample_points[b2.origin_index_in_untraveled_pointset].x(), sample_points[b2.origin_index_in_untraveled_pointset].y())).norm();
@@ -990,10 +986,8 @@ public:
 			const Eigen::Vector2f p(sample_points[i_point].x(), sample_points[i_point].y());
 
 			for (const auto& item_building : v_buildings) {
-				Eigen::AlignedBox2f box(Eigen::Vector2f(item_building.bounding_box_3d.min().x(), item_building.bounding_box_3d.min().y()),
-					Eigen::Vector2f(item_building.bounding_box_3d.max().x(), item_building.bounding_box_3d.max().y()));
-				if (p.x() > item_building.bounding_box_3d.min().x() && p.x() < item_building.bounding_box_3d.max().x() &&
-					p.y() > item_building.bounding_box_3d.min().y() && p.y() < item_building.bounding_box_3d.max().y()) {
+				Eigen::Vector3f point(p.x(), p.y(), 0.f);
+				if (item_building.bounding_box_3d.inside_2d(point)) {
 					//region_status[i_point] = color_occupied;
 					break;
 				}
@@ -1106,10 +1100,10 @@ public:
 
 	bool get_ccpp_trajectory(const Eigen::Vector3f& v_cur_pos, const Building& v_building,int v_ccpp_threshold)
 	{
-		const Eigen::AlignedBox3f& cur_box_3 = v_building.bounding_box_3d;
+		const Eigen::AlignedBox3f& cur_box_3 = v_building.bounding_box_3d.box;
 		Eigen::AlignedBox2f cur_box_2(Eigen::Vector2f(m_map_start.x(), m_map_start.y()),
 			Eigen::Vector2f(cur_box_3.max().x(), cur_box_3.max().y()));
-		Eigen::Vector3f next_point = v_building.bounding_box_3d.max();
+		Eigen::Vector3f next_point = v_building.bounding_box_3d.box.max();
 		if(m_motion_status != Motion_status::final_check)
 		{
 			//cur_box_2.max().x() += 2*DISTANCE_THRESHOLD;
@@ -1281,13 +1275,14 @@ public:
 			const Eigen::Vector2f p(sample_points[i_point].x(), sample_points[i_point].y());
 
 			for (const auto& item_building : v_buildings) {
-				Eigen::AlignedBox2f box(Eigen::Vector2f(item_building.bounding_box_3d.min().x(), item_building.bounding_box_3d.min().y()),
-					Eigen::Vector2f(item_building.bounding_box_3d.max().x(), item_building.bounding_box_3d.max().y()));
-				if (point_box_distance_eigen(p, box) < 20 || inside_box(p, box)) {
+				
+				//Eigen::AlignedBox2f box(Eigen::Vector2f(item_building.bounding_box_3d.min().x(), item_building.bounding_box_3d.min().y()),
+				//	Eigen::Vector2f(item_building.bounding_box_3d.max().x(), item_building.bounding_box_3d.max().y()));
+				//if (point_box_distance_eigen(p, box) < 20 || inside_box(p, box)) {
 				//if (inside_box(p, box)) {
 					//region_status[i_point] = color_occupied;
-					break;
-				}
+				//	break;
+				//}
 			}
 		}
 	}
@@ -1309,8 +1304,8 @@ public:
 					int id_nearest_view = v_buildings[i_building].find_nearest_trajectory_2d(Eigen::Vector3f(cur_point_cgal.x(), cur_point_cgal.y(), 0));
 					//Eigen::Vector2f nearest_view(v_buildings[i_building].trajectory[id_nearest_view].first.x(), 
 					//	v_buildings[i_building].trajectory[id_nearest_view].first.y());
-					Eigen::Vector2f nearest_view(v_buildings[i_building].bounding_box_3d.center().x(),
-						v_buildings[i_building].bounding_box_3d.center().y());
+					Eigen::Vector2f nearest_view(v_buildings[i_building].bounding_box_3d.box.center().x(),
+						v_buildings[i_building].bounding_box_3d.box.center().y());
 					
 					if ((nearest_view - cur_point_cgal).norm() < DISTANCE_THRESHOLD / 1.5)
 						untraveled_buildings_inside_exist_region.push_back(i_building);
@@ -1594,11 +1589,11 @@ public:
 				[&v_cur_pos, &v_buildings, this](const Next_target& b1, const Next_target& b2) {
 				float distance1, distance2;
 				if (b1.origin_index_in_building_vector != -1)
-					distance1 = (v_buildings[b1.origin_index_in_building_vector].bounding_box_3d.center() - v_cur_pos.pos_mesh).norm();
+					distance1 = (v_buildings[b1.origin_index_in_building_vector].bounding_box_3d.box.center() - v_cur_pos.pos_mesh).norm();
 				else
 					distance1 = (Eigen::Vector2f(v_cur_pos.pos_mesh.x(), v_cur_pos.pos_mesh.y()) - Eigen::Vector2f(sample_points[b1.origin_index_in_untraveled_pointset].x(), sample_points[b1.origin_index_in_untraveled_pointset].y())).norm();
 				if (b2.origin_index_in_building_vector != -1)
-					distance2 = (v_buildings[b2.origin_index_in_building_vector].bounding_box_3d.center() - v_cur_pos.pos_mesh).norm();
+					distance2 = (v_buildings[b2.origin_index_in_building_vector].bounding_box_3d.box.center() - v_cur_pos.pos_mesh).norm();
 				else
 					distance2 = (Eigen::Vector2f(v_cur_pos.pos_mesh.x(), v_cur_pos.pos_mesh.y()) - Eigen::Vector2f(sample_points[b2.origin_index_in_untraveled_pointset].x(), sample_points[b2.origin_index_in_untraveled_pointset].y())).norm();
 
@@ -1635,8 +1630,8 @@ public:
 						continue;
 					const auto& original_bounding_box_3d = v_buildings[untraveled_buildings[i_building].origin_index_in_building_vector].bounding_box_3d;
 					const CGAL::Bbox_2 box(
-						original_bounding_box_3d.min().x() - DISTANCE_THRESHOLD, original_bounding_box_3d.min().y() - DISTANCE_THRESHOLD,
-						original_bounding_box_3d.max().x() + DISTANCE_THRESHOLD, original_bounding_box_3d.max().y() + DISTANCE_THRESHOLD
+						original_bounding_box_3d.box.min().x() - DISTANCE_THRESHOLD, original_bounding_box_3d.box.min().y() - DISTANCE_THRESHOLD,
+						original_bounding_box_3d.box.max().x() + DISTANCE_THRESHOLD, original_bounding_box_3d.box.max().y() + DISTANCE_THRESHOLD
 					);
 					{
 						const CGAL::Point_2<K>& p = sample_points[i_point];
@@ -1681,10 +1676,8 @@ public:
 			const Eigen::Vector2f p(sample_points[i_point].x(), sample_points[i_point].y());
 
 			for (const auto& item_building : v_buildings) {
-				Eigen::AlignedBox2f box(Eigen::Vector2f(item_building.bounding_box_3d.min().x(), item_building.bounding_box_3d.min().y()),
-					Eigen::Vector2f(item_building.bounding_box_3d.max().x(), item_building.bounding_box_3d.max().y()));
-				if (p.x() > item_building.bounding_box_3d.min().x() && p.x() < item_building.bounding_box_3d.max().x() &&
-					p.y() > item_building.bounding_box_3d.min().y() && p.y() < item_building.bounding_box_3d.max().y()) {
+				Eigen::Vector3f point(p.x(), p.y(), 0.f);
+				if (item_building.bounding_box_3d.inside_2d(point)) {
 					region_status[i_point] = color_occupied;
 					break;
 				}
@@ -1993,18 +1986,18 @@ public:
 		if(false)
 		{
 			m_buildings_target.resize(3);
-			m_buildings_target[0].bounding_box_3d= Eigen::AlignedBox3f(
+			m_buildings_target[0].bounding_box_3d= Rotated_box(Eigen::AlignedBox3f(
 				Eigen::Vector3f(130 * 4 - 10, 130 * 6 - 10, 0),
 				Eigen::Vector3f(130 * 4 + 10, 130 * 6 + 10, 50)
-			);
-			m_buildings_target[1].bounding_box_3d= Eigen::AlignedBox3f(
+			));
+			m_buildings_target[1].bounding_box_3d= Rotated_box(Eigen::AlignedBox3f(
 				Eigen::Vector3f(130 * 8 - 10,130 * 3 - 10,0),
 				Eigen::Vector3f(130 * 8 + 10,130 * 3 + 10,50)
-			);
-			m_buildings_target[2].bounding_box_3d= Eigen::AlignedBox3f(
+			));
+			m_buildings_target[2].bounding_box_3d= Rotated_box(Eigen::AlignedBox3f(
 				Eigen::Vector3f(130 * 6 - 10, 130 * 1 - 10, 0),
 				Eigen::Vector3f(130 * 6 + 10, 130 * 1 + 10, 50)
-			);
+			));
 			
 			
 			for (int cluster_id = 0; cluster_id < m_buildings_target.size(); ++cluster_id) {
@@ -2075,7 +2068,8 @@ public:
 								add_as_target = false;
 						}
 					}
-					current_building.bounding_box_3d = get_bounding_box(current_building.points_world_space);
+					//current_building.bounding_box_3d = get_bounding_box(current_building.points_world_space);
+					current_building.bounding_box_3d = get_bounding_box_rotated(current_building.points_world_space);
 					current_building.boxes.push_back(current_building.bounding_box_3d);
 
 					if(add_as_target)
@@ -2126,8 +2120,9 @@ public:
 					}
 				}
 				for (int i_building_1 = 0; i_building_1 < m_buildings_target.size(); ++i_building_1) {
-					m_buildings_target[i_building_1].bounding_box_3d = get_bounding_box(m_buildings_target[i_building_1].points_world_space);
-					m_buildings_target[i_building_1].bounding_box_3d.min().z() -= args["HEIGHT_CLIP"].asFloat();
+					//m_buildings_target[i_building_1].bounding_box_3d = get_bounding_box(m_buildings_target[i_building_1].points_world_space);
+					m_buildings_target[i_building_1].bounding_box_3d = get_bounding_box_rotated(m_buildings_target[i_building_1].points_world_space);
+					m_buildings_target[i_building_1].bounding_box_3d.box.min().z() -= args["HEIGHT_CLIP"].asFloat();
 					m_buildings_target[i_building_1].boxes.push_back(m_buildings_target[i_building_1].bounding_box_3d);
 				}
 				m_buildings_safe_place = m_buildings_target;
@@ -2275,8 +2270,8 @@ public:
 					}
 
 					item_building.bounding_box_3d = get_bounding_box(item_building.points_world_space);
-					item_building.bounding_box_3d.min()[2] = 0;
-					item_building.bounding_box_3d.max()[2] = final_height;
+					item_building.bounding_box_3d.box.min()[2] = 0;
+					item_building.bounding_box_3d.box.max()[2] = final_height;
 				}
 			}
 			LOG(INFO) << "2D Bbox to 3D Bbox done";
@@ -2291,7 +2286,8 @@ public:
 			for (auto& item_building : v_buildings) {
 				for (const auto& item_current_building : current_buildings) {
 					size_t index_box = &item_current_building - &current_buildings[0];
-					if (item_building.segmentation_color== item_current_building.segmentation_color) {
+					// Bug here
+					/*if (item_building.segmentation_color== item_current_building.segmentation_color) {
 						need_register[index_box] = false;
 						item_building.bounding_box_3d = item_building.bounding_box_3d.merged(item_current_building.bounding_box_3d);
 						for (const auto& item_point : item_current_building.points_world_space.points())
@@ -2306,7 +2302,7 @@ public:
 							for (const auto& item_point : item_current_building.points_world_space.points())
 								item_building.points_world_space.insert(item_point);
 						}
-					}
+					}*/
 				}
 			}
 			for (int i = 0; i < need_register.size(); ++i) {
@@ -2464,8 +2460,8 @@ public:
 					}
 
 					item_building.bounding_box_3d = get_bounding_box(item_building.points_world_space);
-					item_building.bounding_box_3d.min()[2] = 0;
-					item_building.bounding_box_3d.max()[2] = final_height;
+					item_building.bounding_box_3d.box.min()[2] = 0;
+					item_building.bounding_box_3d.box.max()[2] = final_height;
 				}
 			}
 			LOG(INFO) << "2D Bbox to 3D Bbox done";
@@ -2479,7 +2475,8 @@ public:
 			std::vector<bool> need_register(num_building_current_frame, true);
 			for (auto& item_building : v_buildings) {
 				for (const auto& item_current_building : current_buildings) {
-					size_t index_box = &item_current_building - &current_buildings[0];
+					// bug here
+					/*size_t index_box = &item_current_building - &current_buildings[0];
 					if (item_building.segmentation_color == item_current_building.segmentation_color) {
 						need_register[index_box] = false;
 						item_building.bounding_box_3d = item_building.bounding_box_3d.merged(item_current_building.bounding_box_3d);
@@ -2495,7 +2492,7 @@ public:
 							for (const auto& item_point : item_current_building.points_world_space.points())
 								item_building.points_world_space.insert(item_point);
 						}
-					}
+					}*/
 				}
 			}
 			for (int i = 0; i < need_register.size(); ++i) {
@@ -2575,7 +2572,7 @@ int main(int argc, char** argv){
 		}
 		LOG(INFO) << "Initialization done";
 	}
-	
+
 	// Some global structure
 	bool end = false;
 	bool is_viz=args["is_viz"].asBool();
@@ -2597,6 +2594,7 @@ int main(int argc, char** argv){
 	int cur_frame_id = 0;
 	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> total_passed_trajectory;
 	std::vector<int> trajectory_flag;
+	//debug_img(std::vector<cv::Mat>{height_map.m_map});
 
 	Mapper* mapper;
 	if (args["mapper"] == "gt_mapper")
@@ -2801,12 +2799,13 @@ int main(int argc, char** argv){
 		//if (cur_frame_id > 1000)
 		//	break;
 
-		std::vector<Eigen::AlignedBox3f> boxes;
+		std::vector<Rotated_box> boxes;
 		if(cur_frame_id == 50 || cur_frame_id == 100 || cur_frame_id==150|| cur_frame_id == 450||cur_frame_id == 750)
 		{
 			for (const auto& item : total_buildings)
 				boxes.push_back(item.bounding_box_3d);
-			Surface_mesh mesh = get_box_mesh(boxes);
+			//Surface_mesh mesh = get_box_mesh(boxes);
+			Surface_mesh mesh = get_rotated_box_mesh(boxes);
 			CGAL::write_ply(std::ofstream("log/gradually_results/box" + std::to_string(cur_frame_id) + ".ply"), mesh);
 			write_normal_path_with_flag(total_passed_trajectory, 
 				"log/gradually_results/camera_normal_" + std::to_string(cur_frame_id) + ".log", 
@@ -2820,10 +2819,12 @@ int main(int argc, char** argv){
 	write_normal_path(total_passed_trajectory, "camera_normal.log");
 	write_smith_path(total_passed_trajectory, "camera_smith_invert_x.log");
 	write_normal_path_with_flag(total_passed_trajectory, "camera_with_flag.log", trajectory_flag);
-	std::vector<Eigen::AlignedBox3f> boxes;
+	std::vector<Rotated_box> boxes;
 	for (const auto& item : total_buildings)
 		boxes.push_back(item.bounding_box_3d);
-	Surface_mesh mesh = get_box_mesh(boxes);
+	//Surface_mesh mesh = get_box_mesh(boxes);
+	Surface_mesh mesh = get_rotated_box_mesh(boxes);
+
 	CGAL::write_ply(std::ofstream("proxy.ply"), mesh);
 
 	boxes.clear();
@@ -2854,8 +2855,8 @@ int main(int argc, char** argv){
 	if(args["output_waypoint"].asBool())
 	{
 		
-		safe_global_trajectory = simplify_path_reduce_waypoints(ensure_global_safe(
-			total_passed_trajectory, height_map, args["Z_UP_BOUNDS"].asFloat(),mapper->m_boundary));
+		safe_global_trajectory = ensure_global_safe(
+			total_passed_trajectory, height_map, args["Z_UP_BOUNDS"].asFloat(),mapper->m_boundary);
 		write_wgs_path(args,ensure_three_meter_dji(safe_global_trajectory), "./log/wgs_log/");
 		LOG(ERROR) << "Total waypoint length: " << evaluate_length(safe_global_trajectory);
 	}
