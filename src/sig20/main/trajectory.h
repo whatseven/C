@@ -140,9 +140,9 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> interpolate_path(const 
 // Second element of the pair is the direction
 std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> simplify_path_reduce_waypoints(const std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>>& v_trajectories) {
 	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> simplified_trajectory;
-	int i0 = 0,i1 = 1;
+	int i1 = 1;
 	Eigen::Vector3f towards(0.f, 0.f, 0.f);
-	simplified_trajectory.push_back(v_trajectories[i0]);
+	simplified_trajectory.push_back(v_trajectories[0]);
 	while(i1 < v_trajectories.size())
 	{
 		const Eigen::Vector3f& position0 = v_trajectories[i1-1].first;
@@ -153,12 +153,11 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> simplify_path_reduce_wa
 			i1 += 1;
 			towards = next_towards;
 		}
-		else if (towards.dot(next_towards)>0.99f)
+		else if (towards.dot(next_towards)>0.99f && v_trajectories[i1 - 1].second.dot(v_trajectories[i1].second)>0.95)
 			i1 += 1;
 		else
 		{
 			simplified_trajectory.push_back(v_trajectories[i1-1]);
-			i0 = i1;
 			towards = next_towards;
 			i1 += 1;
 		}
@@ -457,6 +456,27 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> ensure_global_safe(
 		Eigen::Vector3f direction = (next_item.first - cur_item).normalized();
 
 		bool accept = true;
+		float top_height = cur_item.z();
+		
+		while ((cur_item - next_item.first).norm() > 5)
+		{
+			cur_item += direction * 2;
+			if (v_height_map.get_height(cur_item.x(), cur_item.y()) + Z_UP_BOUNDS > cur_item.z())
+			{
+				accept = false;
+				float safe_height = cur_item.z();
+				while (v_height_map.get_height(cur_item.x(), cur_item.y()) + Z_UP_BOUNDS > safe_height) {
+					safe_height += 5;
+				}
+				top_height = top_height > safe_height ? top_height : safe_height;
+			}
+		}
+		if(!accept)
+		{
+			safe_trajectory.emplace_back(Eigen::Vector3f(v_trajectory[i].first.x(), v_trajectory[i].first.y(), top_height), v_trajectory[i].second);
+			safe_trajectory.emplace_back(Eigen::Vector3f(next_item.first.x(), next_item.first.y(), top_height), next_item.second);
+		}
+		/*
 		while((cur_item-next_item.first).norm()>5)
 		{
 			cur_item += direction * 2;
@@ -467,9 +487,9 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> ensure_global_safe(
 		}
 		if(!accept)
 		{
-			safe_trajectory.emplace_back(Eigen::Vector3f(v_trajectory[i].first.x(), v_trajectory[i].first.y(), v_height_map.get_height(cur_item.x(), cur_item.y()) + Z_UP_BOUNDS + 5), v_trajectory[i].second);
-			safe_trajectory.emplace_back(Eigen::Vector3f(next_item.first.x(), next_item.first.y(), v_height_map.get_height(cur_item.x(), cur_item.y()) + Z_UP_BOUNDS + 5), v_trajectory[i+1].second);
-		}
+			safe_trajectory.emplace_back(Eigen::Vector3f(v_trajectory[i].first.x(), v_trajectory[i].first.y(), next_item.first.z() + 5), v_trajectory[i].second);
+			safe_trajectory.emplace_back(Eigen::Vector3f(next_item.first.x(), next_item.first.y(), next_item.first.z() + 5), v_trajectory[i+1].second);
+		}*/
 
 	}
 	safe_trajectory.push_back(v_trajectory.back());
@@ -687,6 +707,12 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 						Eigen::Vector3f(box.cv_box.center.x - box.cv_box.size.width / 2, box.cv_box.center.y - box.cv_box.size.height / 2, min_vector.z()),
 						Eigen::Vector3f(box.cv_box.center.x + box.cv_box.size.width / 2, box.cv_box.center.y + box.cv_box.size.height / 2, max_vector.z()));
 
+					/*
+					LOG(INFO) << box.cv_box.angle / 180. * M_PI;
+					LOG(INFO) << box.angle;
+					LOG(INFO) << item_building.bounding_box_3d.angle;
+					LOG(INFO) << item_building.bounding_box_3d.cv_box.angle / 180. * M_PI;
+					*/
 					
 					temp_building.bounding_box_3d = box;
 					splited_buildings.push_back(temp_building);
@@ -699,7 +725,7 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 	}
 	else
 		splited_buildings = v_buildings;
-	LOG(INFO) << splited_buildings.size();
+	
 	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> total_trajectory;
 	for (int id_building = 0; id_building < splited_buildings.size(); ++id_building) {
 		std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> item_trajectory;
@@ -931,7 +957,9 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 
 		Eigen::Isometry3f transform = Eigen::Isometry3f::Identity();
 		transform.translate(splited_buildings[id_building].bounding_box_3d.box.center());
-		transform.rotate(Eigen::AngleAxisf(splited_buildings[id_building].bounding_box_3d.angle, Eigen::Vector3f::UnitZ()));
+		transform.rotate(Eigen::AngleAxisf(splited_buildings[id_building].bounding_box_3d.cv_box.angle/180.f*M_PI, Eigen::Vector3f::UnitZ()));
+		LOG(INFO) << splited_buildings[id_building].bounding_box_3d.cv_box.angle / 180.f * M_PI;
+		LOG(INFO) << splited_buildings[id_building].bounding_box_3d.angle;
 		transform.translate(-splited_buildings[id_building].bounding_box_3d.box.center());
 		for (int i=0;i< item_trajectory.size();++i)
 		{

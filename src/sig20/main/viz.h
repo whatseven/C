@@ -120,7 +120,7 @@ public:
         glEnableClientState(GL_VERTEX_ARRAY);
 		
         glColor4f(v_color[0], v_color[1], v_color[2], v_color[3]);
-        glDrawArrays(GL_TRIANGLE_STRIP, 0, 12);
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 14);
 		
         //glColor4f(v_color[0], v_color[1], v_color[2], v_color[3]);
         //glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);

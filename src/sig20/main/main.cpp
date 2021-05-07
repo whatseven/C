@@ -2797,15 +2797,6 @@ int main(int argc, char** argv){
 	}
 	total_passed_trajectory.pop_back();
 
-	// Change focus point into direction
-	for (auto& item : total_passed_trajectory)
-	{
-		item.second = (item.second - item.first);
-		if (item.second.z() > 0)
-			item.second.z() = 0;
-		item.second = item.second.normalized();
-	}
-
 	write_unreal_path(total_passed_trajectory, "camera_after_transaction.log");
 	write_normal_path(total_passed_trajectory, "camera_normal.log");
 	write_smith_path(total_passed_trajectory, "camera_smith_invert_x.log");
@@ -2842,16 +2833,6 @@ int main(int argc, char** argv){
 	get_box_mesh_with_colors(boxess1, boxess1_color, "uncertainty_map1.obj");
 	get_box_mesh_with_colors(boxess2, boxess2_color, "uncertainty_map2.obj");
 	
-	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> safe_global_trajectory;
-	if(args["output_waypoint"].asBool())
-	{
-		
-		safe_global_trajectory = ensure_global_safe(
-			total_passed_trajectory, height_map, args["Z_UP_BOUNDS"].asFloat(),mapper->m_boundary);
-		write_wgs_path(args,ensure_three_meter_dji(safe_global_trajectory), "./log/wgs_log/");
-		LOG(ERROR) << "Total waypoint length: " << evaluate_length(safe_global_trajectory);
-	}
-	
 	LOG(ERROR) <<"Total path num: "<< total_passed_trajectory.size();
 	LOG(ERROR) <<"Total path length: "<< evaluate_length(total_passed_trajectory);
 	LOG(ERROR) <<"Total exploration length: "<< exploration_length;
@@ -2863,6 +2844,26 @@ int main(int argc, char** argv){
 	LOG(ERROR) << "Write trajectory done!";
 	height_map.save_height_map_tiff("height_map.tiff");
 	debug_img(std::vector<cv::Mat>{height_map.m_map_dilated});
+
+	total_passed_trajectory = ensure_global_safe(total_passed_trajectory, height_map, args["Z_UP_BOUNDS"].asFloat(), mapper->m_boundary);
+
+	// Change focus point into direction
+	for (auto& item : total_passed_trajectory)
+	{
+		item.second = (item.second - item.first);
+		if (item.second.z() > 0)
+			item.second.z() = 0;
+		item.second = item.second.normalized();
+	}
+
+	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> safe_global_trajectory;
+	if (args["output_waypoint"].asBool())
+	{
+
+		safe_global_trajectory = simplify_path_reduce_waypoints(total_passed_trajectory);
+		write_wgs_path(args, safe_global_trajectory, "./log/wgs_log/");
+		LOG(ERROR) << "Total waypoint length: " << evaluate_length(safe_global_trajectory);
+	}
 	
 	{
 		viz->lock();
