@@ -2718,7 +2718,7 @@ int main(int argc, char** argv){
 			//viz->m_trajectories_spline = total_passed_trajectory;
 			//viz.m_polygon = next_best_target->img_polygon;
 			viz->unlock();
-			override_sleep(0.1);
+			//override_sleep(0.1);
 			//debug_img(std::vector<cv::Mat>{height_map.m_map_dilated});
 		}
 
@@ -2855,9 +2855,9 @@ int main(int argc, char** argv){
 	if(args["output_waypoint"].asBool())
 	{
 		
-		safe_global_trajectory = ensure_global_safe(
-			total_passed_trajectory, height_map, args["Z_UP_BOUNDS"].asFloat(),mapper->m_boundary);
-		write_wgs_path(args,ensure_three_meter_dji(safe_global_trajectory), "./log/wgs_log/");
+		safe_global_trajectory = simplify_path_reduce_waypoints(ensure_global_safe(
+			total_passed_trajectory, height_map, args["Z_UP_BOUNDS"].asFloat(),mapper->m_boundary));
+		write_wgs_path(args,safe_global_trajectory, "./log/wgs_log/");
 		LOG(ERROR) << "Total waypoint length: " << evaluate_length(safe_global_trajectory);
 	}
 	
@@ -2878,11 +2878,11 @@ int main(int argc, char** argv){
 		viz->m_trajectories.clear();
 		if (args["output_waypoint"].asBool())
 		{
-			viz->m_trajectories_spline = safe_global_trajectory;
+			viz->m_trajectories = safe_global_trajectory;
 		}
 		else
 		{
-			viz->m_trajectories_spline = total_passed_trajectory;
+			viz->m_trajectories = total_passed_trajectory;
 		}
 		viz->m_uncertainty_map.clear();
 		for (const auto& item : next_best_target->sample_points) {
