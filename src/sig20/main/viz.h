@@ -42,6 +42,16 @@ public:
         //render_loop.join();
         return;
 	}
+
+    void calculate_pitch() {
+        for (auto& item : m_trajectories)
+        {
+            item.second = (item.second - item.first);
+            if (item.second.z() > 0)
+                item.second.z() = 0;
+            item.second = item.second.normalized();
+        }
+    }
     
     void draw_point_cloud(const Point_set& v_points) {
         glBegin(GL_POINTS);

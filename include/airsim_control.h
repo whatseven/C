@@ -17,7 +17,8 @@ class Airsim_tools
 public:
 	Airsim_tools(const Eigen::Vector3f& v_drone_start):m_drone_start(v_drone_start)
 	{
-		m_agent = new msr::airlib::RpcLibClientBase("127.0.0.1");
+		//m_agent = new msr::airlib::RpcLibClientBase("127.0.0.1");
+		m_agent = new msr::airlib::RpcLibClientBase("192.168.10.168");
 		m_agent->confirmConnection();
 		/*m_agent = new msr::airlib::MultirotorRpcLibClient("192.168.123.64");
 		m_agent->enableApiControl(true);

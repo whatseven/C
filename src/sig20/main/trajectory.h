@@ -432,6 +432,11 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> ensure_three_meter_dji(
 		auto item = v_trajectory[i];
 		if (item.first.z() > 120)
 			item.first.z() = 119;
+
+		item.second = (item.second - item.first);
+		if (item.second.z() > 0)
+			item.second.z() = 0;
+		item.second = item.second.normalized();
 		if(!duplicated)
 			safe_trajectory.push_back(item);
 	}
@@ -465,8 +470,8 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> ensure_global_safe(
 		}
 		if(!accept)
 		{
-			safe_trajectory.emplace_back(Eigen::Vector3f(v_trajectory[i].first.x(), v_trajectory[i].first.y(),100), v_trajectory[i].second);
-			safe_trajectory.emplace_back(Eigen::Vector3f(next_item.first.x(), next_item.first.y(),100), v_trajectory[i+1].second);
+			safe_trajectory.emplace_back(Eigen::Vector3f(v_trajectory[i].first.x(), v_trajectory[i].first.y(), v_height_map.get_height(cur_item.x(), cur_item.y()) + Z_UP_BOUNDS + 5), v_trajectory[i].second);
+			safe_trajectory.emplace_back(Eigen::Vector3f(next_item.first.x(), next_item.first.y(), v_height_map.get_height(cur_item.x(), cur_item.y()) + Z_UP_BOUNDS + 5), v_trajectory[i+1].second);
 		}
 
 	}
@@ -483,10 +488,10 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> ensure_safe_trajectory_
 		while (v_height_map.get_height(item.first.x(), item.first.y()) + Z_UP_BOUNDS > item.first.z()) {
 			item.first[2] += 5;
 		}
-		item.second = (item.second - item.first);
-		if (item.second.z() > 0)
-			item.second.z() = 0;
-		item.second = item.second.normalized();
+		//item.second = (item.second - item.first);
+		//if (item.second.z() > 0)
+		//	item.second.z() = 0;
+		//item.second = item.second.normalized();
 		safe_trajectory.push_back(item);
 	}
 	return safe_trajectory;

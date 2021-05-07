@@ -271,7 +271,9 @@ void read_mesh(std::string in_path,
 
 			// Note: the number will be added by 1 in unreal
 			int origin_index = std::atoi(iter->path().stem().string().c_str());
-			int changed_index = origin_index + 1;
+			//int changed_index = origin_index + 1;
+			// Do not need to add 1
+			int changed_index = origin_index;
 			v_out_point_clouds.insert(std::make_pair(std::to_string(changed_index), point_cloud));
 			v_out_meshes.insert(std::make_pair(std::to_string(changed_index), mesh));
 
@@ -492,7 +494,7 @@ int main(int argc, char* argv[])
 		if(building_key_world.size()==0)
 			color_to_mesh_name_map = airsim_client->reset_color([](std::string v_name)
 			{
-				std::regex rx("^[0-9]+$");
+				std::regex rx("^[0-9_]+$");
 				bool bl = std::regex_match(v_name.begin(), v_name.end(), rx);
 				return bl;
 			});
@@ -542,13 +544,15 @@ int main(int argc, char* argv[])
 	LOG(INFO) << "Total generate " << place_to_be_travel.size() << " place to be traveled";
 	auto tqdm_bar = tqdm();
 	int cur_num = 0;
+	int fov_in_degree = 53;
 	std::map<string, std::vector<Point_3>> camera_bbox_corner_vertices;
 	for (const Pos_Pack& item_pos_pack:place_to_be_travel)
 	{
 		// Calibration
 		{
 			std::ofstream f_calibration((output_root_path / "training" / "calib" / (std::string(filename_num - std::to_string(cur_num).length(), '0') + std::to_string(cur_num)+".txt")).string());
-			f_calibration << (boost::format("P2: %f %f %f %f %f %f %f %f %f %f %f %f\n") % 400 % 0 % 400 % 0 % 0 % 400 % 400 % 0 % 0 % 0 % 1 % 0).str();
+			float f = 800 / (2 * std::tan(fov_in_degree * M_PI / 360));
+			f_calibration << (boost::format("P2: %f %f %f %f %f %f %f %f %f %f %f %f\n") % f % 0 % 400 % 0 % 0 % f % 400 % 0 % 0 % 0 % 1 % 0).str();
 			f_calibration.close();
 		}
 
@@ -595,6 +599,8 @@ int main(int argc, char* argv[])
 				camera_matrix(1, 0), camera_matrix(1, 1), camera_matrix(1, 2), camera_matrix(1, 3),
 				camera_matrix(2, 0), camera_matrix(2, 1), camera_matrix(2, 2), camera_matrix(2, 3)
 			);
+			if (meshes.find(building.name) == meshes.end())
+				continue;
 			Surface_mesh item_mesh(meshes.at(building.name));
 			CGAL::Polygon_mesh_processing::transform(transform_to_camera, item_mesh);
 			
@@ -609,16 +615,16 @@ int main(int argc, char* argv[])
 				rotation(2, 0), rotation(2, 1), rotation(2, 2)
 			);
 			
-			CGAL::write_ply_point_set(
+			/*CGAL::write_ply_point_set(
 				std::ofstream((root_current_frame / "point_cloud_camera_coordinates"/(std::to_string(index)+"_before_transform_to_xz.ply")).string()), 
-				item_points_camera_coordinates);
+				item_points_camera_coordinates);*/
 			for (auto& item_point : item_points_camera_coordinates.points())
 				item_point = transform_back_to_xz_plane(item_point);
 
 			auto box = get_bbox_3d(item_points_camera_coordinates);
-			CGAL::write_ply_point_set(
+			/*CGAL::write_ply_point_set(
 				std::ofstream((root_current_frame / "point_cloud_camera_coordinates" / (std::to_string(index) + "_after_transform_to_xz.ply")).string()),
-				item_points_camera_coordinates);
+				item_points_camera_coordinates);*/
 			boxes_3d.push_back(box.first);
 			zses.push_back(box.second);
 			boxes_2d.push_back(building.box);
@@ -630,9 +636,9 @@ int main(int argc, char* argv[])
 			//test
 			Point_set point_test;
 			std::copy(item_mesh.points().begin(), item_mesh.points().end(), point_test.point_back_inserter());
-			CGAL::write_ply_point_set(
+			/*CGAL::write_ply_point_set(
 				std::ofstream((root_current_frame / "point_cloud_camera_coordinates" / (std::to_string(index) + "_after_transform_to_xz_mesh.ply")).string()),
-				point_test);
+				point_test);*/
 
 			float zmax, zmin, xmax, xmin, ymax, ymin;
 			std::vector<float> x_vertices, y_vertices, z_vertices;
@@ -664,9 +670,9 @@ int main(int argc, char* argv[])
 			//test
 			point_test.clear();
 			std::copy(item_mesh.points().begin(), item_mesh.points().end(), point_test.point_back_inserter());
-			CGAL::write_ply_point_set(
+			/*CGAL::write_ply_point_set(
 				std::ofstream((root_current_frame / "point_cloud_camera_coordinates" / (std::to_string(index) + "_to_reconstruct_coord_mesh.ply")).string()),
-				point_test);
+				point_test);*/
 
 			int resolution = 64;
 			std::vector<Point_3> query_points = {Point_3(0.5,0.5,-0.5)};

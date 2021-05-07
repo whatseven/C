@@ -2715,6 +2715,7 @@ int main(int argc, char** argv){
 			viz->m_direction = current_pos.direction;
 			//viz->m_trajectories = current_trajectory;
 			viz->m_trajectories = total_passed_trajectory;
+			viz->calculate_pitch();
 			viz->m_is_reconstruction_status = trajectory_flag;
 			//viz->m_trajectories_spline = total_passed_trajectory;
 			//viz.m_polygon = next_best_target->img_polygon;
@@ -2734,7 +2735,8 @@ int main(int argc, char** argv){
 			int interpolated_num = int(direction.norm() /  DRONE_STEP);
 			if (direction.norm() < 2 * DRONE_STEP||!with_interpolated)
 			{
-				next_direction = next_pos_direction.second.normalized();
+				//next_direction = next_pos_direction.second.normalized();
+				next_direction = next_pos_direction.second;
 				next_pos = next_pos_direction.first;
 				is_interpolated = false;
 			}
