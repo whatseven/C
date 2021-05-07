@@ -1489,9 +1489,9 @@ public:
 					bool untraveled = true;
 					for (auto item_passed_trajectory_iter = passed_trajectory.begin(); item_passed_trajectory_iter < passed_trajectory.end(); ++item_passed_trajectory_iter) {
 						auto item_passed_trajectory = *item_passed_trajectory_iter;
-						//Eigen::Vector3f vector1 = item_passed_trajectory.second - item_passed_trajectory.first;
-						//Eigen::Vector3f vector2 = item_new_trajectory.second - item_new_trajectory.first;
-						float dot_product = item_passed_trajectory.second.dot(item_new_trajectory.second);
+						Eigen::Vector3f vector1 = (item_passed_trajectory.second - item_passed_trajectory.first).normalized();
+						Eigen::Vector3f vector2 = (item_new_trajectory.second - item_new_trajectory.first).normalized();
+						float dot_product = vector1.dot(vector2);
 						if (dot_product > 1)
 							dot_product = 1;
 						float angle = std::acos(dot_product) / M_PI * 180;
@@ -2661,6 +2661,7 @@ int main(int argc, char** argv){
 				params.fov = args["fov"].asFloat();
 				params.vertical_overlap = args["vertical_overlap"].asFloat();
 				params.horizontal_overlap = args["horizontal_overlap"].asFloat();
+				params.pitch_in_degree = args["pitch_in_degree"].asInt();
 				current_trajectory = generate_trajectory(params, total_buildings, height_map, params.z_up_bounds);
 				overlap_step = params.view_distance * std::tan(params.fov / 180.f * M_PI / 2) * 2 * (1. - params.horizontal_overlap);
 				LOG(INFO) << "New trajectory ??!";
@@ -2718,7 +2719,7 @@ int main(int argc, char** argv){
 			//viz->m_trajectories_spline = total_passed_trajectory;
 			//viz.m_polygon = next_best_target->img_polygon;
 			viz->unlock();
-			//override_sleep(0.1);
+			override_sleep(0.1);
 			//debug_img(std::vector<cv::Mat>{height_map.m_map_dilated});
 		}
 

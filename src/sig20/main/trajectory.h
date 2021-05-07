@@ -510,6 +510,7 @@ struct Trajectory_params
 	float fov; //Small one in degree
 	float vertical_overlap;
 	float horizontal_overlap;
+	int pitch_in_degree;
 };
 /*
 bool generate_next_view_curvature(const Trajectory_params& v_params,
@@ -737,6 +738,7 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 		}
 		
 		
+		float pitch_ratio = std::tan(v_params.pitch_in_degree / 180.f * M_PI);
 		for (int i_pass = 0; i_pass < num_pass; ++i_pass) {
 			Eigen::Vector3f cur_pos(xmin - v_params.view_distance, ymin - v_params.view_distance, zmax + v_params.z_up_bounds);
 			Eigen::Vector3f focus_point;
@@ -936,6 +938,7 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 		for (int i=0;i< item_trajectory.size();++i)
 		{
 			item_trajectory[i].first = transform * item_trajectory[i].first;
+			item_trajectory[i].second = transform * item_trajectory[i].second;
 		}
 		
 		if(v_params.with_erosion)
