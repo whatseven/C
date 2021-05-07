@@ -626,11 +626,11 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 	if (v_params.split_flag)
 	{
 		//float min_distance = (v_params.z_up_bounds * tan((v_params.fov / 2 + 60.f) / 180.f * M_PI) - 35) / 3 * 4;
-		/*float min_distance = 65;
-		for (auto item_building : v_buildings)
+		float min_distance = 65;
+		for (auto& item_building : v_buildings)
 		{
-			int split_width_num = int((item_building.bounding_box_3d.max().x() - item_building.bounding_box_3d.min().x()) / min_distance + 0.5);
-			int split_length_num = int((item_building.bounding_box_3d.max().y() - item_building.bounding_box_3d.min().y()) / min_distance + 0.5);
+			int split_width_num = int((item_building.bounding_box_3d.box.max().x() - item_building.bounding_box_3d.box.min().x()) / min_distance + 0.5);
+			int split_length_num = int((item_building.bounding_box_3d.box.max().y() - item_building.bounding_box_3d.box.min().y()) / min_distance + 0.5);
 			if (split_width_num < 1)
 				split_width_num = 1;
 			if (split_length_num < 1)
@@ -645,30 +645,57 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 			Eigen::Vector3f min_vector, max_vector;
 			for (int i = 0; i < split_width_num; i++)
 			{
-				max_vector[2] = item_building.bounding_box_3d.max().z();
-				min_vector[2] = item_building.bounding_box_3d.min().z();
-				min_vector[0] = item_building.bounding_box_3d.min().x() + i * min_distance;
-				max_vector[0] = item_building.bounding_box_3d.min().x() + (i + 1) * min_distance;
+				max_vector[2] = item_building.bounding_box_3d.box.max().z();
+				min_vector[2] = item_building.bounding_box_3d.box.min().z();
+				min_vector[0] = item_building.bounding_box_3d.box.min().x() + i * min_distance;
+				max_vector[0] = item_building.bounding_box_3d.box.min().x() + (i + 1) * min_distance;
 				if (i == split_width_num - 1)
-					max_vector[0] = item_building.bounding_box_3d.max().x();
+					max_vector[0] = item_building.bounding_box_3d.box.max().x();
+
+
+				
 				for (int j = 0; j < split_length_num; j++)
 				{
-					min_vector[1] = item_building.bounding_box_3d.min().y() + j * min_distance;
-					max_vector[1] = item_building.bounding_box_3d.min().y() + (j + 1) * min_distance;
+					min_vector[1] = item_building.bounding_box_3d.box.min().y() + j * min_distance;
+					max_vector[1] = item_building.bounding_box_3d.box.min().y() + (j + 1) * min_distance;
 					if (j == split_length_num - 1)
-						max_vector[1] = item_building.bounding_box_3d.max().y();
-					temp_building.bounding_box_3d = Eigen::AlignedBox3f(min_vector, max_vector);
+						max_vector[1] = item_building.bounding_box_3d.box.max().y();
+
+					Eigen::Isometry3f transform = Eigen::Isometry3f::Identity();
+					transform.translate(item_building.bounding_box_3d.box.center());
+					transform.rotate(Eigen::AngleAxisf(item_building.bounding_box_3d.angle, Eigen::Vector3f::UnitZ()));
+					transform.translate(-item_building.bounding_box_3d.box.center());
+
+					Rotated_box box;
+					box.angle = item_building.bounding_box_3d.angle;
+
+					Eigen::Vector3f v1 = transform * min_vector;
+					Eigen::Vector3f v2 = transform * Eigen::Vector3f(max_vector.x(), min_vector.y(), min_vector.z());
+					Eigen::Vector3f v3 = transform * max_vector;
+
+					box.cv_box = cv::RotatedRect(
+						cv::Point2f(v1.x(), v1.y()),
+						cv::Point2f(v2.x(), v2.y()),
+						cv::Point2f(v3.x(), v3.y())
+					);
+
+					box.box = Eigen::AlignedBox3f(
+						Eigen::Vector3f(box.cv_box.center.x - box.cv_box.size.width / 2, box.cv_box.center.y - box.cv_box.size.height / 2, min_vector.z()),
+						Eigen::Vector3f(box.cv_box.center.x + box.cv_box.size.width / 2, box.cv_box.center.y + box.cv_box.size.height / 2, max_vector.z()));
+
+					
+					temp_building.bounding_box_3d = box;
 					splited_buildings.push_back(temp_building);
 				}
 			}
 			parent_num += 1;
-		}*/
-		splited_buildings = v_buildings;
+		}
+		//splited_buildings = v_buildings;
 
 	}
 	else
 		splited_buildings = v_buildings;
-
+	LOG(INFO) << splited_buildings.size();
 	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> total_trajectory;
 	for (int id_building = 0; id_building < splited_buildings.size(); ++id_building) {
 		std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> item_trajectory;
