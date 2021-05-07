@@ -1499,7 +1499,8 @@ public:
 							angle = 0;
 						if ((item_passed_trajectory.first - item_new_trajectory.first).norm() < v_threshold && angle < 5) {
 							untraveled = false;
-							start_pos_id = unpassed_trajectory.size();
+							if (start_pos_id == unpassed_trajectory.size() - 1)
+								start_pos_id = unpassed_trajectory.size();
 							if ((item_passed_trajectory_iter - passed_trajectory.begin()) == passed_trajectory.size() - 1)
 								start_pos_id = 0;
 						}
