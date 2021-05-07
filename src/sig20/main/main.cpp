@@ -1499,7 +1499,8 @@ public:
 							angle = 0;
 						if ((item_passed_trajectory.first - item_new_trajectory.first).norm() < v_threshold && angle < 5) {
 							untraveled = false;
-							start_pos_id = unpassed_trajectory.size();
+							if (start_pos_id == unpassed_trajectory.size() - 1)
+								start_pos_id = unpassed_trajectory.size();
 							if ((item_passed_trajectory_iter - passed_trajectory.begin()) == passed_trajectory.size() - 1)
 								start_pos_id = 0;
 						}
@@ -2718,7 +2719,7 @@ int main(int argc, char** argv){
 			//viz->m_trajectories_spline = total_passed_trajectory;
 			//viz.m_polygon = next_best_target->img_polygon;
 			viz->unlock();
-			override_sleep(0.1);
+			//override_sleep(0.1);
 			//debug_img(std::vector<cv::Mat>{height_map.m_map_dilated});
 		}
 
