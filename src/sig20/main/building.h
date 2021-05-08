@@ -5,7 +5,6 @@
 #include <CGAL/random_selection.h>
 
 struct Building {
-	int parent = -1;
 	//Eigen::AlignedBox3f bounding_box_3d;
 	Rotated_box bounding_box_3d;
 	Point_set points_camera_space;
@@ -14,6 +13,9 @@ struct Building {
 	cv::Vec3b segmentation_color;
 	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> passed_trajectory;
 	std::vector<Rotated_box> boxes;
+	bool is_changed = true;
+	bool is_divide = false;
+	int parent = -1;
 
 	//Used for trajectory generation
 	int start_box = -1;

@@ -73,6 +73,7 @@ int main(int argc,char* argv[])
 	
 	std::pair<Eigen::Vector3f, Eigen::Vector2f> cur_view = trajectory[0];
 	int id_view = 1;
+	int id_output = 0;
 	cv::VideoWriter video_writer((root / "viz.mp4").string(), cv::VideoWriter::fourcc('x', '2', '6', '4'), 10, cv::Size(400, 400));
 	if (!video_writer.isOpened())
 	{
@@ -99,9 +100,10 @@ int main(int argc,char* argv[])
 				const vector<ImageResponse>& response = airsim_tools.m_agent->simGetImages(request);
 				cv::Mat rgb = cv::Mat(response[0].height, response[0].width, CV_8UC3,
 					(unsigned*)response[0].image_data_uint8.data()).clone();
-				cv::cvtColor(rgb, rgb, cv::COLOR_BGR2RGB);
 				cv::resize(rgb, rgb, cv::Size(400, 400));
 				video_writer.write(rgb);
+				//cv::cvtColor(rgb, rgb, cv::COLOR_BGR2RGB);
+				cv::imwrite("./output/"+std::to_string(id_output)+".png", rgb);
 			}
 			std::cout << boost::format("%f, %f, %f, %f, %f") % pos_pack.pos_mesh.x() % pos_pack.pos_mesh.y() % pos_pack.pos_mesh.z() % pos_pack.pitch % pos_pack.yaw << std::endl;
 
@@ -113,13 +115,14 @@ int main(int argc,char* argv[])
 			float delta_yaw;
 
 			// Bug, have no idea how to simulate the actual rotation of the drone
-			if (trajectory[id_view].second[1] > cur_view.second[1])
+			if (trajectory[id_view].second[1] - cur_view.second[1] < M_PI)
 				delta_yaw = trajectory[id_view].second[1] - cur_view.second[1];
 			else
-				delta_yaw = trajectory[id_view].second[1] - cur_view.second[1];
+				delta_yaw = (M_PI - trajectory[id_view].second[1]) - cur_view.second[1];
 			
 			cur_view.second.x() += delta_pitch / (float)step;
 			cur_view.second.y() += delta_yaw / (float)step;
+			id_output+=1;
 		}
 		cur_view = trajectory[id_view];
 		id_view += 1;

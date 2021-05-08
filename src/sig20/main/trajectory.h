@@ -644,15 +644,25 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 	std::vector<Building>& v_buildings, const Height_map& v_height_map, const float v_z_up_bound, float& vertical_step, float& horizontal_step, float& split_min_distance)
 {
 	// Split building when it cannot be covered by one round flight
-	std::vector<Building> splited_buildings;
-	int parent_num = 0;
+
+	std::vector<bool> building_valid_flags(v_buildings.size(), true);
+	
 	if (v_params.split_flag)
 	{
 		//float min_distance = (v_params.z_up_bounds * tan((v_params.fov / 2 + 60.f) / 180.f * M_PI) - 35) / 3 * 4;
 		float min_distance = (160 - 2 * v_params.view_distance) / (1 + v_params.split_overlap);
 		split_min_distance = min_distance;
-		for (auto& item_building : v_buildings)
+		for (int i_building = v_buildings.size() - 1;i_building >= 0 ; --i_building)
 		{
+			auto& item_building = v_buildings[i_building];
+			if (!item_building.is_changed)
+			{
+				continue;
+			}
+			if(item_building.parent != -1)
+			{
+				continue;
+			}
 			int split_width_num = int((item_building.bounding_box_3d.box.max().x() - item_building.bounding_box_3d.box.min().x()) / min_distance + 0.5);
 			int split_length_num = int((item_building.bounding_box_3d.box.max().y() - item_building.bounding_box_3d.box.min().y()) / min_distance + 0.5);
 			if (split_width_num < 1)
@@ -660,12 +670,17 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 			if (split_length_num < 1)
 				split_length_num = 1;
 			Building temp_building(item_building);
-			if (split_width_num <= 1 && split_length_num <= 1)
-			{
-				splited_buildings.push_back(temp_building);
+			if (split_width_num <= 1 && split_length_num <= 1) //Do not need to split
 				continue;
-			}
-			temp_building.parent = parent_num;
+
+			// Delete the exist split building
+			for (int i_building2 = v_buildings.size() - 1;i_building2 >= 0; --i_building2)
+				if (v_buildings[i_building2].parent == i_building)
+					building_valid_flags[i_building2] = false;
+
+			
+			item_building.is_divide = true;
+			temp_building.parent = i_building;
 			Eigen::Vector3f min_vector, max_vector;
 			for (int i = 0; i < split_width_num; i++)
 			{
@@ -715,27 +730,39 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 					*/
 					
 					temp_building.bounding_box_3d = box;
-					splited_buildings.push_back(temp_building);
+					v_buildings.push_back(temp_building);
 				}
 			}
-			parent_num += 1;
 		}
-		//splited_buildings = v_buildings;
-
 	}
-	else
-		splited_buildings = v_buildings;
+
+	// BUG Temporal solution. Do not sure
+	std::remove_if(v_buildings.begin(), v_buildings.end(), [&building_valid_flags, &v_buildings](const auto& building)
+		{
+			int idx = &building - &(v_buildings[0]);
+			if (idx >= building_valid_flags.size())
+				return false;
+			else
+				return !building_valid_flags[idx];
+		});
 	
 	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> total_trajectory;
-	for (int id_building = 0; id_building < splited_buildings.size(); ++id_building) {
+	for (int id_building = 0; id_building < v_buildings.size(); ++id_building) {
+		if(!v_buildings[id_building].is_changed)
+			continue;
+		if(v_buildings[id_building].is_divide)
+		{
+			v_buildings[id_building].is_changed = false;
+			continue;
+		}
 		std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> item_trajectory;
 
-		float xmin = splited_buildings[id_building].bounding_box_3d.box.min().x();
-		float ymin = splited_buildings[id_building].bounding_box_3d.box.min().y();
-		float zmin = splited_buildings[id_building].bounding_box_3d.box.min().z();
-		float xmax = splited_buildings[id_building].bounding_box_3d.box.max().x();
-		float ymax = splited_buildings[id_building].bounding_box_3d.box.max().y();
-		float zmax = splited_buildings[id_building].bounding_box_3d.box.max().z();
+		float xmin = v_buildings[id_building].bounding_box_3d.box.min().x();
+		float ymin = v_buildings[id_building].bounding_box_3d.box.min().y();
+		float zmin = v_buildings[id_building].bounding_box_3d.box.min().z();
+		float xmax = v_buildings[id_building].bounding_box_3d.box.max().x();
+		float ymax = v_buildings[id_building].bounding_box_3d.box.max().y();
+		float zmax = v_buildings[id_building].bounding_box_3d.box.max().z();
 
 		bool double_flag = v_params.double_flag;
 
@@ -956,11 +983,9 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 		}
 
 		Eigen::Isometry3f transform = Eigen::Isometry3f::Identity();
-		transform.translate(splited_buildings[id_building].bounding_box_3d.box.center());
-		transform.rotate(Eigen::AngleAxisf(splited_buildings[id_building].bounding_box_3d.cv_box.angle/180.f*M_PI, Eigen::Vector3f::UnitZ()));
-		LOG(INFO) << splited_buildings[id_building].bounding_box_3d.cv_box.angle / 180.f * M_PI;
-		LOG(INFO) << splited_buildings[id_building].bounding_box_3d.angle;
-		transform.translate(-splited_buildings[id_building].bounding_box_3d.box.center());
+		transform.translate(v_buildings[id_building].bounding_box_3d.box.center());
+		transform.rotate(Eigen::AngleAxisf(v_buildings[id_building].bounding_box_3d.cv_box.angle/180.f*M_PI, Eigen::Vector3f::UnitZ()));
+		transform.translate(-v_buildings[id_building].bounding_box_3d.box.center());
 		for (int i=0;i< item_trajectory.size();++i)
 		{
 			item_trajectory[i].first = transform * item_trajectory[i].first;
@@ -986,9 +1011,9 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 		//	});
 		//splited_buildings[id_building].trajectory = clean_trajectory;
 
-		splited_buildings[id_building].trajectory = item_trajectory;
-		v_buildings = splited_buildings;
+		v_buildings[id_building].trajectory = item_trajectory;
 		total_trajectory.insert(total_trajectory.end(), item_trajectory.begin(), item_trajectory.end());
+		v_buildings[id_building].is_changed = false;
 	}
 	return total_trajectory;
 }

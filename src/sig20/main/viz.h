@@ -227,6 +227,8 @@ public:
         	//Building
         	for (const auto& item_building : m_buildings)
             {
+        		if(item_building.is_divide)
+                    continue;
                 int index = &item_building - &m_buildings[0];
                 if(m_current_building == index)
 	                draw_cube(item_building.bounding_box_3d,
