@@ -627,7 +627,7 @@ public:
 		start_end.at<cv::uint8_t>(end_pos_on_map.y(), end_pos_on_map.x()) = 255;
 
 		std::vector<Eigen::Vector2i> map_trajectory = perform_ccpp(start_end,
-			start_pos_on_map, end_pos_on_map, 1);
+			start_pos_on_map, end_pos_on_map);
 		cv::Mat viz_ccpp = ccpp_map.clone();
 
 		float iter_trajectory = 0;
@@ -1161,7 +1161,7 @@ public:
 		//debug_img(std::vector<cv::Mat>{ccpp_map, start_end});
 
 		std::vector<Eigen::Vector2i> map_trajectory = perform_ccpp(start_end,
-			start_pos_on_map, end_pos_on_map,0);
+			start_pos_on_map, end_pos_on_map, 0.5);
 
 		//std::cout << "  " << std::endl;
 		cv::Mat viz_ccpp = ccpp_map.clone();

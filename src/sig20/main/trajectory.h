@@ -649,7 +649,7 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 	if (v_params.split_flag)
 	{
 		//float min_distance = (v_params.z_up_bounds * tan((v_params.fov / 2 + 60.f) / 180.f * M_PI) - 35) / 3 * 4;
-		float min_distance = 160 / (1 + v_params.split_overlap);
+		float min_distance = (160 - 2 * v_params.view_distance) / (1 + v_params.split_overlap);
 		split_min_distance = min_distance;
 		for (auto& item_building : v_buildings)
 		{
@@ -1019,10 +1019,10 @@ void generate_distance_map(const cv::Mat& v_map, cv::Mat& distance_map, const Ei
 	generate_distance_map(v_map, distance_map, goal, Eigen::Vector2i(now_point.x(), now_point.y() + 1), distance);
 	generate_distance_map(v_map, distance_map, goal, Eigen::Vector2i(now_point.x() - 1, now_point.y()), distance);
 	generate_distance_map(v_map, distance_map, goal, Eigen::Vector2i(now_point.x(), now_point.y() - 1), distance);
-	generate_distance_map(v_map, distance_map, goal, Eigen::Vector2i(now_point.x() + 1, now_point.y()+1), distance);
-	generate_distance_map(v_map, distance_map, goal, Eigen::Vector2i(now_point.x()-1, now_point.y() + 1), distance);
-	generate_distance_map(v_map, distance_map, goal, Eigen::Vector2i(now_point.x() - 1, now_point.y()-1), distance);
-	generate_distance_map(v_map, distance_map, goal, Eigen::Vector2i(now_point.x()+1, now_point.y() - 1), distance);
+	//generate_distance_map(v_map, distance_map, goal, Eigen::Vector2i(now_point.x() + 1, now_point.y()+1), distance);
+	//generate_distance_map(v_map, distance_map, goal, Eigen::Vector2i(now_point.x()-1, now_point.y() + 1), distance);
+	//generate_distance_map(v_map, distance_map, goal, Eigen::Vector2i(now_point.x() - 1, now_point.y()-1), distance);
+	//generate_distance_map(v_map, distance_map, goal, Eigen::Vector2i(now_point.x()+1, now_point.y() - 1), distance);
 	
 }
 
@@ -1083,10 +1083,10 @@ void explore(const cv::Mat& v_map, const cv::Mat& distance_map, const cv::Mat& o
 	neighbors.push_back(Eigen::Vector2i(now_point.x(), now_point.y() - 1));
 	neighbors.push_back(Eigen::Vector2i(now_point.x() - 1, now_point.y()));
 
-	neighbors.push_back(Eigen::Vector2i(now_point.x()-1, now_point.y() - 1));
-	neighbors.push_back(Eigen::Vector2i(now_point.x()-1, now_point.y() + 1));
-	neighbors.push_back(Eigen::Vector2i(now_point.x()+1, now_point.y() - 1));
-	neighbors.push_back(Eigen::Vector2i(now_point.x()+1, now_point.y() + 1));
+	//neighbors.push_back(Eigen::Vector2i(now_point.x()-1, now_point.y() - 1));
+	//neighbors.push_back(Eigen::Vector2i(now_point.x()-1, now_point.y() + 1));
+	//neighbors.push_back(Eigen::Vector2i(now_point.x()+1, now_point.y() - 1));
+	//neighbors.push_back(Eigen::Vector2i(now_point.x()+1, now_point.y() + 1));
 	// down right up left
 	for (int i = 0; i < neighbors.size(); i++)
 	{
