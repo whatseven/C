@@ -1194,6 +1194,8 @@ public:
 		// Find next target (building or place) with higher confidence
 		std::vector<int> untraveled_buildings;
 		for (int i_building = 0; i_building < v_buildings.size(); ++i_building) {
+			if (v_buildings[i_building].is_divide)
+				continue;
 			if (v_buildings[i_building].passed_trajectory.size() == 0)
 			{
 				untraveled_buildings.push_back(i_building);
@@ -1304,6 +1306,8 @@ public:
 			Eigen::Vector2f cur_point_cgal(m_ccpp_trajectory[m_current_ccpp_trajectory_id].first.x(), 
 				m_ccpp_trajectory[m_current_ccpp_trajectory_id].first.y());
 			for (int i_building = 0; i_building < v_buildings.size(); ++i_building) {
+				if (v_buildings[i_building].is_divide)
+					continue;
 				if (v_buildings[i_building].passed_trajectory.size() == 0) {
 					int id_nearest_view = v_buildings[i_building].find_nearest_trajectory_2d(Eigen::Vector3f(cur_point_cgal.x(), cur_point_cgal.y(), 0));
 					//Eigen::Vector2f nearest_view(v_buildings[i_building].trajectory[id_nearest_view].first.x(), 
@@ -1489,8 +1493,24 @@ public:
 
 			if (unpassed_trajectory.size() == 0) {
 				//debug_img(std::vector<cv::Mat>{cv::Mat(1, 1, CV_8UC1)});
-				m_motion_status = Motion_status::exploration;
-				next_pos = determine_next_target(v_frame_id, v_cur_pos, v_buildings, with_exploration, v_threshold);
+				if(with_exploration)
+				{
+					m_motion_status = Motion_status::exploration;
+					next_pos = determine_next_target(v_frame_id, v_cur_pos, v_buildings, with_exploration, v_threshold);
+				}
+				else
+				{
+					m_motion_status = Motion_status::reconstruction_in_exploration;
+					get_next_target(v_frame_id, v_cur_pos, v_buildings, with_exploration);
+					if(m_motion_status == Motion_status::final_check)
+					{
+						m_motion_status = Motion_status::done;
+						return next_pos;
+					}
+
+					next_pos = determine_next_target(v_frame_id, v_cur_pos, v_buildings, with_exploration, v_threshold);
+				}
+
 				//get_next_target(v_frame_id, v_cur_pos, v_buildings, with_exploration);
 				//LOG(INFO) << "Change target !";
 				//return determine_next_target(v_frame_id, v_cur_pos, v_buildings, with_exploration, v_threshold);
@@ -1945,7 +1965,8 @@ public:
 			for (int i_point = 0; i_point < num_point; ++i_point) {
 				Point_2 p_lonlat(v_args["boundary"][i_point * 3 + 0].asFloat(),
 					v_args["boundary"][i_point * 3 + 1].asFloat());
-				Eigen::Vector2f p_mercator = lonLat2Mercator(Eigen::Vector2f(p_lonlat.x(), p_lonlat.y())) - lonLat2Mercator(Eigen::Vector2f(v_args["geo_origin"][0].asFloat(), v_args["geo_origin"][1].asFloat()));
+				Eigen::Vector2f p_mercator = lonLat2Mercator(Eigen::Vector2f(p_lonlat.x(), p_lonlat.y())) - Eigen::Vector2f(v_args["geo_origin"][0].asFloat(), v_args["geo_origin"][1].asFloat());
+				//Eigen::Vector2f p_mercator = lonLat2Mercator(Eigen::Vector2f(p_lonlat.x(), p_lonlat.y())) - lonLat2Mercator(Eigen::Vector2f(v_args["geo_origin"][0].asFloat(), v_args["geo_origin"][1].asFloat()));
 				points.emplace_back(p_mercator.x(), p_mercator.y());
 			}
 			m_boundary = Polygon_2(points.begin(), points.end());
@@ -2105,6 +2126,24 @@ public:
 					m_buildings_target[i_building_1].bounding_box_3d.box.min().z() -= args["HEIGHT_CLIP"].asFloat();
 					m_buildings_target[i_building_1].boxes.push_back(m_buildings_target[i_building_1].bounding_box_3d);
 				}
+
+				for (int i_building_1 = m_buildings_target.size() - 1; i_building_1 >= 0; --i_building_1) 
+				{
+					Point_2 p(m_buildings_target[i_building_1].bounding_box_3d.box.center().x(),
+						m_buildings_target[i_building_1].bounding_box_3d.box.center().y()
+					);
+					if (m_boundary.size() > 0)
+					{
+						for (auto iter_segment = m_boundary.edges_begin(); iter_segment != m_boundary.edges_end(); ++iter_segment)
+							if (CGAL::squared_distance(p, *iter_segment) < 00 * 00)
+								m_buildings_target.erase(m_buildings_target.begin() + i_building_1);
+						if (m_boundary.bounded_side(p) != CGAL::ON_BOUNDED_SIDE)
+							m_buildings_target.erase(m_buildings_target.begin() + i_building_1);
+					}
+				}
+
+				
+				
 				m_buildings_safe_place = m_buildings_target;
 			}
 		}
@@ -2619,8 +2658,10 @@ int main(int argc, char** argv){
 	while (!end) {
 		LOG(INFO) << "<<<<<<<<<<<<< Frame " << cur_frame_id << " <<<<<<<<<<<<<";
 
+		auto t = recordTime();
 		mapper->get_buildings(total_buildings, current_pos, cur_frame_id, height_map);
 		next_best_target->update_uncertainty(current_pos, total_buildings);
+		profileTime(t, "Height map");
 
 		std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> current_trajectory;
 		if(!with_interpolated||(with_interpolated&& !is_interpolated))
@@ -2661,6 +2702,7 @@ int main(int argc, char** argv){
 			LOG(INFO) << (boost::format("Current mode: %s. Building progress: %d/%d") % std::to_string(next_best_target->m_motion_status) % current_building_num % total_buildings.size()).str();
 
 		}
+		profileTime(t, "Generate trajectory");
 
 		// Statics
 		{
@@ -2703,6 +2745,7 @@ int main(int argc, char** argv){
 			//override_sleep(0.1);
 			//debug_img(std::vector<cv::Mat>{height_map.m_map_dilated});
 		}
+		profileTime(t, "Viz");
 
 		//
 		// Prepare next move
