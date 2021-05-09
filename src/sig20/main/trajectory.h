@@ -444,10 +444,78 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> ensure_global_safe(
 	const Height_map& v_height_map, const float Z_UP_BOUNDS,const Polygon_2& v_boundary)
 {
 	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> safe_trajectory;
-	for (int i = 0; i < v_trajectory.size()-1;++i) {
-		safe_trajectory.push_back(v_trajectory[i]);
-		Eigen::Vector3f cur_item = v_trajectory[i].first;
-		auto next_item = v_trajectory[i + 1];
+	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> boundary_safe_trajectory = v_trajectory;
+
+	//// Ensure boundary safe
+	//for (int i = 0; i < v_trajectory.size() - 1; ++i) {
+	//	boundary_safe_trajectory.push_back(v_trajectory[i]);
+	//	Eigen::Vector2f cur_item = Eigen::Vector2f(v_trajectory[i].first.x(), v_trajectory[i].first.y());
+	//	float cur_z = v_trajectory[i].first.z();
+	//	auto next_item = Eigen::Vector2f(v_trajectory[i + 1].first.x(), v_trajectory[i + 1].first.y());
+	//	float length_2D = (cur_item - next_item).norm();
+	//	Eigen::Vector2f temp_point = cur_item;
+	//	bool accept;
+	//	bool fail = false;
+
+	//	while ((cur_item - next_item).norm() > 5)
+	//	{
+	//		cur_item = temp_point;
+	//		Eigen::Vector2f direction = (next_item - cur_item).normalized();
+	//		for (int angle_in_degree = 0; angle_in_degree <= 90; angle_in_degree+=10)
+	//		{
+	//			// Add angle
+	//			float now_angle = std::atan2(direction.y(), direction.x()) + (angle_in_degree / 180 * M_PI);
+	//			Eigen::Vector2f now_direction = Eigen::Vector2f(std::cos(now_angle), std::sin(now_angle));
+	//			while ((cur_item - temp_point).norm() < length_2D && (cur_item - next_item).norm() > 5)
+	//			{
+	//				cur_item += now_direction * 2;
+	//				accept = true;
+	//				if (v_boundary.bounded_side(CGAL::Point_2<K>(cur_item.x(), cur_item.y())) != CGAL::ON_BOUNDED_SIDE)
+	//				{
+	//					accept = false;
+	//					cur_item = temp_point;
+	//					break;
+	//				}
+	//			}
+	//			if (accept)
+	//			{
+	//				boundary_safe_trajectory.push_back(std::make_pair(Eigen::Vector3f(cur_item.x(), cur_item.y(), cur_z), v_trajectory[i].second));
+	//				temp_point = cur_item;
+	//				break;
+	//			}
+
+	//			// Sub angle
+	//			now_angle = std::atan2(direction.y(), direction.x()) - (angle_in_degree / 180 * M_PI);
+	//			now_direction = Eigen::Vector2f(std::cos(now_angle), std::sin(now_angle));
+	//			while ((cur_item - temp_point).norm() < length_2D && (cur_item - next_item).norm() > 5)
+	//			{
+	//				cur_item += now_direction * 2;
+	//				accept = true;
+	//				if (v_boundary.bounded_side(CGAL::Point_2<K>(cur_item.x(), cur_item.y())) != CGAL::ON_BOUNDED_SIDE)
+	//				{
+	//					accept = false;
+	//					cur_item = temp_point;
+	//					break;
+	//				}
+	//			}
+	//			if (accept)
+	//			{
+	//				boundary_safe_trajectory.push_back(std::make_pair(Eigen::Vector3f(cur_item.x(), cur_item.y(), cur_z), v_trajectory[i].second));
+	//				temp_point = cur_item;
+	//				break;
+	//			}
+	//			else
+	//				fail = true;
+	//		}
+	//		if (fail)
+	//			break;
+	//	}
+	//}
+
+	// Ensure Height Safe
+	for (int i = 0; i < boundary_safe_trajectory.size()-1;++i) {
+		Eigen::Vector3f cur_item = boundary_safe_trajectory[i].first;
+		auto next_item = boundary_safe_trajectory[i + 1];
 		if (v_height_map.get_height(next_item.first.x(), next_item.first.y()) + Z_UP_BOUNDS > next_item.first.z()) {
 			while (v_height_map.get_height(next_item.first.x(), next_item.first.y()) + Z_UP_BOUNDS > next_item.first.z()) {
 				next_item.first.z() += 5;
@@ -461,6 +529,7 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> ensure_global_safe(
 		while ((cur_item - next_item.first).norm() > 5)
 		{
 			cur_item += direction * 2;
+
 			if (v_height_map.get_height(cur_item.x(), cur_item.y()) + Z_UP_BOUNDS > cur_item.z())
 			{
 				accept = false;
@@ -473,9 +542,11 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> ensure_global_safe(
 		}
 		if(!accept)
 		{
-			safe_trajectory.emplace_back(Eigen::Vector3f(v_trajectory[i].first.x(), v_trajectory[i].first.y(), top_height), v_trajectory[i].second);
+			safe_trajectory.emplace_back(Eigen::Vector3f(boundary_safe_trajectory[i].first.x(), boundary_safe_trajectory[i].first.y(), top_height), boundary_safe_trajectory[i].second);
 			safe_trajectory.emplace_back(Eigen::Vector3f(next_item.first.x(), next_item.first.y(), top_height), next_item.second);
 		}
+		else
+			safe_trajectory.push_back(boundary_safe_trajectory[i]);
 		/*
 		while((cur_item-next_item.first).norm()>5)
 		{
@@ -492,7 +563,7 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> ensure_global_safe(
 		}*/
 
 	}
-	safe_trajectory.push_back(v_trajectory.back());
+	safe_trajectory.push_back(boundary_safe_trajectory.back());
 	return safe_trajectory;
 }
 
@@ -795,8 +866,9 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 			Eigen::Vector3f focus_point;
 
 			cur_pos.z() = zmax + v_params.z_up_bounds - (zmax + v_params.z_up_bounds) / num_pass * i_pass;
-
+			
 			float delta = (xmax + v_params.view_distance - cur_pos.x()) / overlap_step;
+			v_buildings[id_building].one_pass_trajectory_num += int(delta);
 			for (int i = 0; i <  delta ;++i)
 			{
 				if(i==0)
@@ -839,6 +911,7 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 				}
 			}
 			delta = (ymax + v_params.view_distance - cur_pos.y()) / overlap_step;
+			v_buildings[id_building].one_pass_trajectory_num += int(delta);
 			for (int i = 0; i < delta; ++i) {
 				if (i == 0) {
 					focus_point = cur_pos + Eigen::Vector3f(-v_params.view_distance, v_params.view_distance, -v_params.view_distance / 1.732f);
@@ -877,6 +950,7 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 				}
 			}
 			delta = (cur_pos.x() - (xmin - v_params.view_distance)) / overlap_step;
+			v_buildings[id_building].one_pass_trajectory_num += int(delta);
 			for (int i = 0; i < delta; ++i) {
 				if (i == 0) {
 					focus_point = cur_pos + Eigen::Vector3f(-v_params.view_distance, -v_params.view_distance, -v_params.view_distance / 1.732f);
@@ -915,6 +989,7 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 				}
 			}
 			delta = (cur_pos.y() - (ymin - v_params.view_distance)) / overlap_step;
+			v_buildings[id_building].one_pass_trajectory_num += int(delta);
 			for (int i = 0; i <  delta; ++i) {
 				if (i == 0) {
 					focus_point = cur_pos + Eigen::Vector3f(v_params.view_distance, -v_params.view_distance, -v_params.view_distance / 1.732f);
@@ -1058,6 +1133,10 @@ void update_obstacle_map(const cv::Mat& v_map, cv::Mat& distance_map, const Eige
 	generate_distance_map(v_map, distance_map, goal, Eigen::Vector2i(now_point.x(), now_point.y() + 1), distance);
 	generate_distance_map(v_map, distance_map, goal, Eigen::Vector2i(now_point.x() - 1, now_point.y()), distance);
 	generate_distance_map(v_map, distance_map, goal, Eigen::Vector2i(now_point.x(), now_point.y() - 1), distance);
+	generate_distance_map(v_map, distance_map, goal, Eigen::Vector2i(now_point.x() + 1, now_point.y()+1), distance);
+	generate_distance_map(v_map, distance_map, goal, Eigen::Vector2i(now_point.x()-1, now_point.y() + 1), distance);
+	generate_distance_map(v_map, distance_map, goal, Eigen::Vector2i(now_point.x() - 1, now_point.y()-1), distance);
+	generate_distance_map(v_map, distance_map, goal, Eigen::Vector2i(now_point.x()+1, now_point.y() - 1), distance);
 }
 
 void print_map(const cv::Mat& v_map)
@@ -1130,7 +1209,7 @@ void explore(const cv::Mat& v_map, const cv::Mat& distance_map, const cv::Mat& o
 					temp_num = int(visited_map.at<cv::int32_t>(neighbor_point.x(), neighbor_point.y()));
 					if (temp_num == 0)
 					{
-						float distance = float(distance_map.at<cv::int32_t>(neighbor_point.x(), neighbor_point.y())) + weight * float(obstacle_map.at<cv::int32_t>(neighbor_point.x(), neighbor_point.y()));
+						float distance = float(distance_map.at<cv::int32_t>(neighbor_point.x(), neighbor_point.y())) - weight * float(obstacle_map.at<cv::int32_t>(neighbor_point.x(), neighbor_point.y()));
 						if (distance > max_num)
 						{
 							max_num = distance;
@@ -1280,7 +1359,7 @@ std::vector<Eigen::Vector2i> perform_ccpp(const cv::Mat& ccpp_map, const Eigen::
 	cv::Mat distance_map(v_map.rows, v_map.cols, CV_32SC1, cv::Scalar(0));
 	generate_distance_map(v_map, distance_map, goal, goal, 0);
 	std::cout << "distance_map" << std::endl;
-	print_map(distance_map);
+	//print_map(distance_map);
 	cv::Mat obstacle_map(v_map.rows, v_map.cols, CV_32SC1, cv::Scalar(0));
 	for (int i = 0; i < v_map.rows; i++)
 	{
@@ -1293,9 +1372,9 @@ std::vector<Eigen::Vector2i> perform_ccpp(const cv::Mat& ccpp_map, const Eigen::
 		}
 	}
 	std::cout << "v_map" << std::endl;
-	print_map(v_map);
+	//print_map(v_map);
 	std::cout << "obstacle_map" << std::endl;
-	print_map(obstacle_map);
+	//print_map(obstacle_map);
 
 	Eigen::Vector2i now_point(start_point);
 	cv::Mat visited_map(v_map.rows, v_map.cols, CV_32SC1, cv::Scalar(0));

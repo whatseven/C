@@ -616,10 +616,6 @@ public:
 			CV_8UC1, cv::Scalar(255));
 		Eigen::Vector3f t1 = (v_cur_pos - m_map_start) / DISTANCE_THRESHOLD;
 		Eigen::Vector3f t2 = (m_map_end - m_map_start) / DISTANCE_THRESHOLD;
-		if (std::abs(int(t2.x()) - int(t1.x())) % 2 == 1)
-			t2[0] += 1;
-		if (std::abs(int(t2.y()) - int(t1.y())) % 2 == 1)
-			t2[1] += 1;
 		Eigen::Vector2i start_pos_on_map(t1.x(), t1.y());
 		Eigen::Vector2i end_pos_on_map(t2.x(), t2.y());
 		cv::Mat start_end = ccpp_map.clone();
@@ -1104,9 +1100,30 @@ public:
 
 	bool get_ccpp_trajectory(const Eigen::Vector3f& v_cur_pos, const Building& v_building,int v_ccpp_threshold)
 	{
+		
 		const Eigen::AlignedBox3f& cur_box_3 = v_building.bounding_box_3d.box;
+		
+
+		// Ensure even
+		Eigen::AlignedBox2f last_topology;
+		Eigen::Vector2i last_map_pos;
+		int x_add = 0, y_add = 0;
+		if (topology.size() == 0)
+			last_map_pos = Eigen::Vector2i(0, 0);
+		else
+		{
+			last_topology = topology.at(topology.size() - 1);
+			last_map_pos = Eigen::Vector2i(int((last_topology.max().x() - m_map_start.x()) / DISTANCE_THRESHOLD + 1), int((last_topology.max().y() - m_map_start.y()) / DISTANCE_THRESHOLD + 1));
+		}
+		Eigen::Vector2i now_map_pos(int((cur_box_3.max().x() - m_map_start.x()) / DISTANCE_THRESHOLD + 1), int((cur_box_3.max().y() - m_map_start.y()) / DISTANCE_THRESHOLD + 1));
+		if ((now_map_pos.x() - last_map_pos.x()) % 2 == 1)
+			x_add = 1;
+		if ((now_map_pos.y() - last_map_pos.y()) % 2 == 1)
+			y_add = 1;
+
 		Eigen::AlignedBox2f cur_box_2(Eigen::Vector2f(m_map_start.x(), m_map_start.y()),
-			Eigen::Vector2f(cur_box_3.max().x(), cur_box_3.max().y()));
+			Eigen::Vector2f(cur_box_3.max().x() + DISTANCE_THRESHOLD * x_add, cur_box_3.max().y() + DISTANCE_THRESHOLD * y_add));
+
 		Eigen::Vector3f next_point = v_building.bounding_box_3d.box.max();
 		if(m_motion_status != Motion_status::final_check)
 		{
@@ -1149,6 +1166,7 @@ public:
 		Eigen::Vector3f t1 = (v_cur_pos - m_map_start) / DISTANCE_THRESHOLD;
 
 		Eigen::Vector3f t2 = (next_point - m_map_start) / DISTANCE_THRESHOLD;
+
 		Eigen::Vector2i start_pos_on_map(t1.x(), t1.y());
 		Eigen::Vector2i end_pos_on_map(t2.x(), t2.y());
 		if (v_ccpp_threshold == 0)//Last check
@@ -1161,7 +1179,7 @@ public:
 		//debug_img(std::vector<cv::Mat>{ccpp_map, start_end});
 
 		std::vector<Eigen::Vector2i> map_trajectory = perform_ccpp(start_end,
-			start_pos_on_map, end_pos_on_map, 0.5);
+			start_pos_on_map, end_pos_on_map, 2);
 
 		//std::cout << "  " << std::endl;
 		cv::Mat viz_ccpp = ccpp_map.clone();
@@ -1250,7 +1268,10 @@ public:
 		// return trajectory
 		//debug_img(std::vector<cv::Mat>{map});
 		m_current_building_id = untraveled_buildings[id_building];
-		m_motion_status = Motion_status::reconstruction_in_exploration;
+		if (with_exploration)
+			m_motion_status = Motion_status::exploration;
+		else
+			m_motion_status = Motion_status::reconstruction_in_exploration;
 		return;
 	}
 
@@ -1466,9 +1487,10 @@ public:
 			std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> unpassed_trajectory;
 			std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>>& passed_trajectory = v_buildings[cur_building_id].passed_trajectory;
 			int start_pos_id = 0;
+			int one_pass_trajectory_num = v_buildings[cur_building_id].one_pass_trajectory_num;
 			std::copy_if(v_buildings[cur_building_id].trajectory.begin(), v_buildings[cur_building_id].trajectory.end(),
 				std::back_inserter(unpassed_trajectory),
-				[&passed_trajectory, v_threshold, &unpassed_trajectory, &start_pos_id](const auto& item_new_trajectory) {
+				[&passed_trajectory, v_threshold, &unpassed_trajectory, &start_pos_id, one_pass_trajectory_num](const auto& item_new_trajectory) {
 					bool untraveled = true;
 					for (auto item_passed_trajectory_iter = passed_trajectory.begin(); item_passed_trajectory_iter < passed_trajectory.end(); ++item_passed_trajectory_iter) {
 						auto item_passed_trajectory = *item_passed_trajectory_iter;
@@ -1482,10 +1504,10 @@ public:
 							angle = 0;
 						if ((item_passed_trajectory.first - item_new_trajectory.first).norm() < v_threshold && angle < 5) {
 							untraveled = false;
-							if (start_pos_id == unpassed_trajectory.size() - 1)
+							/*if (unpassed_trajectory.size() - start_pos_id < one_pass_trajectory_num / 2)
 								start_pos_id = unpassed_trajectory.size();
 							if ((item_passed_trajectory_iter - passed_trajectory.begin()) == passed_trajectory.size() - 1)
-								start_pos_id = 0;
+								start_pos_id = 0;*/
 						}
 					}
 					return untraveled;
@@ -2129,16 +2151,23 @@ public:
 
 				for (int i_building_1 = m_buildings_target.size() - 1; i_building_1 >= 0; --i_building_1) 
 				{
-					Point_2 p(m_buildings_target[i_building_1].bounding_box_3d.box.center().x(),
-						m_buildings_target[i_building_1].bounding_box_3d.box.center().y()
-					);
+					cv::Point2f points[4];
+					m_buildings_target[i_building_1].bounding_box_3d.cv_box.points(points);
+
 					if (m_boundary.size() > 0)
 					{
-						for (auto iter_segment = m_boundary.edges_begin(); iter_segment != m_boundary.edges_end(); ++iter_segment)
-							if (CGAL::squared_distance(p, *iter_segment) < 00 * 00)
-								m_buildings_target.erase(m_buildings_target.begin() + i_building_1);
-						if (m_boundary.bounded_side(p) != CGAL::ON_BOUNDED_SIDE)
+						bool should_delete = false;
+						for (int i_point = 0; i_point < 4; ++i_point) {
+							Point_2 p(points[i_point].x, points[i_point].y);
+							for (auto iter_segment = m_boundary.edges_begin(); iter_segment != m_boundary.edges_end(); ++iter_segment)
+								if (CGAL::squared_distance(p, *iter_segment) < args["BOUNDS_MIN"].asFloat() * args["BOUNDS_MIN"].asFloat() * 2)
+									should_delete = true;
+							if (m_boundary.bounded_side(p) != CGAL::ON_BOUNDED_SIDE)
+								should_delete = true;
+						}
+						if(should_delete)
 							m_buildings_target.erase(m_buildings_target.begin() + i_building_1);
+
 					}
 				}
 
@@ -2565,7 +2594,10 @@ int main(int argc, char** argv){
 	Visualizer* viz = new Visualizer;
 	viz->m_uncertainty_map_distance=args["ccpp_cell_distance"].asFloat();
 	CGAL::Point_set_3<Point_3, Vector_3> original_point_cloud;
-	CGAL::read_ply_point_set(std::ifstream(args["model_path"].asString(), std::ios::binary), original_point_cloud);
+	CGAL::read_ply_point_set(std::ifstream(args["height_map_model_path"].asString(), std::ios::binary), original_point_cloud);
+	Height_map original_height_map(original_point_cloud, args["heightmap_resolution"].asFloat(),
+		args["heightmap_dilate"].asFloat());
+	debug_img(std::vector<cv::Mat>{original_height_map.m_map_dilated});
 	viz->lock();
 	viz->m_points = original_point_cloud;
 	viz->unlock();
@@ -2839,6 +2871,7 @@ int main(int argc, char** argv){
 		
 	}
 	total_passed_trajectory.pop_back();
+	total_passed_trajectory.pop_back();
 
 	write_unreal_path(total_passed_trajectory, "camera_after_transaction.log");
 	write_normal_path(total_passed_trajectory, "camera_normal.log");
@@ -2888,7 +2921,7 @@ int main(int argc, char** argv){
 	height_map.save_height_map_tiff("height_map.tiff");
 	debug_img(std::vector<cv::Mat>{height_map.m_map_dilated});
 
-	total_passed_trajectory = ensure_global_safe(total_passed_trajectory, height_map, args["Z_UP_BOUNDS"].asFloat(), mapper->m_boundary);
+	total_passed_trajectory = ensure_global_safe(total_passed_trajectory, original_height_map, args["Z_UP_BOUNDS"].asFloat(), mapper->m_boundary);
 
 	// Change focus point into direction
 	for (auto& item : total_passed_trajectory)
