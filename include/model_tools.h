@@ -108,7 +108,7 @@ std::vector<Polygon_2> get_polygons(std::string file_path);
 class Height_map {
 	
 public:
-    Height_map(const Point_set& v_point_cloud, const float v_resolution,float v_dilate)
+    Height_map(const Point_set& v_point_cloud, const float v_resolution,int v_dilate)
 	:m_resolution(v_resolution), m_dilate(v_dilate){
         Eigen::AlignedBox3f bounds = get_bounding_box(v_point_cloud);
         m_start = bounds.min();
@@ -126,12 +126,15 @@ public:
                 m_map.at<float>((int)((point.y() - m_start[1]) / m_resolution), (int)((point.x() - m_start[0]) / m_resolution)) = point.z();
         }
         if (v_dilate!=0)
-            cv::dilate(m_map, m_map_dilated, cv::getStructuringElement(cv::MorphShapes::MORPH_RECT, cv::Size(v_dilate, v_dilate)), cv::Point(-1, -1), 3);
+			cv::dilate(m_map, m_map_dilated, 
+                cv::getStructuringElement(cv::MorphShapes::MORPH_RECT, cv::Size(3, 3)), 
+                cv::Point(-1, -1), 
+                v_dilate);
         else
             m_map_dilated = m_map;
     }
 
-    Height_map(const Eigen::Vector3f& v_min, const Eigen::Vector3f& v_max, const float v_resolution, float v_dilate)
+    Height_map(const Eigen::Vector3f& v_min, const Eigen::Vector3f& v_max, const float v_resolution, int v_dilate)
 	:m_resolution(v_resolution),m_start(v_min), m_dilate(v_dilate) {
         Eigen::Vector3f delta = (v_max - m_start) / m_resolution;
         m_map = cv::Mat((int)delta[1] + 1, (int)delta[0] + 1, CV_32FC1);
@@ -191,7 +194,10 @@ public:
             }
                 
         if(m_dilate!=0)
-    		cv::dilate(m_map, m_map_dilated, cv::getStructuringElement(cv::MorphShapes::MORPH_RECT, cv::Size(m_dilate, m_dilate)),cv::Point(-1,-1),3);
+            cv::dilate(m_map, m_map_dilated,
+                cv::getStructuringElement(cv::MorphShapes::MORPH_RECT, cv::Size(3, 3)),
+                cv::Point(-1, -1),
+                m_dilate);
         else
     		m_map_dilated = m_map;
 
@@ -214,7 +220,7 @@ public:
         cv::imwrite(v_path, m_map);
     }
 	
-    float m_dilate;
+    int m_dilate;
     Eigen::Vector3f m_start;
     float m_resolution;
     cv::Mat m_map;

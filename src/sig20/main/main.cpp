@@ -2160,7 +2160,7 @@ public:
 						for (int i_point = 0; i_point < 4; ++i_point) {
 							Point_2 p(points[i_point].x, points[i_point].y);
 							for (auto iter_segment = m_boundary.edges_begin(); iter_segment != m_boundary.edges_end(); ++iter_segment)
-								if (CGAL::squared_distance(p, *iter_segment) < args["BOUNDS_MIN"].asFloat() * args["BOUNDS_MIN"].asFloat() * 2)
+								if (CGAL::squared_distance(p, *iter_segment) < args["safe_distance"].asFloat() * args["safe_distance"].asFloat() * 2)
 									should_delete = true;
 							if (m_boundary.bounded_side(p) != CGAL::ON_BOUNDED_SIDE)
 								should_delete = true;
@@ -2593,14 +2593,12 @@ int main(int argc, char** argv){
 	Airsim_tools* airsim_client;
 	Visualizer* viz = new Visualizer;
 	viz->m_uncertainty_map_distance=args["ccpp_cell_distance"].asFloat();
-	CGAL::Point_set_3<Point_3, Vector_3> original_point_cloud;
-	CGAL::read_ply_point_set(std::ifstream(args["height_map_model_path"].asString(), std::ios::binary), original_point_cloud);
-	Height_map original_height_map(original_point_cloud, args["heightmap_resolution"].asFloat(),
-		args["heightmap_dilate"].asFloat());
-	debug_img(std::vector<cv::Mat>{original_height_map.m_map_dilated});
-	viz->lock();
-	viz->m_points = original_point_cloud;
-	viz->unlock();
+	
+	CGAL::Point_set_3<Point_3, Vector_3> safe_zone_point_cloud;
+	CGAL::read_ply_point_set(std::ifstream(args["safe_zone_model_path"].asString(), std::ios::binary), safe_zone_point_cloud);
+	Height_map original_height_map(safe_zone_point_cloud, args["heightmap_resolution"].asFloat(),
+		args["heightmap_dilate"].asInt());
+	
 	{
 		if (boost::filesystem::exists(log_root))
 			boost::filesystem::remove_all(log_root);
@@ -2635,7 +2633,7 @@ int main(int argc, char** argv){
 	const Eigen::Vector3f map_end_mesh(map_end_unreal.x() / 100.f, -map_start_unreal.y() / 100.f, map_end_unreal.z() / 100.f);
 	Height_map height_map(map_start_mesh,map_end_mesh,
 		args["heightmap_resolution"].asFloat(),
-		args["heightmap_dilate"].asFloat()
+		args["heightmap_dilate"].asInt()
 		);
 	std::vector<Building> total_buildings;
 	Pos_Pack current_pos = map_converter.get_pos_pack_from_unreal(
@@ -2701,30 +2699,16 @@ int main(int argc, char** argv){
 			// Generating trajectory
 			// Input: Building vectors (std::vector<Building>)
 			// Output: Modified Building.trajectory and return the whole trajectory
-			float overlap_step;
 			{
-				Trajectory_params params;
-				params.view_distance = args["BOUNDS_MIN"].asFloat();
-				params.split_flag = args["split_flag"].asBool();
-				params.z_down_bounds = args["Z_DOWN_BOUND"].asFloat();
-				params.z_up_bounds = args["Z_UP_BOUNDS"].asFloat();
-				params.with_continuous_height = args["with_continuous_height"].asBool();
-				params.with_erosion = args["with_erosion"].asBool();
-				params.double_flag = args["double_flag"].asBool();
-				params.step = args["step"].asFloat();
-				params.fov = args["fov"].asFloat();
-				params.vertical_overlap = args["vertical_overlap"].asFloat();
-				params.horizontal_overlap = args["horizontal_overlap"].asFloat();
-				params.split_overlap = args["split_overlap"].asFloat();
-				current_trajectory = generate_trajectory(params, total_buildings, height_map, params.z_up_bounds, vertical_step, horizontal_step, split_min_distance);
-				overlap_step = params.view_distance * std::tan(params.fov / 180.f * M_PI / 2) * 2 * (1. - params.horizontal_overlap);
+				current_trajectory = generate_trajectory(args, total_buildings, args["mapper"].asString()=="gt_mapper"? original_height_map:height_map,
+					vertical_step, horizontal_step, split_min_distance);
 				LOG(INFO) << "New trajectory ??!";
 			}
 
 			// Determine next position
 			{
 				next_pos_direction = next_best_target->determine_next_target(cur_frame_id, current_pos,
-					total_buildings, with_exploration,  overlap_step /  2);
+					total_buildings, with_exploration, horizontal_step /  2);
 				LOG(INFO) << "Determine next position ??";
 			}
 			// End
@@ -2871,7 +2855,6 @@ int main(int argc, char** argv){
 		
 	}
 	total_passed_trajectory.pop_back();
-	total_passed_trajectory.pop_back();
 
 	write_unreal_path(total_passed_trajectory, "camera_after_transaction.log");
 	write_normal_path(total_passed_trajectory, "camera_normal.log");
@@ -2921,7 +2904,7 @@ int main(int argc, char** argv){
 	height_map.save_height_map_tiff("height_map.tiff");
 	debug_img(std::vector<cv::Mat>{height_map.m_map_dilated});
 
-	total_passed_trajectory = ensure_global_safe(total_passed_trajectory, original_height_map, args["Z_UP_BOUNDS"].asFloat(), mapper->m_boundary);
+	total_passed_trajectory = ensure_global_safe(total_passed_trajectory, original_height_map, args["safe_distance"].asFloat(), mapper->m_boundary);
 
 	// Change focus point into direction
 	for (auto& item : total_passed_trajectory)
