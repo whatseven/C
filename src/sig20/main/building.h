@@ -17,6 +17,7 @@ struct Building {
 	bool is_divide = false;
 	int parent = -1;
 	int one_pass_trajectory_num = 0;
+	int closest_trajectory_id = 0;
 
 	//Used for trajectory generation
 	int start_box = -1;

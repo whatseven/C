@@ -1486,9 +1486,17 @@ public:
 			const int& cur_building_id = m_current_building_id;
 			std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> unpassed_trajectory;
 			std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>>& passed_trajectory = v_buildings[cur_building_id].passed_trajectory;
+			if (passed_trajectory.size() == 0)
+			{
+				int id_closest_trajectory = std::min_element(v_buildings[cur_building_id].trajectory.begin(), v_buildings[cur_building_id].trajectory.end(),
+					[&v_cur_pos](const auto& tra1, const auto& tra2) {
+						return (tra1.first - v_cur_pos.pos_mesh).norm() < (tra2.first - v_cur_pos.pos_mesh).norm();
+					}) - v_buildings[cur_building_id].trajectory.begin();
+					v_buildings[cur_building_id].closest_trajectory_id = id_closest_trajectory;
+			}
 			int start_pos_id = 0;
 			int one_pass_trajectory_num = v_buildings[cur_building_id].one_pass_trajectory_num;
-			std::copy_if(v_buildings[cur_building_id].trajectory.begin(), v_buildings[cur_building_id].trajectory.end(),
+			std::copy_if(v_buildings[cur_building_id].trajectory.begin() + v_buildings[cur_building_id].closest_trajectory_id, v_buildings[cur_building_id].trajectory.end(),
 				std::back_inserter(unpassed_trajectory),
 				[&passed_trajectory, v_threshold, &unpassed_trajectory, &start_pos_id, one_pass_trajectory_num](const auto& item_new_trajectory) {
 					bool untraveled = true;
@@ -1508,6 +1516,33 @@ public:
 								start_pos_id = unpassed_trajectory.size();
 							if ((item_passed_trajectory_iter - passed_trajectory.begin()) == passed_trajectory.size() - 1)
 								start_pos_id = 0;*/
+							//TODO trajectory merge.
+						}
+					}
+					return untraveled;
+				});
+
+			std::copy_if(v_buildings[cur_building_id].trajectory.begin(), v_buildings[cur_building_id].trajectory.begin() + v_buildings[cur_building_id].closest_trajectory_id,
+				std::back_inserter(unpassed_trajectory),
+				[&passed_trajectory, v_threshold, &unpassed_trajectory, &start_pos_id, one_pass_trajectory_num](const auto& item_new_trajectory) {
+					bool untraveled = true;
+					for (auto item_passed_trajectory_iter = passed_trajectory.begin(); item_passed_trajectory_iter < passed_trajectory.end(); ++item_passed_trajectory_iter) {
+						auto item_passed_trajectory = *item_passed_trajectory_iter;
+						Eigen::Vector3f vector1 = (item_passed_trajectory.second - item_passed_trajectory.first).normalized();
+						Eigen::Vector3f vector2 = (item_new_trajectory.second - item_new_trajectory.first).normalized();
+						float dot_product = vector1.dot(vector2);
+						if (dot_product > 1)
+							dot_product = 1;
+						float angle = std::acos(dot_product) / M_PI * 180;
+						if (angle >= 180)
+							angle = 0;
+						if ((item_passed_trajectory.first - item_new_trajectory.first).norm() < v_threshold && angle < 5) {
+							untraveled = false;
+							/*if (unpassed_trajectory.size() - start_pos_id < one_pass_trajectory_num / 2)
+								start_pos_id = unpassed_trajectory.size();
+							if ((item_passed_trajectory_iter - passed_trajectory.begin()) == passed_trajectory.size() - 1)
+								start_pos_id = 0;*/
+								//TODO trajectory merge.
 						}
 					}
 					return untraveled;
