@@ -718,7 +718,7 @@ void cluster_duplicate(
 	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>>& v_trajectory,
 	const float v_vertical_overlap, const float v_fov,const float v_view_distance)
 {
-	float duplicate_threshold = 3; // Threshold to cluster views
+	float duplicate_threshold = 5; // Threshold to cluster views
 	std::vector<std::vector<int>> duplicate_pairs; // Store the clusters. Smallest index -> Largest index
 	std::vector<int> index_table(v_trajectory.size(),-1); // Whether a view is already been clustered
 
@@ -756,7 +756,7 @@ void cluster_duplicate(
 		surface_distance_one_view = surface_distance_one_view * (1-v_vertical_overlap);
 
 		int step = (last_focus_point - first_focus_point).norm() / surface_distance_one_view + 1;
-		if (step >= duplicate_pairs.size()) // Can not be optimized
+		if (step >= duplicate_pairs[i_pair].size()) // Can not be optimized
 			continue;
 		Eigen::Vector3f current_focus_point = first_focus_point;
 		for(int i_view = 1;i_view < duplicate_pairs[i_pair].size();i_view++)
@@ -927,7 +927,9 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 					else
 						surface_distance_one_view = std::tan((30 + v_params["fov"].asFloat() / 2) / 180.f * M_PI) * view_distance + std::tan((v_params["fov"].asFloat() / 2 - 30) / 180.f * M_PI) * view_distance;
 					vertical_step = surface_distance_one_view * (1 - v_params["vertical_overlap"].asFloat());
-					num_pass = (zmax + view_distance) / vertical_step;
+					num_pass = (zmax + view_distance - surface_distance_one_view) / vertical_step;
+					if (num_pass < 0)
+						num_pass = 0;
 					num_pass += 1;
 				//}
 			}
