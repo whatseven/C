@@ -1052,6 +1052,7 @@ public:
 	cv::Vec3b color_occupied;
 	cv::Vec3b color_unobserved;
 	cv::Vec3b color_reconstruction;
+	Json::Value m_arg;
 
 	//const int CCPP_CELL_THRESHOLD = 50;
 	//const int CCPP_CELL_THRESHOLD = 70;
@@ -1070,7 +1071,7 @@ public:
 	float dummy3 = 0;
 
 	Next_best_target_topology_exploration(const Eigen::Vector3f& v_map_start_mesh, const Eigen::Vector3f& v_map_end_mesh,
-		int v_CCPP_CELL_THRESHOLD,const Polygon_2& m_boundary,float v_ccpp_cell_distance):CCPP_CELL_THRESHOLD(v_CCPP_CELL_THRESHOLD),
+		int v_CCPP_CELL_THRESHOLD,const Polygon_2& m_boundary,float v_ccpp_cell_distance, const Json::Value& v_arg):CCPP_CELL_THRESHOLD(v_CCPP_CELL_THRESHOLD), m_arg(v_arg),
 		Next_best_target(v_map_start_mesh, v_map_end_mesh, v_ccpp_cell_distance)
 	{
 		//color_reconstruction = region_viz_color[2];
@@ -1381,6 +1382,7 @@ public:
 						auto& item = m_ccpp_trajectory[m_current_ccpp_trajectory_id].first;
 
 						std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> start_points;
+
 						start_points.emplace_back(
 							Eigen::Vector3f(
 								item.x() - DISTANCE_THRESHOLD * 0.3,
@@ -1418,17 +1420,17 @@ public:
 						m_exploration_point.emplace(
 							start_points[nearest_id].first + DISTANCE_THRESHOLD * 0.25 * 0 * start_points[nearest_id].second,
 							start_points[nearest_id].first + DISTANCE_THRESHOLD * 0.25 * 0 * start_points[nearest_id].second +
-							Eigen::Vector3f(-0.5, -0.5 * 1.732, -std::tan(64.f / 180 * M_PI)).normalized()
+							(m_arg["fix_angle_flag"].asBool()?Eigen::Vector3f(std::cos(64.f / 180 * M_PI), 0, -std::sin(64.f / 180 * M_PI)) : Eigen::Vector3f(-0.5, -0.5 * 1.732, -std::tan(64.f / 180 * M_PI)).normalized())
 						);
 						m_exploration_point.emplace(
 							start_points[nearest_id].first + DISTANCE_THRESHOLD * 0.25 * 1 * start_points[nearest_id].second,
 							start_points[nearest_id].first + DISTANCE_THRESHOLD * 0.25 * 1 * start_points[nearest_id].second + 
-							Eigen::Vector3f(1, 0, -std::tan(64.f / 180 * M_PI)).normalized()
+							(m_arg["fix_angle_flag"].asBool() ? Eigen::Vector3f(std::cos(64.f / 180 * M_PI), 0, -std::sin(64.f / 180 * M_PI)) : Eigen::Vector3f(1, 0, -std::tan(64.f / 180 * M_PI)).normalized())
 						);
 						m_exploration_point.emplace(
 							start_points[nearest_id].first + DISTANCE_THRESHOLD * 0.25 * 2 * start_points[nearest_id].second,
 							start_points[nearest_id].first + DISTANCE_THRESHOLD * 0.25 * 2 * start_points[nearest_id].second + 
-							Eigen::Vector3f(-0.5, 0.5 * 1.732, -std::tan(64.f / 180 * M_PI)).normalized()
+							(m_arg["fix_angle_flag"].asBool() ? Eigen::Vector3f(std::cos(64.f / 180 * M_PI), 0, -std::sin(64.f / 180 * M_PI)) : Eigen::Vector3f(-0.5, 0.5 * 1.732, -std::tan(64.f / 180 * M_PI)).normalized())
 						);
 					
 						
@@ -1796,8 +1798,8 @@ public:
 class Next_best_target_order_reconstruction :public Next_best_target_topology_exploration {
 public:
 	Next_best_target_order_reconstruction(const Eigen::Vector3f& v_map_start_mesh, const Eigen::Vector3f& v_map_end_mesh,
-		int v_CCPP_CELL_THRESHOLD, const Polygon_2& m_boundary, float v_ccpp_cell_distance)
-	:Next_best_target_topology_exploration(v_map_start_mesh, v_map_end_mesh, v_CCPP_CELL_THRESHOLD, m_boundary, v_ccpp_cell_distance){}
+		int v_CCPP_CELL_THRESHOLD, const Polygon_2& m_boundary, float v_ccpp_cell_distance,const Json::Value& v_arg)
+	:Next_best_target_topology_exploration(v_map_start_mesh, v_map_end_mesh, v_CCPP_CELL_THRESHOLD, m_boundary, v_ccpp_cell_distance, v_arg){}
 	
 	//int m_current_exploration_id = -1;
 	//cv::Vec3b color_unobserved, color_free, color_occupied;
@@ -2673,6 +2675,7 @@ public:
 
 int main(int argc, char** argv){
 	// Read arguments
+	LOG(INFO) << "Read config "<< argv[2];
 	Json::Value args;
 	{
 		FLAGS_logtostderr = 1; 
@@ -2707,13 +2710,15 @@ int main(int argc, char** argv){
 	Visualizer* viz = new Visualizer;
 	std::map<cv::Vec3b, std::string> color_to_mesh_name_map;
 	viz->m_uncertainty_map_distance=args["ccpp_cell_distance"].asFloat();
-	
+
+	LOG(INFO) << "Read safe zone " << args["safe_zone_model_path"].asString();
 	CGAL::Point_set_3<Point_3, Vector_3> safe_zone_point_cloud;
 	CGAL::read_ply_point_set(std::ifstream(args["safe_zone_model_path"].asString(), std::ios::binary), safe_zone_point_cloud);
 	Height_map original_height_map(safe_zone_point_cloud, args["heightmap_resolution"].asFloat(),
 		args["heightmap_dilate"].asInt());
 	
 	{
+		LOG(INFO) << "Initialization directory, airsim and reset color";
 		if (boost::filesystem::exists(log_root))
 			boost::filesystem::remove_all(log_root);
 		boost::filesystem::create_directories(log_root);
@@ -2749,7 +2754,6 @@ int main(int argc, char** argv){
 					return bl;
 				});
 		}
-		LOG(INFO) << "Initialization done";
 	}
 
 	// Some global structure
@@ -2775,6 +2779,7 @@ int main(int argc, char** argv){
 	std::vector<int> trajectory_flag;
 	//debug_img(std::vector<cv::Mat>{height_map.m_map});
 
+	LOG(INFO) << "Mapping building ";
 	Mapper* mapper;
 	if (args["mapper"] == "gt_mapper")
 		mapper = new GT_mapper(args);
@@ -2786,12 +2791,12 @@ int main(int argc, char** argv){
 	Next_best_target* next_best_target;
 	if (args["nbv_target"] == "Topology_decomposition")
 		next_best_target = new Next_best_target_topology_exploration(map_start_mesh, map_end_mesh, 
-			args["CCPP_CELL_THRESHOLD"].asInt(), mapper->m_boundary, args["ccpp_cell_distance"].asFloat());
+			args["CCPP_CELL_THRESHOLD"].asInt(), mapper->m_boundary, args["ccpp_cell_distance"].asFloat(),args);
 	else if (args["nbv_target"] == "Min_distance")
 		next_best_target = new Next_best_target_min_distance_ccpp(map_start_mesh, map_end_mesh, args["ccpp_cell_distance"].asFloat());
 	else if (args["nbv_target"] == "Order_reconstruction")
 		next_best_target = new Next_best_target_order_reconstruction(map_start_mesh, map_end_mesh,
-			args["CCPP_CELL_THRESHOLD"].asInt(), mapper->m_boundary, args["ccpp_cell_distance"].asFloat());
+			args["CCPP_CELL_THRESHOLD"].asInt(), mapper->m_boundary, args["ccpp_cell_distance"].asFloat(), args);
 	else if (args["nbv_target"] == "Random_min_distance")
 		next_best_target = new Next_best_target_random_min_distance(map_start_mesh, map_end_mesh, args["ccpp_cell_distance"].asFloat());
 	else if (args["nbv_target"] == "Min_max_information")
@@ -2965,6 +2970,7 @@ int main(int argc, char** argv){
 			current_pos = map_converter.get_pos_pack_from_mesh(next_pos, yaw, pitch);
 			cur_frame_id++;
 		}
+		profileTime(t, "Find next move");
 		LOG(INFO) << "<<<<<<<<<<<<< Frame " << cur_frame_id - 1 << " done! <<<<<<<<<<<<<";
 		LOG(INFO) << "";
 		//if (cur_frame_id > 1000)

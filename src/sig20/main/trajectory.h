@@ -1138,6 +1138,15 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 		else
 			item_trajectory = ensure_safe_trajectory_and_calculate_direction(item_trajectory, v_height_map, safe_distance);
 
+		if(v_params.isMember("z_down_bounds"))
+		{
+			for (int i = 0;i < item_trajectory.size();++i)
+			{
+				if (item_trajectory[i].first.z() < v_params["z_down_bounds"].asFloat())
+					item_trajectory[i].first.z() = v_params["z_down_bounds"].asFloat();
+			}
+		}
+		
 		if (v_params["cluster_duplicate_flag"].asBool())
 			cluster_duplicate(item_trajectory, v_params["vertical_overlap"].asFloat(), v_params["fov"].asFloat(),view_distance);
 
