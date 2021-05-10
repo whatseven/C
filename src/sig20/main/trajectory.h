@@ -721,7 +721,7 @@ void cluster_duplicate(
 	float duplicate_threshold = 5; // Threshold to cluster views
 	std::vector<std::vector<int>> duplicate_pairs; // Store the clusters. Smallest index -> Largest index
 	std::vector<int> index_table(v_trajectory.size(),-1); // Whether a view is already been clustered
-
+	
 	// Clustering
 	for (int i_view1 = 0;i_view1 < v_trajectory.size();i_view1++) {
 		for (int i_view2 = 0;i_view2 < i_view1;i_view2++) {
@@ -753,9 +753,9 @@ void cluster_duplicate(
 		
 		float new_angle = -std::atan2(direction.z(), std::sqrtf(direction.x() * direction.x() + direction.y() * direction.y()));
 		float surface_distance_one_view = std::tan(new_angle+(v_fov / 2) / 180.f * M_PI) * v_view_distance - std::tan(new_angle-(v_fov / 2) / 180.f * M_PI) * v_view_distance;
-		surface_distance_one_view = surface_distance_one_view * (1-v_vertical_overlap);
 
-		int step = (last_focus_point - first_focus_point).norm() / surface_distance_one_view + 1;
+		int step = ((last_focus_point - first_focus_point).norm() - surface_distance_one_view) / (surface_distance_one_view * (1 - v_vertical_overlap)) + 1;
+
 		if (step >= duplicate_pairs[i_pair].size()) // Can not be optimized
 			continue;
 		Eigen::Vector3f current_focus_point = first_focus_point;
@@ -1439,7 +1439,7 @@ std::vector<Eigen::Vector2i> perform_ccpp(const cv::Mat& ccpp_map, const Eigen::
 	cv::Mat distance_map(v_map.rows, v_map.cols, CV_32SC1, cv::Scalar(0));
 	generate_distance_map(v_map, distance_map, goal, goal, 0);
 	std::cout << "distance_map" << std::endl;
-	print_map(distance_map);
+	//print_map(distance_map);
 	cv::Mat obstacle_map(v_map.rows, v_map.cols, CV_32SC1, cv::Scalar(0));
 	for (int i = 0; i < v_map.rows; i++)
 	{
@@ -1452,9 +1452,9 @@ std::vector<Eigen::Vector2i> perform_ccpp(const cv::Mat& ccpp_map, const Eigen::
 		}
 	}
 	std::cout << "v_map" << std::endl;
-	print_map(v_map);
+	//print_map(v_map);
 	std::cout << "obstacle_map" << std::endl;
-	print_map(obstacle_map);
+	//print_map(obstacle_map);
 
 	Eigen::Vector2i now_point(start_point);
 	cv::Mat visited_map(v_map.rows, v_map.cols, CV_32SC1, cv::Scalar(0));

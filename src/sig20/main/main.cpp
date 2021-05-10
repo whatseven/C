@@ -1181,7 +1181,7 @@ public:
 		//debug_img(std::vector<cv::Mat>{ccpp_map, start_end});
 
 		std::vector<Eigen::Vector2i> map_trajectory = perform_ccpp(start_end,
-			start_pos_on_map, end_pos_on_map, 2);
+			start_pos_on_map, end_pos_on_map, 2.5);
 
 		//std::cout << "  " << std::endl;
 		cv::Mat viz_ccpp = ccpp_map.clone();
@@ -1342,7 +1342,7 @@ public:
 						untraveled_buildings_inside_exist_region.push_back(i_building);
 				}
 			}
-			if (untraveled_buildings_inside_exist_region.size() != 0) {
+			if (untraveled_buildings_inside_exist_region.size() != 0 && m_arg["with_reconstruction"].asBool()) {
 				//throw;
 				m_motion_status = Motion_status::reconstruction_in_exploration;
 				int id_building = std::min_element(untraveled_buildings_inside_exist_region.begin(),
@@ -2843,7 +2843,7 @@ int main(int argc, char** argv){
 			// Determine next position
 			{
 				next_pos_direction = next_best_target->determine_next_target(cur_frame_id, current_pos,
-					total_buildings, with_exploration, horizontal_step /  2);
+					total_buildings, with_exploration, horizontal_step / 2);
 				LOG(INFO) << "Determine next position ??";
 			}
 			// End
