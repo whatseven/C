@@ -15,6 +15,7 @@
 #include <CGAL/point_generators_2.h>
 #include <json/reader.h>
 #include <algorithm>
+#include <regex>
 
 #include "model_tools.h"
 #include "intersection_tools.h"
@@ -1180,7 +1181,7 @@ public:
 		//debug_img(std::vector<cv::Mat>{ccpp_map, start_end});
 
 		std::vector<Eigen::Vector2i> map_trajectory = perform_ccpp(start_end,
-			start_pos_on_map, end_pos_on_map, 2);
+			start_pos_on_map, end_pos_on_map, 2.5);
 
 		//std::cout << "  " << std::endl;
 		cv::Mat viz_ccpp = ccpp_map.clone();
@@ -1341,7 +1342,7 @@ public:
 						untraveled_buildings_inside_exist_region.push_back(i_building);
 				}
 			}
-			if (untraveled_buildings_inside_exist_region.size() != 0) {
+			if (untraveled_buildings_inside_exist_region.size() != 0 && m_arg["with_reconstruction"].asBool()) {
 				//throw;
 				m_motion_status = Motion_status::reconstruction_in_exploration;
 				int id_building = std::min_element(untraveled_buildings_inside_exist_region.begin(),
@@ -2237,16 +2238,92 @@ public:
 	Unreal_object_detector* m_unreal_object_detector;
 	Synthetic_SLAM* m_synthetic_SLAM;
 	Airsim_tools* m_airsim_client;
+	std::map<cv::Vec3b, std::string> m_color_to_mesh_name_map;
 	
-	Virtual_mapper(const Json::Value& args, Airsim_tools* v_airsim_client)
+	Virtual_mapper(const Json::Value& args, Airsim_tools* v_airsim_client, std::map<cv::Vec3b, std::string> color_to_mesh_name_map)
 	: Mapper(args), m_airsim_client(v_airsim_client){
 		m_unreal_object_detector =new Unreal_object_detector;
-		m_synthetic_SLAM = new Synthetic_SLAM;
+		m_color_to_mesh_name_map = color_to_mesh_name_map;
+		//m_synthetic_SLAM = new Synthetic_SLAM;
 	}
-	
+
+	struct ImageCluster
+	{
+		CGAL::Bbox_2 box;
+		std::string name;
+		cv::Vec3b color;
+		std::vector<int> xs;
+		std::vector<int> ys;
+	};
+
+	std::vector<ImageCluster> solveCluster(const cv::Mat& vSeg, const std::map<cv::Vec3b, std::string> colorMap, bool& isValid) {
+
+		isValid = true;
+		std::map<cv::Vec3b, int> currentColor;
+		std::vector<std::pair<std::vector<int>, std::vector<int>>> bbox;
+
+		int background_num = 0;
+		for (int y = 0; y < vSeg.size().height; y++) {
+			for (int x = 0; x < vSeg.size().width; x++) {
+				cv::Vec3b pixel = vSeg.at<cv::Vec3b>(y, x);
+				if (pixel == cv::Vec3b(55, 181, 57))
+				{
+					background_num++;
+					continue;
+				}
+
+				if (currentColor.find(pixel) == currentColor.end()) {
+					currentColor.insert(std::make_pair(pixel, bbox.size()));
+					bbox.push_back(std::make_pair(std::vector<int>(), std::vector<int>()));
+				}
+
+				bbox[currentColor.at(pixel)].first.push_back(x);
+				bbox[currentColor.at(pixel)].second.push_back(y);
+			}
+		}
+
+		std::vector<ImageCluster> result;
+		if (background_num > vSeg.size().height * vSeg.size().width * 0.8)
+		{
+			isValid = false;
+			return result;
+		}
+
+		int small_building_num = 0;
+		for (auto colorIter = currentColor.begin(); colorIter != currentColor.end(); colorIter++) {
+			ImageCluster cluster;
+			if (bbox[colorIter->second].first.size() < 30 * 30)
+			{
+				small_building_num++;
+				continue;
+			}
+			//if (bbox[colorIter->second].first.size() < 30 * 30)
+			//{
+			//	isValid = false;
+			//	break;
+			//}
+			cluster.box = CGAL::Bbox_2(
+				*std::min_element(bbox[colorIter->second].first.begin(), bbox[colorIter->second].first.end()),
+				*std::min_element(bbox[colorIter->second].second.begin(), bbox[colorIter->second].second.end()),
+				*std::max_element(bbox[colorIter->second].first.begin(), bbox[colorIter->second].first.end()),
+				*std::max_element(bbox[colorIter->second].second.begin(), bbox[colorIter->second].second.end())
+			);
+			cluster.color = colorIter->first;
+			if (colorMap.find(cluster.color) == colorMap.end())
+				continue;
+			cluster.name = std::to_string(std::atoi(colorMap.at(cluster.color).c_str()));
+			cluster.xs = bbox[currentColor.at(colorIter->first)].first;
+			cluster.ys = bbox[currentColor.at(colorIter->first)].second;
+			result.push_back(cluster);
+		}
+		if (small_building_num > 40)
+			isValid = false;
+		return result;
+	}
+
 	void get_buildings(std::vector<Building>& v_buildings,
 		const Pos_Pack& v_current_pos,
-		const int v_cur_frame_id,Height_map& v_height_map) override {
+		const int v_cur_frame_id, Height_map& v_height_map) override {
 		std::vector<Building> current_buildings;
 		int num_building_current_frame;
 		// Get current image and pose
@@ -2323,12 +2400,12 @@ public:
 					size_t cluster_index = &item_building - &current_buildings[0];
 					z_mins[cluster_index] = std::min_element(item_building.points_camera_space.range(item_building.points_camera_space.point_map()).begin(), item_building.points_camera_space.range(item_building.points_camera_space.point_map()).end(),
 						[](const auto& a, const auto& b) {
-						return a.z() < b.z();
-					})->z();
-					z_maxs[cluster_index] = std::max_element(item_building.points_camera_space.range(item_building.points_camera_space.point_map()).begin(), item_building.points_camera_space.range(item_building.points_camera_space.point_map()).end(),
-						[](const auto& a, const auto& b) {
-						return a.z() < b.z();
-					})->z();
+							return a.z() < b.z();
+						})->z();
+						z_maxs[cluster_index] = std::max_element(item_building.points_camera_space.range(item_building.points_camera_space.point_map()).begin(), item_building.points_camera_space.range(item_building.points_camera_space.point_map()).end(),
+							[](const auto& a, const auto& b) {
+								return a.z() < b.z();
+							})->z();
 				}
 
 				// Calculate height of the building, Get 3D bbox world space
@@ -2403,6 +2480,7 @@ public:
 			v_height_map.update(item_building.bounding_box_3d);
 		}
 	}
+
 };
 
 class Real_mapper :public Mapper
@@ -2634,6 +2712,7 @@ int main(int argc, char** argv){
 	// Reset segmentation color, initialize map converter
 	Airsim_tools* airsim_client;
 	Visualizer* viz = new Visualizer;
+	std::map<cv::Vec3b, std::string> color_to_mesh_name_map;
 	viz->m_uncertainty_map_distance=args["ccpp_cell_distance"].asFloat();
 
 	LOG(INFO) << "Read safe zone " << args["safe_zone_model_path"].asString();
@@ -2662,6 +2741,22 @@ int main(int argc, char** argv){
 			airsim_client = new Airsim_tools(UNREAL_START);
 			airsim_client->reset_color("building");
 			//	airsim_client.m_agent->simSetSegmentationObjectID("BP_Sky_Sphere", 0);
+
+			const boost::filesystem::path color_map_path(args["color_map"].asString());
+			airsim_client->m_color_map = cv::imread(color_map_path.string());
+			if (airsim_client->m_color_map.size == 0)
+			{
+				LOG(ERROR) << "Cannot open color map " << color_map_path << std::endl;
+				return 0;
+			}
+			cv::cvtColor(airsim_client->m_color_map, airsim_client->m_color_map, cv::COLOR_BGR2RGB);
+
+			color_to_mesh_name_map = airsim_client->reset_color([](std::string v_name)
+				{
+					std::regex rx("^[0-9_]+$");
+					bool bl = std::regex_match(v_name.begin(), v_name.end(), rx);
+					return bl;
+				});
 		}
 	}
 
@@ -2692,10 +2787,10 @@ int main(int argc, char** argv){
 	Mapper* mapper;
 	if (args["mapper"] == "gt_mapper")
 		mapper = new GT_mapper(args);
-	else if(args["mapper"] == "real_mapper")
+	else if (args["mapper"] == "real_mapper")
 		mapper = new Real_mapper(args, airsim_client);
 	else
-		mapper = new Virtual_mapper(args,airsim_client);
+		mapper = new Virtual_mapper(args, airsim_client, color_to_mesh_name_map);
 	
 	Next_best_target* next_best_target;
 	if (args["nbv_target"] == "Topology_decomposition")
@@ -2752,7 +2847,7 @@ int main(int argc, char** argv){
 			// Determine next position
 			{
 				next_pos_direction = next_best_target->determine_next_target(cur_frame_id, current_pos,
-					total_buildings, with_exploration, horizontal_step /  2);
+					total_buildings, with_exploration, horizontal_step / 2);
 				LOG(INFO) << "Determine next position ??";
 			}
 			// End
