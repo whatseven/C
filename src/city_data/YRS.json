@@ -21,7 +21,7 @@
   "MAP_START_UNREAL_Z1": 13690.0,
   "MAP_END_UNREAL_X": 14320.0,
   "MAP_END_UNREAL_Y": 29800.0,
-  "MAP_END_UNREAL_Z": 12500.0,
+  "MAP_END_UNREAL_Z": 15000.0,
   "output_root": "F:\\Unreal_model_split\\Shenzhen_dataset\\YRS",
   "mesh_root": "F:\\DataSet\\Shenzhen\\Yingrenshi_split\\mannual_selection",
   "heightmap_resolution": 5,
