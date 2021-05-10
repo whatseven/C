@@ -2597,10 +2597,10 @@ public:
 
 int main(int argc, char** argv){
 	// Read arguments
-	LOG(INFO) << "Read config "<< argv[2];
+	std::cout << "Read config "<< argv[2];
 	Json::Value args;
 	{
-		FLAGS_logtostderr = 1; 
+		FLAGS_logtostderr = 1;
 		google::InitGoogleLogging(argv[0]);
 		argparse::ArgumentParser program("Jointly exploration, navigation and reconstruction");
 		program.add_argument("--config_file").required();
@@ -2626,6 +2626,10 @@ int main(int argc, char** argv){
 			exit(0);
 		}
 	}
+	bool is_log = args["is_log"].asBool();
+	FLAGS_logtostderr = int(is_log);
+
+
 	// Prepare environment
 	// Reset segmentation color, initialize map converter
 	Airsim_tools* airsim_client;
@@ -2731,7 +2735,7 @@ int main(int argc, char** argv){
 		auto t = recordTime();
 		mapper->get_buildings(total_buildings, current_pos, cur_frame_id, height_map);
 		next_best_target->update_uncertainty(current_pos, total_buildings);
-		profileTime(t, "Height map");
+		profileTime(t, "Height map", is_log);
 
 		std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> current_trajectory;
 		if(!with_interpolated||(with_interpolated&& !is_interpolated))
@@ -2758,7 +2762,7 @@ int main(int argc, char** argv){
 			LOG(INFO) << (boost::format("Current mode: %s. Building progress: %d/%d") % std::to_string(next_best_target->m_motion_status) % current_building_num % total_buildings.size()).str();
 
 		}
-		profileTime(t, "Generate trajectory");
+		profileTime(t, "Generate trajectory", is_log);
 
 		// Statics
 		{
@@ -2801,7 +2805,7 @@ int main(int argc, char** argv){
 			//override_sleep(0.1);
 			//debug_img(std::vector<cv::Mat>{height_map.m_map_dilated});
 		}
-		profileTime(t, "Viz");
+		profileTime(t, "Viz", is_log);
 
 		//
 		// Prepare next move
@@ -2875,7 +2879,7 @@ int main(int argc, char** argv){
 			current_pos = map_converter.get_pos_pack_from_mesh(next_pos, yaw, pitch);
 			cur_frame_id++;
 		}
-		profileTime(t, "Find next move");
+		profileTime(t, "Find next move", is_log);
 		LOG(INFO) << "<<<<<<<<<<<<< Frame " << cur_frame_id - 1 << " done! <<<<<<<<<<<<<";
 		LOG(INFO) << "";
 		//if (cur_frame_id > 1000)
