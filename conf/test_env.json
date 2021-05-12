@@ -56,12 +56,15 @@
     // "mapper": "Virtual_mapper",
     // "mapper": "real_mapper",
 
-    "nbv_target3": "Topology_decomposition",
+    "nbv_target": "Topology_decomposition",
     "nbv_target3": "Min_distance",
-    "nbv_target1": "Random_min_distance",
     "nbv_target1": "Reconstruction_only",
-    "nbv_target": "Exploration_first",
-    "nbv_target2": "Min_max_information",
+    "nbv_target1": "Min_max_information",
+
+    // Ablation study
+    "nbv_target1": "Exploration_first",
+    "nbv_target2": "Random_min_distance",
+
     "CCPP_CELL_THRESHOLD": 5,
     "ccpp_cell_distance": 150,
 
