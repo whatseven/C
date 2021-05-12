@@ -171,8 +171,11 @@ void write_wgs_path(const Json::Value& v_args,const std::vector<std::pair<Eigen:
 	Eigen::Vector3f origin_wgs(v_args["geo_origin"][0].asFloat(), v_args["geo_origin"][1].asFloat(), 0.f);
 	//Eigen::Vector2f origin_xy=lonLat2Mercator(origin_wgs);
 	Eigen::Vector2f origin_xy(origin_wgs.x(), origin_wgs.y());
-	std::ofstream pose(v_path+"camera_wgs.txt");
+	std::ofstream pose_total(v_path+"camera_wgs.txt");
+	std::ofstream pose(v_path+"camera_wgs_0.txt");
 
+	Eigen::Vector3f prev_pos = v_trajectories[0].first;
+	int cur_log_id = 0;
 	for (int i_id = 0; i_id < v_trajectories.size(); i_id++) {
 		const Eigen::Vector3f& position = v_trajectories[i_id].first;
 		Eigen::Vector2f pos_mac = Eigen::Vector2f(position.x(), position.y()) + origin_xy;
@@ -186,14 +189,21 @@ void write_wgs_path(const Json::Value& v_args,const std::vector<std::pair<Eigen:
 		if (yaw > 180.f)
 			yaw -= 360.f;
 
-		pose << (fmt % pos_wgs[0] % pos_wgs[1] % (position[2]+ origin_wgs.z()) % yaw % pitch).str();
-		//if(i_id%180==179)
-		//{
-		//	pose.close();
-		//	pose = std::ofstream(v_path + "camera_wgs_" + std::to_string(i_id / 180 + 1) + ".txt");
-		//}
+		float z = position[2] + origin_wgs.z();
+		if (z > 119)
+			z = 119;
+		pose << (fmt % pos_wgs[0] % pos_wgs[1] % z % yaw % pitch).str();
+		pose_total << (fmt % pos_wgs[0] % pos_wgs[1] % z % yaw % pitch).str();
+		if((position-prev_pos).norm()>500)
+		{
+			pose.close();
+			pose = std::ofstream(v_path + "camera_wgs_" + std::to_string(cur_log_id + 1) + ".txt");
+			cur_log_id += 1;
+		}
+		prev_pos = position;
 	}
 	pose.close();
+	pose_total.close();
 }
 
 std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> read_unreal_trajectory(const std::string& v_path)
@@ -922,39 +932,54 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 			if (double_flag) {
 				//if (view_dir.dot(view_dir_camera_to_ground) < std::cos(v_params.fov / 180.f * M_PI / 2)) {
 					float surface_distance_one_view;
-					if(v_params["fov"].asFloat() <60)
-						surface_distance_one_view = std::tan((30 + v_params["fov"].asFloat() / 2) / 180.f * M_PI) * view_distance - std::tan((30 - v_params["fov"].asFloat() / 2) / 180.f * M_PI) * view_distance;
+					if(v_params["fov"].asFloat() < 60)
+					{
+						float total_part = std::tan((30 + v_params["fov"].asFloat() / 2) / 180.f * M_PI) * view_distance;
+						float first_part = std::tan((30 - v_params["fov"].asFloat() / 2) / 180.f * M_PI) * view_distance;
+						surface_distance_one_view = total_part - first_part;
+						vertical_step = surface_distance_one_view * (1 - v_params["vertical_overlap"].asFloat());
+						num_pass = (zmax + view_distance) / vertical_step;
+					}
 					else
-						surface_distance_one_view = std::tan((30 + v_params["fov"].asFloat() / 2) / 180.f * M_PI) * view_distance + std::tan((v_params["fov"].asFloat() / 2 - 30) / 180.f * M_PI) * view_distance;
-					vertical_step = surface_distance_one_view * (1 - v_params["vertical_overlap"].asFloat());
-					num_pass = (zmax + view_distance - surface_distance_one_view) / vertical_step;
+					{
+						float second_part = std::tan((30 + v_params["fov"].asFloat() / 2) / 180.f * M_PI) * view_distance;
+						float first_part= std::tan((v_params["fov"].asFloat() / 2 - 30) / 180.f * M_PI) * view_distance;
+						surface_distance_one_view = first_part + second_part;
+						vertical_step = surface_distance_one_view * (1 - v_params["vertical_overlap"].asFloat());
+						num_pass = (zmax + view_distance + first_part) / vertical_step;
+					}
 					if (num_pass < 0)
 						num_pass = 0;
 					num_pass += 1;
 				//}
 			}
 		}
+
+		float focus_z_corner = - view_distance / 3. * std::sqrtf(6.);
+		float focus_z_second_corner = - std::sqrtf(15.) / 6. * view_distance;
+		float focus_z_corner_normal = - std::sqrtf(3.) / 3 * view_distance;
 		
 		for (int i_pass = 0; i_pass < num_pass; ++i_pass) {
 			Eigen::Vector3f cur_pos(xmin - view_distance, ymin - view_distance, zmax + view_distance);
 			Eigen::Vector3f focus_point;
 
-			cur_pos.z() = zmax + view_distance - (zmax + view_distance) / num_pass * i_pass;
+			cur_pos.z() = zmax + view_distance - vertical_step * i_pass;
 			
 			float delta = (xmax + view_distance - cur_pos.x()) / overlap_step;
+			delta = delta > 4 ? delta : 4;
 			v_buildings[id_building].one_pass_trajectory_num += int(delta);
 			for (int i = 0; i <  delta ;++i)
 			{
 				if(i==0)
 				{
-					focus_point = cur_pos + Eigen::Vector3f(view_distance, view_distance, -view_distance / 1.732f);
+					focus_point = cur_pos + Eigen::Vector3f(view_distance, view_distance, focus_z_corner);
 					item_trajectory.push_back(std::make_pair(
 						cur_pos, focus_point
 					));
 					cur_pos[0] += overlap_step;
 				}
 				else if (i == 1) {
-					focus_point = cur_pos + Eigen::Vector3f(view_distance /2, view_distance, -view_distance / 1.732f);
+					focus_point = cur_pos + Eigen::Vector3f(view_distance / 2, view_distance, focus_z_second_corner);
 					item_trajectory.push_back(std::make_pair(
 						cur_pos, focus_point
 					));
@@ -963,13 +988,13 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 				else if(i >= delta-1)
 				{
 					cur_pos[0] = xmax + view_distance;
-					focus_point = cur_pos + Eigen::Vector3f(-view_distance, view_distance, -view_distance / 1.732f);
+					focus_point = cur_pos + Eigen::Vector3f(-view_distance, view_distance, focus_z_corner);
 					item_trajectory.push_back(std::make_pair(
 						cur_pos, focus_point
 					));
 				}
 				else if (i >= delta - 2) {
-					focus_point = cur_pos + Eigen::Vector3f(-view_distance / 2, view_distance, -view_distance / 1.732f);
+					focus_point = cur_pos + Eigen::Vector3f(-view_distance / 2, view_distance, focus_z_second_corner);
 					item_trajectory.push_back(std::make_pair(
 						cur_pos, focus_point
 					));
@@ -977,7 +1002,7 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 				}
 				else
 				{
-					focus_point = cur_pos + Eigen::Vector3f(0, view_distance, -view_distance / 1.732f);
+					focus_point = cur_pos + Eigen::Vector3f(0, view_distance, focus_z_corner_normal);
 					item_trajectory.push_back(std::make_pair(
 						cur_pos, focus_point
 					));
@@ -985,17 +1010,18 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 				}
 			}
 			delta = (ymax + view_distance - cur_pos.y()) / overlap_step;
+			delta = delta > 4 ? delta : 4;
 			v_buildings[id_building].one_pass_trajectory_num += int(delta);
 			for (int i = 0; i < delta; ++i) {
 				if (i == 0) {
-					focus_point = cur_pos + Eigen::Vector3f(-view_distance, view_distance, -view_distance / 1.732f);
+					focus_point = cur_pos + Eigen::Vector3f(-view_distance, view_distance, focus_z_corner);
 					item_trajectory.push_back(std::make_pair(
 						cur_pos, focus_point
 					));
 					cur_pos[1] += overlap_step;
 				}
 				else if (i == 1) {
-					focus_point = cur_pos + Eigen::Vector3f(-view_distance, view_distance /2, -view_distance / 1.732f);
+					focus_point = cur_pos + Eigen::Vector3f(-view_distance, view_distance /2, focus_z_second_corner);
 					item_trajectory.push_back(std::make_pair(
 						cur_pos, focus_point
 					));
@@ -1003,20 +1029,20 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 				}
 				else if (i >= delta - 1) {
 					cur_pos[1] = ymax + view_distance;
-					focus_point = cur_pos + Eigen::Vector3f(-view_distance, -view_distance, -view_distance / 1.732f);
+					focus_point = cur_pos + Eigen::Vector3f(-view_distance, -view_distance, focus_z_corner);
 					item_trajectory.push_back(std::make_pair(
 						cur_pos, focus_point
 					));
 				}
 				else if (i >= delta - 2) {
-					focus_point = cur_pos + Eigen::Vector3f(-view_distance, -view_distance / 2, -view_distance / 1.732f);
+					focus_point = cur_pos + Eigen::Vector3f(-view_distance, -view_distance / 2, focus_z_second_corner);
 					item_trajectory.push_back(std::make_pair(
 						cur_pos, focus_point
 					));
 					cur_pos[1] += overlap_step;
 				}
 				else {
-					focus_point = cur_pos + Eigen::Vector3f(-view_distance, 0, -view_distance / 1.732f);
+					focus_point = cur_pos + Eigen::Vector3f(-view_distance, 0, focus_z_corner_normal);
 					item_trajectory.push_back(std::make_pair(
 						cur_pos, focus_point
 					));
@@ -1024,17 +1050,18 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 				}
 			}
 			delta = (cur_pos.x() - (xmin - view_distance)) / overlap_step;
+			delta = delta > 4 ? delta : 4;
 			v_buildings[id_building].one_pass_trajectory_num += int(delta);
 			for (int i = 0; i < delta; ++i) {
 				if (i == 0) {
-					focus_point = cur_pos + Eigen::Vector3f(-view_distance, -view_distance, -view_distance / 1.732f);
+					focus_point = cur_pos + Eigen::Vector3f(-view_distance, -view_distance, focus_z_corner);
 					item_trajectory.push_back(std::make_pair(
 						cur_pos, focus_point
 					));
 					cur_pos[0] -= overlap_step;
 				}
 				else if (i == 1) {
-					focus_point = cur_pos + Eigen::Vector3f(-view_distance /2, -view_distance, -view_distance / 1.732f);
+					focus_point = cur_pos + Eigen::Vector3f(-view_distance /2, -view_distance, focus_z_second_corner);
 					item_trajectory.push_back(std::make_pair(
 						cur_pos, focus_point
 					));
@@ -1042,20 +1069,20 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 				}
 				else if (i >= delta - 1){
 					cur_pos[0] = xmin - view_distance;
-					focus_point = cur_pos + Eigen::Vector3f(view_distance, -view_distance, -view_distance / 1.732f);
+					focus_point = cur_pos + Eigen::Vector3f(view_distance, -view_distance, focus_z_corner);
 					item_trajectory.push_back(std::make_pair(
 						cur_pos, focus_point
 					));
 				}
 				else if (i >= delta - 2) {
-					focus_point = cur_pos + Eigen::Vector3f(view_distance / 2, -view_distance, -view_distance / 1.732f);
+					focus_point = cur_pos + Eigen::Vector3f(view_distance / 2, -view_distance, focus_z_second_corner);
 					item_trajectory.push_back(std::make_pair(
 						cur_pos, focus_point
 					));
 					cur_pos[0] -= overlap_step;
 				}
 				else {
-					focus_point = cur_pos + Eigen::Vector3f(0, -view_distance, -view_distance / 1.732f);
+					focus_point = cur_pos + Eigen::Vector3f(0, -view_distance, focus_z_corner_normal);
 					item_trajectory.push_back(std::make_pair(
 						cur_pos, focus_point
 					));
@@ -1063,17 +1090,18 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 				}
 			}
 			delta = (cur_pos.y() - (ymin - view_distance)) / overlap_step;
+			delta = delta > 4 ? delta : 4;
 			v_buildings[id_building].one_pass_trajectory_num += int(delta);
 			for (int i = 0; i <  delta; ++i) {
 				if (i == 0) {
-					focus_point = cur_pos + Eigen::Vector3f(view_distance, -view_distance, -view_distance / 1.732f);
+					focus_point = cur_pos + Eigen::Vector3f(view_distance, -view_distance, focus_z_corner);
 					item_trajectory.push_back(std::make_pair(
 						cur_pos, focus_point
 					));
 					cur_pos[1] -= overlap_step;
 				}
 				else if (i == 1) {
-					focus_point = cur_pos + Eigen::Vector3f(view_distance, -view_distance /2, -view_distance / 1.732f);
+					focus_point = cur_pos + Eigen::Vector3f(view_distance, -view_distance /2, focus_z_second_corner);
 					item_trajectory.push_back(std::make_pair(
 						cur_pos, focus_point
 					));
@@ -1081,13 +1109,13 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 				}
 				else if (i >= delta - 1) {
 					cur_pos[1] = ymin - view_distance;
-					focus_point = cur_pos + Eigen::Vector3f(view_distance, view_distance, -view_distance / 1.732f);
+					focus_point = cur_pos + Eigen::Vector3f(view_distance, view_distance, focus_z_corner);
 					/*item_trajectory.push_back(std::make_pair(
 						cur_pos, focus_point
 					));*/
 				}
 				else if (i >= delta - 2) {
-					focus_point = cur_pos + Eigen::Vector3f(view_distance, view_distance /2, -view_distance / 1.732f);
+					focus_point = cur_pos + Eigen::Vector3f(view_distance, view_distance /2, focus_z_second_corner);
 					item_trajectory.push_back(std::make_pair(
 						cur_pos, focus_point
 					));
@@ -1096,7 +1124,7 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 				}
 
 				else {
-					focus_point = cur_pos + Eigen::Vector3f(view_distance, 0, -view_distance / 1.732f);
+					focus_point = cur_pos + Eigen::Vector3f(view_distance, 0, focus_z_corner_normal);
 					item_trajectory.push_back(std::make_pair(
 						cur_pos, focus_point
 					));
