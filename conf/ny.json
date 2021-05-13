@@ -5,20 +5,20 @@
     "with_continuous_height_flag": false,
     "with_erosion_flag": false,
     "double_flag": true,
-    "split_flag": false,
-    "cluster_duplicate_flag": false,
+    "split_flag": true,
+    "cluster_duplicate_flag": true,
     //Exploration Flags
     "fix_angle_flag": true,
 
     // Reconstruction parameters
-    "view_distance": 20,
-    "safe_distance": 3,
-    "vertical_overlap": 0.2,
-    "horizontal_overlap": 0.6,
+    "view_distance": 15,
+    "safe_distance": 10,
+    "vertical_overlap": 0.4,
+    "horizontal_overlap": 0.8,
     "split_overlap": 0.5,
     "z_down_bounds": 0, //Optinal
 
-    "fov": 60,
+    "fov": 90,
     "ratio": 1.5,
 
     "HEIGHT_CLIP": 2, // Effect the clustering of the buildings. Do not important here, we manually select a good point cloud for clustering
@@ -27,10 +27,9 @@
     "heightmap_resolution": 5,
     "heightmap_dilate": 0,
     "cluster_radius": 5,
-    "model_path": "D:\\BACKUP\\SIG21\\ablation\\2_2\\bridge\\bridge_points.ply",
-    "model_path1": "D:\\BACKUP\\SIG21\\ablation\\2_2\\bridge\\bridge_points_truncated.ply",
-    "safe_zone_model_path": "D:\\BACKUP\\SIG21\\ablation\\2_2\\bridge\\bridge_points.ply",
-    "safe_zone_model_path1": "D:\\BACKUP\\SIG21\\ablation\\2_2\\bridge\\bridge_points_truncated.ply",
+    "model_path": "D:\\BACKUP\\SIG21\\ablation\\2_2\\ny\\ny_points.ply",
+    "safe_zone_model_path1": "D:\\BACKUP\\SIG21\\ablation\\2_2\\bridge\\bridge_points.ply",
+    "safe_zone_model_path": "D:\\BACKUP\\SIG21\\ablation\\2_2\\ny\\ny_points.ply",
 
     "is_viz": true,
     "is_viz1": false,
