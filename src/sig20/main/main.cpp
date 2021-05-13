@@ -939,6 +939,7 @@ public:
 		}
 		
 		m_current_color_id = 0;
+		m_current_ccpp_trajectory_id = 0;
 		region_status[0] = region_viz_color[m_current_color_id];
 		//topology.emplace_back(Eigen::Vector2f(m_map_start.x(), m_map_start.y()), 
 		//	Eigen::Vector2f(m_map_start.x()+1, m_map_start.y()+1));
@@ -959,14 +960,18 @@ public:
 			last_topology = topology.at(topology.size() - 1);
 			last_map_pos = Eigen::Vector2i(int((last_topology.max().x() - m_map_start.x()) / DISTANCE_THRESHOLD + 1), int((last_topology.max().y() - m_map_start.y()) / DISTANCE_THRESHOLD + 1));
 		}
+
 		Eigen::Vector2i now_map_pos(int((cur_box_3.max().x() - m_map_start.x()) / DISTANCE_THRESHOLD + 1), int((cur_box_3.max().y() - m_map_start.y()) / DISTANCE_THRESHOLD + 1));
-		if ((now_map_pos.x() - last_map_pos.x()) % 2 == 1)
+		if (std::abs(now_map_pos.x() - last_map_pos.x()) % 2 == 1)
 			x_add = 1;
-		if ((now_map_pos.y() - last_map_pos.y()) % 2 == 1)
+		if (std::abs(now_map_pos.y() - last_map_pos.y()) % 2 == 1)
 			y_add = 1;
 
+		float bbox_x = std::min(cur_box_3.max().x() + DISTANCE_THRESHOLD * x_add, m_map_end.x());
+		float bbox_y = std::min(cur_box_3.max().y() + DISTANCE_THRESHOLD * y_add, m_map_end.y());
+
 		Eigen::AlignedBox2f cur_box_2(Eigen::Vector2f(m_map_start.x(), m_map_start.y()),
-			Eigen::Vector2f(cur_box_3.max().x() + DISTANCE_THRESHOLD * x_add, cur_box_3.max().y() + DISTANCE_THRESHOLD * y_add));
+			Eigen::Vector2f(bbox_x, bbox_y));
 
 		Eigen::Vector3f next_point = v_building.bounding_box_3d.box.max();
 		if(m_motion_status != Motion_status::final_check)
@@ -1001,20 +1006,18 @@ public:
 				
 			}
 		}
-		if (num_ccpp_cell < v_ccpp_threshold || num_ccpp_cell==0)
-			return false;
 		dummy2 += num_ccpp_cell;
 		topology.push_back(cur_box_2);
 		//cv::imwrite(std::to_string(dummy1++)+"_ccpp_map.png", ccpp_map);
 		// Find the nearest view point
+
 		Eigen::Vector3f t1 = (v_cur_pos - m_map_start) / DISTANCE_THRESHOLD;
 
 		Eigen::Vector3f t2 = (next_point - m_map_start) / DISTANCE_THRESHOLD;
 
-		Eigen::Vector2i start_pos_on_map(t1.x(), t1.y());
-		Eigen::Vector2i end_pos_on_map(t2.x(), t2.y());
-		if (v_ccpp_threshold == 0)//Last check
-			end_pos_on_map = start_pos_on_map;
+		//Eigen::Vector2i start_pos_on_map(t1.x(), t1.y());
+		Eigen::Vector2i start_pos_on_map = last_map_pos;
+		Eigen::Vector2i end_pos_on_map(t2.x() + x_add, t2.y() + y_add);
 
 		cv::Mat start_end = ccpp_map.clone();
 		//start_end.setTo(0);
@@ -1023,7 +1026,7 @@ public:
 		//debug_img(std::vector<cv::Mat>{ccpp_map, start_end});
 
 		std::vector<Eigen::Vector2i> map_trajectory = perform_ccpp(start_end,
-			start_pos_on_map, end_pos_on_map, 2.5);
+			start_pos_on_map, end_pos_on_map, m_arg["CCPP_Obstacle_weight"].asFloat());
 
 		//std::cout << "  " << std::endl;
 		cv::Mat viz_ccpp = ccpp_map.clone();
@@ -1085,18 +1088,22 @@ public:
 		}
 
 		Building fake_building;
-		if (num_already_travelled_cell > 0.1 * sample_points.size()) // Expand in default size
+		if (num_already_travelled_cell > 0.1 * sample_points.size() && (m_map_start.x() + max_x + DISTANCE_THRESHOLD * CCPP_CELL_THRESHOLD < m_map_end.x()
+			|| m_map_start.y() + max_y + DISTANCE_THRESHOLD * CCPP_CELL_THRESHOLD < m_map_end.y())) // Expand in default size
 		{
 			m_motion_status = Motion_status::exploration;
+			
 			if (max_x_id != max_y_id) // Current traveled is not forming a rectangle 
 			{
-				Eigen::Vector3f max_point(m_map_start.x() + DISTANCE_THRESHOLD * max_x, m_map_start.y() + DISTANCE_THRESHOLD * max_y, 100);
+				Eigen::Vector3f max_point(m_map_start.x() + max_x, m_map_start.y() + max_y, 100);
 				fake_building.bounding_box_3d = Eigen::AlignedBox3f(max_point - Eigen::Vector3f(1, 1, 1), max_point);
 				fake_building.trajectory.emplace_back(max_point, Eigen::Vector3f(0, 0, 1));
 			}
 			else // Current traveled is forming a rectangle 
 			{
-				Eigen::Vector3f max_point(m_map_start.x() + DISTANCE_THRESHOLD * (max_x + CCPP_CELL_THRESHOLD), m_map_start.y() + DISTANCE_THRESHOLD * (max_y + CCPP_CELL_THRESHOLD), 100);
+				max_x = (m_map_start.x() + max_x + DISTANCE_THRESHOLD * CCPP_CELL_THRESHOLD < m_map_end.x()) ? max_x : (m_map_end.x() - m_map_start.x() - DISTANCE_THRESHOLD * CCPP_CELL_THRESHOLD);
+				max_y = (m_map_start.y() + max_y + DISTANCE_THRESHOLD * CCPP_CELL_THRESHOLD < m_map_end.y()) ? max_y : (m_map_end.y() - m_map_start.y() - DISTANCE_THRESHOLD * CCPP_CELL_THRESHOLD);
+				Eigen::Vector3f max_point(m_map_start.x() + max_x + DISTANCE_THRESHOLD * CCPP_CELL_THRESHOLD, m_map_start.y() + max_y + DISTANCE_THRESHOLD * CCPP_CELL_THRESHOLD, 100);
 				fake_building.bounding_box_3d = Eigen::AlignedBox3f(max_point - Eigen::Vector3f(1, 1, 1), max_point);
 				fake_building.trajectory.emplace_back(max_point, Eigen::Vector3f(0, 0, 1));
 			}
@@ -1104,7 +1111,7 @@ public:
 		else // Final check 
 		{
 			m_motion_status = Motion_status::final_check;
-			Building fake_building;
+			//Building fake_building;
 			fake_building.bounding_box_3d = Eigen::AlignedBox3f(m_map_end - Eigen::Vector3f(1, 1, 1), m_map_end);
 			fake_building.trajectory.emplace_back(m_map_end, Eigen::Vector3f(0, 0, 1));
 		}
@@ -1142,7 +1149,7 @@ public:
 			//return (v_buildings[id1].trajectory[view1].first.x()- v_cur_pos.pos_mesh.x()) < (v_buildings[id2].trajectory[view2].first.x() - v_cur_pos.pos_mesh.x());
 		});
 
-		int  id_building = 0;
+		int id_building = 0;
 		if(with_exploration)
 		{
 			bool ccpp_done = get_ccpp_trajectory(v_cur_pos.pos_mesh,v_buildings[untraveled_buildings[id_building]],
@@ -1957,6 +1964,9 @@ public:
 			fake_building.bounding_box_3d = Eigen::AlignedBox3f(m_map_end - Eigen::Vector3f(1, 1, 1), m_map_end);
 			fake_building.trajectory.emplace_back(m_map_end, Eigen::Vector3f(0, 0, 1));
 			get_ccpp_trajectory(v_cur_pos.pos_mesh, fake_building, CCPP_CELL_THRESHOLD);
+			next_pos = std::make_pair(Eigen::Vector3f(
+				0, 0, 100),
+				Eigen::Vector3f(1, 0, 0));
 			LOG(INFO) << "Initialization target !";
 		}
 		if (m_motion_status == Motion_status::exploration)
@@ -1964,25 +1974,25 @@ public:
 			std::vector<int> untraveled_buildings_inside_exist_region;
 			Eigen::Vector2f cur_point_cgal(m_ccpp_trajectory[m_current_ccpp_trajectory_id].first.x(),
 				m_ccpp_trajectory[m_current_ccpp_trajectory_id].first.y());
-				m_current_ccpp_trajectory_id += 1;
-				if (m_current_ccpp_trajectory_id >= m_ccpp_trajectory.size()) {
-					m_motion_status = Motion_status::reconstruction;
-					get_next_target(v_frame_id, v_cur_pos, v_buildings, with_exploration);
-					next_pos = determine_next_target(v_frame_id, v_cur_pos, v_buildings, with_exploration, v_threshold);
-					//m_motion_status = Motion_status::reconstruction;
-					m_current_color_id += 1;
-					return next_pos;
-				}
-				else {
-					auto& item = m_ccpp_trajectory[m_current_ccpp_trajectory_id].first;
+			m_current_ccpp_trajectory_id += 1;
+			if (m_current_ccpp_trajectory_id >= m_ccpp_trajectory.size()) {
+				m_motion_status = Motion_status::reconstruction;
+				get_next_target(v_frame_id, v_cur_pos, v_buildings, with_exploration);
+				next_pos = determine_next_target(v_frame_id, v_cur_pos, v_buildings, with_exploration, v_threshold);
+				//m_motion_status = Motion_status::reconstruction;
+				m_current_color_id += 1;
+				return next_pos;
+			}
+			else {
+				auto& item = m_ccpp_trajectory[m_current_ccpp_trajectory_id].first;
 
-					std::pair<Eigen::Vector3f, Eigen::Vector3f> start_points = std::make_pair(Eigen::Vector3f(
-						item.x(),
-						item.y(),
-						100),
-						Eigen::Vector3f(1, 0, 0));
-					next_pos = start_points;
-				}
+				std::pair<Eigen::Vector3f, Eigen::Vector3f> start_points = std::make_pair(Eigen::Vector3f(
+					item.x(),
+					item.y(),
+					100),
+					Eigen::Vector3f(1, 0, 0));
+				next_pos = start_points;
+			}
 		}
 		if (m_motion_status == Motion_status::reconstruction)
 		{
@@ -2234,9 +2244,10 @@ class Graduate_GT_mapper :public Mapper
 public:
 	std::vector<Building> m_buildings_target;
 	std::vector<bool> m_is_building_add;
+	std::vector<Building> m_buildings_safe_place;
 	Graduate_GT_mapper(const Json::Value& args) : Mapper(args)
 	{
-		if (true)
+		if (false)
 		{
 			m_buildings_target.resize(4);
 			m_buildings_target[0].bounding_box_3d = Rotated_box(Eigen::AlignedBox3f(
@@ -2264,6 +2275,151 @@ public:
 			}
 			m_is_building_add.resize(m_buildings_target.size(), false);
 		}
+		else if (false)
+		{
+			tinyobj::attrib_t attr;
+			std::vector<tinyobj::shape_t> shapes;
+			std::vector<tinyobj::material_t> mtl;
+			std::tie(attr, shapes, mtl) = load_obj(args["model_path"].asString());
+
+			m_buildings_target.resize(shapes.size());
+			for (int cluster_id = 0; cluster_id < shapes.size(); ++cluster_id) {
+				Building& current_building = m_buildings_target[cluster_id];
+				size_t index_offset = 0;
+				for (int i_face = 0; i_face < shapes[cluster_id].mesh.num_face_vertices.size(); ++i_face)
+				{
+					for (int i_vertice = 0; i_vertice < shapes[cluster_id].mesh.num_face_vertices[i_face]; ++i_vertice)
+					{
+						tinyobj::index_t idx = shapes[cluster_id].mesh.indices[index_offset + i_vertice];
+
+						current_building.points_world_space.insert(Point_3(
+							attr.vertices[3 * idx.vertex_index + 0],
+							attr.vertices[3 * idx.vertex_index + 1],
+							attr.vertices[3 * idx.vertex_index + 2]
+						));
+					}
+					index_offset += shapes[cluster_id].mesh.num_face_vertices[i_face];
+				}
+				current_building.bounding_box_3d = get_bounding_box(current_building.points_world_space);
+				current_building.boxes.push_back(current_building.bounding_box_3d);
+			}
+			m_buildings_safe_place = m_buildings_target;
+			m_is_building_add.resize(m_buildings_target.size(), false);
+		}
+		else
+		{
+			CGAL::Point_set_3<Point_3, Vector_3> original_point_cloud;
+			std::vector<CGAL::Point_set_3<Point_3, Vector_3>> pcs;
+			if (boost::filesystem::is_directory(args["model_path"].asString())) {
+				boost::filesystem::directory_iterator end_iter;
+				for (fs::directory_iterator iter(args["model_path"].asString()); iter != end_iter; iter++) {
+					CGAL::Point_set_3<Point_3, Vector_3> pc_item;
+					CGAL::read_ply_point_set(std::ifstream(iter->path().string(), std::ios::binary), pc_item);
+					pcs.push_back(pc_item);
+				}
+				//CGAL::read_ply_point_set(std::ifstream("D:\\datasets\\Realcity\\Shenzhen\\sample_500000.ply", std::ios::binary), original_point_cloud);
+				//CGAL::Point_set_3<Point_3, Vector_3> point_cloud(original_point_cloud);
+
+				m_buildings_safe_place.resize(pcs.size());
+				for (int cluster_id = 0; cluster_id < pcs.size(); ++cluster_id) {
+					Building& current_building = m_buildings_safe_place[cluster_id];
+					bool add_as_target = true;
+					for (Point_set::Index idx : pcs[cluster_id]) {
+						current_building.points_world_space.insert(pcs[cluster_id].point(idx));
+						Point_2 p(pcs[cluster_id].point(idx).x(), pcs[cluster_id].point(idx).y());
+						if (m_boundary.size() > 0)
+						{
+							for (auto iter_segment = m_boundary.edges_begin(); iter_segment != m_boundary.edges_end(); ++iter_segment)
+								if (CGAL::squared_distance(p, *iter_segment) < 00 * 00)
+									add_as_target = false;
+							if (m_boundary.bounded_side(p) != CGAL::ON_BOUNDED_SIDE)
+								add_as_target = false;
+						}
+					}
+					//current_building.bounding_box_3d = get_bounding_box(current_building.points_world_space);
+					current_building.bounding_box_3d = get_bounding_box_rotated(current_building.points_world_space);
+					current_building.boxes.push_back(current_building.bounding_box_3d);
+
+					if (add_as_target)
+						m_buildings_target.push_back(current_building);
+				}
+				m_is_building_add.resize(m_buildings_target.size(), false);
+				return;
+			}
+			else {
+				CGAL::read_ply_point_set(std::ifstream(args["model_path"].asString(), std::ios::binary), original_point_cloud);
+				CGAL::Point_set_3<Point_3, Vector_3> point_cloud(original_point_cloud);
+				// Delete ground planes
+				{
+					for (int idx = point_cloud.size() - 1; idx >= 0; idx--) {
+						if (point_cloud.point(idx).z() < args["HEIGHT_CLIP"].asFloat())
+							point_cloud.remove(idx);
+					}
+
+					point_cloud.collect_garbage();
+				}
+				CGAL::write_ply_point_set(std::ofstream("points_without_plane.ply"), point_cloud);
+				// Cluster building
+				std::size_t nb_clusters;
+				{
+					Point_set::Property_map<int> cluster_map = point_cloud.add_property_map<int>("cluster", -1).first;
+
+					std::vector<std::pair<std::size_t, std::size_t>> adjacencies;
+
+					nb_clusters = CGAL::cluster_point_set(point_cloud, cluster_map,
+						point_cloud.parameters().neighbor_radius(
+							args["cluster_radius"].asFloat()).
+						adjacencies(std::back_inserter(adjacencies)));
+					m_buildings_target.resize(nb_clusters);
+
+					Point_set::Property_map<unsigned char> red = point_cloud.add_property_map<unsigned char>("red", 0).first;
+					Point_set::Property_map<unsigned char> green = point_cloud
+						.add_property_map<unsigned char>("green", 0).first;
+					Point_set::Property_map<unsigned char> blue = point_cloud.add_property_map<unsigned char>("blue", 0).first;
+					for (Point_set::Index idx : point_cloud) {
+						// One color per cluster
+						int cluster_id = cluster_map[idx];
+						CGAL::Random rand(cluster_id);
+						red[idx] = rand.get_int(64, 192);
+						green[idx] = rand.get_int(64, 192);
+						blue[idx] = rand.get_int(64, 192);
+
+						Building& current_building = m_buildings_target[cluster_id];
+						current_building.points_world_space.insert(point_cloud.point(idx));
+					}
+				}
+				for (int i_building_1 = 0; i_building_1 < m_buildings_target.size(); ++i_building_1) {
+					//m_buildings_target[i_building_1].bounding_box_3d = get_bounding_box(m_buildings_target[i_building_1].points_world_space);
+					m_buildings_target[i_building_1].bounding_box_3d = get_bounding_box_rotated(m_buildings_target[i_building_1].points_world_space);
+					m_buildings_target[i_building_1].bounding_box_3d.box.min().z() -= args["HEIGHT_CLIP"].asFloat();
+					m_buildings_target[i_building_1].boxes.push_back(m_buildings_target[i_building_1].bounding_box_3d);
+				}
+
+				for (int i_building_1 = m_buildings_target.size() - 1; i_building_1 >= 0; --i_building_1)
+				{
+					cv::Point2f points[4];
+					m_buildings_target[i_building_1].bounding_box_3d.cv_box.points(points);
+
+					if (m_boundary.size() > 0)
+					{
+						bool should_delete = false;
+						for (int i_point = 0; i_point < 4; ++i_point) {
+							Point_2 p(points[i_point].x, points[i_point].y);
+							for (auto iter_segment = m_boundary.edges_begin(); iter_segment != m_boundary.edges_end(); ++iter_segment)
+								if (CGAL::squared_distance(p, *iter_segment) < args["safe_distance"].asFloat() * args["safe_distance"].asFloat() * 2)
+									should_delete = true;
+							if (m_boundary.bounded_side(p) != CGAL::ON_BOUNDED_SIDE)
+								should_delete = true;
+						}
+						if (should_delete)
+							m_buildings_target.erase(m_buildings_target.begin() + i_building_1);
+
+					}
+				}
+				m_buildings_safe_place = m_buildings_target;
+				m_is_building_add.resize(m_buildings_target.size(), false);
+			}
+		}
 	}
 
 	void get_buildings(std::vector<Building>& v_buildings,
@@ -2275,7 +2431,8 @@ public:
 			for (auto& item_building : m_buildings_target) {
 				v_height_map.update(item_building.bounding_box_3d);
 				if (!m_is_building_add[&item_building - &m_buildings_target[0]] &&
-					(v_current_pos.pos_mesh - item_building.bounding_box_3d.box.center()).norm() < m_args["ccpp_cell_distance"].asFloat() * 5)
+					(Eigen::Vector2f(v_current_pos.pos_mesh.x() - item_building.bounding_box_3d.box.center().x(),
+						v_current_pos.pos_mesh.y() - item_building.bounding_box_3d.box.center().y())).norm() < m_args["ccpp_cell_distance"].asFloat() * 3)
 				{
 					v_buildings.push_back(item_building);
 					m_is_building_add[&item_building - &m_buildings_target[0]] = true;
@@ -2933,6 +3090,7 @@ int main(int argc, char** argv){
 		}
 
 		// Visualize
+		//debug_img(std::vector<cv::Mat>{original_height_map.m_map_dilated});
 		if(is_viz)
 		{
 			viz->lock();
@@ -2956,6 +3114,7 @@ int main(int argc, char** argv){
 			//override_sleep(0.1);
 			//debug_img(std::vector<cv::Mat>{height_map.m_map_dilated});
 		}
+		//debug_img(std::vector<cv::Mat>{original_height_map.m_map_dilated});
 		profileTime(t, "Viz", is_log);
 
 		//

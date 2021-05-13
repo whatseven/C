@@ -26,8 +26,8 @@
     "heightmap_resolution": 5,
     "heightmap_dilate": 5,
     "cluster_radius": 4,
-    "model_path": "D:\\BACKUP\\SIG21\\ablation\\2_2\\bridge\\bridge_points_truncated.ply",
-    "safe_zone_model_path": "D:\\BACKUP\\SIG21\\ablation\\2_2\\bridge\\bridge_points_truncated.ply",
+    "model_path": "F:\\Sig\\Real\\partial_szu.ply",
+    "safe_zone_model_path": "F:\\Sig\\Real\\partial_szu.ply",
     "is_viz": true,
     "is_viz1": false,
     "is_log": true,
@@ -42,7 +42,7 @@
     "MAP_START_UNREAL_X": 0,
     "MAP_START_UNREAL_Y": -130000,
     "MAP_START_UNREAL_Z": -500,
-    "MAP_END_UNREAL_X": 200000,
+    "MAP_END_UNREAL_X": 280000,
     "MAP_END_UNREAL_Y": 0,
     "MAP_END_UNREAL_Z": 7000,
 
@@ -63,9 +63,10 @@
 
     // Ablation study
     "nbv_target1": "Exploration_first",
-    "nbv_target2": "Random_min_distance",
+    "nbv_target1": "Random_min_distance",
 
     "CCPP_CELL_THRESHOLD": 5,
+    "CCPP_Obstacle_weight": 0,
     "ccpp_cell_distance": 150,
 
     "output_waypoint": true,
