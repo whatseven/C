@@ -1,75 +1,75 @@
 {
-  "with_exploration": true,
-  "with_reconstruction": true,
-  //Reconstruction Flags
-  "with_continuous_height_flag": false,
-  "with_erosion_flag": false,
-  "double_flag": false,
-  "split_flag": false,
-  "cluster_duplicate_flag": false,
-  //Exploration Flags
-  "fix_angle_flag": true,
-  "explore_multi_angle": false,
+    "with_exploration": true,
+    "with_reconstruction": true,
+    //Reconstruction Flags
+    "with_continuous_height_flag": false,
+    "with_erosion_flag": false,
+    "double_flag": false,
+    "split_flag": false,
+    "cluster_duplicate_flag": false,
+    //Exploration Flags
+    "fix_angle_flag": true,
+    "explore_multi_angle": false,
 
-  // Reconstruction parameters
-  "view_distance": 40,
-  "safe_distance": 25,
-  "vertical_overlap": 0.4,
-  "horizontal_overlap": 0.1,
-  "split_overlap": 0.5,
-  "z_down_bounds": 40, //Optinal
+    // Reconstruction parameters
+    "view_distance": 40,
+    "safe_distance": 25,
+    "vertical_overlap": 0.4,
+    "horizontal_overlap": 0.1,
+    "split_overlap": 0.5,
+    "z_down_bounds": 40, //Optinal
 
-  "fov": 53,
+    "fov": 53,
 
-  "HEIGHT_CLIP": 10, // Effect the clustering of the buildings. Do not important here, we manually select a good point cloud for clustering
-  "MERGED_THRESHOLD": -1,
-  "SPLIT_THRESHOLD": 100,
-  "heightmap_resolution": 5,
-  "heightmap_dilate": 0,
-  "cluster_radius": 10,
-  "model_path": "F:\\Sig\\Real\\paper_2nd\\2_3_global\\Shanghai_points_2.ply",
-  "safe_zone_model_path": "F:\\Sig\\Real\\paper_2nd\\2_3_global\\Shanghai_points_2.ply",
-  "is_viz": true,
-  "is_viz1": false,
-  "is_log": true,
+    "HEIGHT_CLIP": 10, // Effect the clustering of the buildings. Do not important here, we manually select a good point cloud for clustering
+    "MERGED_THRESHOLD": -1,
+    "SPLIT_THRESHOLD": 100,
+    "heightmap_resolution": 5,
+    "heightmap_dilate": 0,
+    "cluster_radius": 10,
+    "model_path": "D:\\BACKUP\\SIG21_Local\\2_3_global\\Shanghai_points_2.ply",
+    "safe_zone_model_path": "D:\\BACKUP\\SIG21_Local\\2_3_global\\Shanghai_points_2.ply",
+    "is_viz1": true,
+    "is_viz": false,
+    "is_log": true,
 
-  //
-  // These are all unreal coordinates
-  // Y axis in invert, min y in unreal is max y in mesh
-  //
-  "START_X": 200000,
-  "START_Y": 440000,
-  "START_Z": 4000,
-  "MAP_START_UNREAL_X": 200000,
-  "MAP_START_UNREAL_Y": 200000,
-  "MAP_START_UNREAL_Z": -500,
-  "MAP_END_UNREAL_X": 590000,
-  "MAP_END_UNREAL_Y": 440000,
-  "MAP_END_UNREAL_Z": 7000,
+    //
+    // These are all unreal coordinates
+    // Y axis in invert, min y in unreal is max y in mesh
+    //
+    "START_X": 200000,
+    "START_Y": 440000,
+    "START_Z": 4000,
+    "MAP_START_UNREAL_X": 200000,
+    "MAP_START_UNREAL_Y": 200000,
+    "MAP_START_UNREAL_Z": -500,
+    "MAP_END_UNREAL_X": 590000,
+    "MAP_END_UNREAL_Y": 440000,
+    "MAP_END_UNREAL_Z": 7000,
 
-  "DRONE_STEP": 10,
-  "with_interpolated": false,
+    "DRONE_STEP": 10,
+    "with_interpolated": false,
 
-  "SYNTHETIC_POINT_CLOUD": true,
-  "MAP_2D_BOX_TO_3D": true,
-  //"mapper": "gt_mapper",
-  "mapper": "graduate_gt_mapper",
-  // "mapper": "Virtual_mapper",
-  // "mapper": "real_mapper",
+    "SYNTHETIC_POINT_CLOUD": true,
+    "MAP_2D_BOX_TO_3D": true,
+    //"mapper": "gt_mapper",
+    "mapper": "graduate_gt_mapper",
+    // "mapper": "Virtual_mapper",
+    // "mapper": "real_mapper",
 
-  "nbv_target1": "Topology_decomposition",
-  "nbv_target3": "Min_distance",
-  "nbv_target1": "Reconstruction_only",
-  "nbv_target1": "Min_max_information",
+    "nbv_target3": "Topology_decomposition",
+    "nbv_target1": "Min_distance",
+    "nbv_target1": "Reconstruction_only",
+    "nbv_target1": "Min_max_information",
 
-  // Ablation study
-  "nbv_target": "Exploration_first",
-  "nbv_target1": "Random_min_distance",
+    // Ablation study
+    "nbv_target1": "Exploration_first",
+    "nbv_target": "Random_min_distance",
 
-  "CCPP_CELL_THRESHOLD": 5,
-  "CCPP_Obstacle_weight": 2.5,
-  "ccpp_cell_distance": 150,
+    "CCPP_CELL_THRESHOLD": 5,
+    "CCPP_Obstacle_weight": 2.5,
+    "ccpp_cell_distance": 30,
 
-  "output_waypoint": true,
-  "geo_origin": []
+    "output_waypoint": true,
+    "geo_origin": []
 }

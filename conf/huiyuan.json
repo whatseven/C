@@ -29,8 +29,8 @@
     "model_path": "D:\\Projects\\SEAR\\Real\\Huiyuan\\proxy\\\\szu_north_0422_points.ply",
     "safe_zone_model_path": "D:\\Projects\\SEAR\\Real\\Huiyuan\\proxy\\\\szu_north_safe_zone.ply",
 
-    "is_viz": true,
-    "is_viz1": false,
+    "is_viz1": true,
+    "is_viz": false,
     "is_log": true,
 
     //

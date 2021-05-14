@@ -3060,12 +3060,13 @@ int main(int argc, char** argv){
 	std::pair<Eigen::Vector3f, Eigen::Vector3f> next_pos_direction;
 	//total_passed_trajectory.push_back(std::make_pair(current_pos.pos_mesh, Eigen::Vector3f(0,0,-1)));
 
-	debug_img(std::vector<cv::Mat>{height_map.m_map});
+	//debug_img(std::vector<cv::Mat>{height_map.m_map});
 	while (!end) {
 		LOG(INFO) << "<<<<<<<<<<<<< Frame " << cur_frame_id << " <<<<<<<<<<<<<";
 
 		auto t = recordTime();
-		mapper->get_buildings(total_buildings, current_pos, cur_frame_id, height_map);
+		if(next_best_target->m_motion_status==Motion_status::exploration)
+			mapper->get_buildings(total_buildings, current_pos, cur_frame_id, height_map);
 		next_best_target->update_uncertainty(current_pos, total_buildings);
 		profileTime(t, "Height map", is_log);
 
@@ -3313,6 +3314,7 @@ int main(int argc, char** argv){
 		viz->m_pos = total_passed_trajectory[0].first;
 		viz->m_direction = total_passed_trajectory[0].second;
 		viz->m_trajectories.clear();
+
 		if (args["output_waypoint"].asBool())
 		{
 			viz->m_trajectories = safe_global_trajectory;
@@ -3321,6 +3323,8 @@ int main(int argc, char** argv){
 		{
 			viz->m_trajectories = total_passed_trajectory;
 		}
+		if (viz->m_is_reconstruction_status.size() == 0)
+			viz->m_is_reconstruction_status.resize(viz->m_trajectories.size(), 1);
 		viz->m_uncertainty_map.clear();
 		for (const auto& item : next_best_target->sample_points) {
 			int index = &item - &next_best_target->sample_points[0];
