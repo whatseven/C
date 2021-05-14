@@ -12,16 +12,16 @@
     "explore_multi_angle": false,
 
     // Reconstruction parameters
-    "view_distance": 40,
-    "safe_distance": 25,
-    "vertical_overlap": 0.4,
+    "view_distance": 30,
+    "safe_distance": 10,
+    "vertical_overlap": 0.1,
     "horizontal_overlap": 0.1,
     "split_overlap": 0.5,
     "z_down_bounds": 40, //Optinal
 
-    "fov": 53,
+    "fov": 90,
 
-    "HEIGHT_CLIP": 10, // Effect the clustering of the buildings. Do not important here, we manually select a good point cloud for clustering
+    "HEIGHT_CLIP": 15, // Effect the clustering of the buildings. Do not important here, we manually select a good point cloud for clustering
     "MERGED_THRESHOLD": -1,
     "SPLIT_THRESHOLD": 100,
     "heightmap_resolution": 5,
@@ -57,18 +57,18 @@
     // "mapper": "Virtual_mapper",
     // "mapper": "real_mapper",
 
-    "nbv_target3": "Topology_decomposition",
+    "nbv_target1": "Topology_decomposition",
     "nbv_target1": "Min_distance",
     "nbv_target1": "Reconstruction_only",
     "nbv_target1": "Min_max_information",
 
     // Ablation study
-    "nbv_target1": "Exploration_first",
+    "nbv_target3": "Exploration_first",
     "nbv_target": "Random_min_distance",
 
     "CCPP_CELL_THRESHOLD": 5,
     "CCPP_Obstacle_weight": 2.5,
-    "ccpp_cell_distance": 30,
+    "ccpp_cell_distance": 60,
 
     "output_waypoint": true,
     "geo_origin": []
