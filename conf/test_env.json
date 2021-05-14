@@ -40,9 +40,9 @@
     "START_Y": 0.0,
     "START_Z": 10000,
     "MAP_START_UNREAL_X": 0,
-    "MAP_START_UNREAL_Y": -130000,
+    "MAP_START_UNREAL_Y": -120000,
     "MAP_START_UNREAL_Z": -500,
-    "MAP_END_UNREAL_X": 280000,
+    "MAP_END_UNREAL_X": 270000,
     "MAP_END_UNREAL_Y": 0,
     "MAP_END_UNREAL_Z": 7000,
 
@@ -66,7 +66,7 @@
     "nbv_target1": "Random_min_distance",
 
     "CCPP_CELL_THRESHOLD": 5,
-    "CCPP_Obstacle_weight": 0,
+    "CCPP_Obstacle_weight": 2.5,
     "ccpp_cell_distance": 150,
 
     "output_waypoint": true,

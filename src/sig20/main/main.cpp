@@ -1116,8 +1116,8 @@ public:
 			}
 			else // Current traveled is forming a rectangle 
 			{
-				max_x = (m_map_start.x() + max_x + DISTANCE_THRESHOLD * CCPP_CELL_THRESHOLD < m_map_end.x()) ? max_x : (m_map_end.x() - m_map_start.x() - DISTANCE_THRESHOLD * CCPP_CELL_THRESHOLD);
-				max_y = (m_map_start.y() + max_y + DISTANCE_THRESHOLD * CCPP_CELL_THRESHOLD < m_map_end.y()) ? max_y : (m_map_end.y() - m_map_start.y() - DISTANCE_THRESHOLD * CCPP_CELL_THRESHOLD);
+				max_x = (m_map_start.x() + max_x + DISTANCE_THRESHOLD * CCPP_CELL_THRESHOLD < m_map_end.x()) ? max_x : (m_map_end.x() - m_map_start.x() - DISTANCE_THRESHOLD * (CCPP_CELL_THRESHOLD + 0.5));
+				max_y = (m_map_start.y() + max_y + DISTANCE_THRESHOLD * CCPP_CELL_THRESHOLD < m_map_end.y()) ? max_y : (m_map_end.y() - m_map_start.y() - DISTANCE_THRESHOLD * (CCPP_CELL_THRESHOLD + 0.5));
 				Eigen::Vector3f max_point(m_map_start.x() + max_x + DISTANCE_THRESHOLD * CCPP_CELL_THRESHOLD, m_map_start.y() + max_y + DISTANCE_THRESHOLD * CCPP_CELL_THRESHOLD, 100);
 				fake_building.bounding_box_3d = Eigen::AlignedBox3f(max_point - Eigen::Vector3f(1, 1, 1), max_point);
 				fake_building.trajectory.emplace_back(max_point, Eigen::Vector3f(0, 0, 1));
@@ -1127,7 +1127,7 @@ public:
 		{
 			m_motion_status = Motion_status::final_check;
 			//Building fake_building;
-			fake_building.bounding_box_3d = Eigen::AlignedBox3f(m_map_end - Eigen::Vector3f(1, 1, 1), m_map_end);
+			fake_building.bounding_box_3d = Eigen::AlignedBox3f(m_map_end - Eigen::Vector3f(1 + DISTANCE_THRESHOLD * 0.5, 1 + DISTANCE_THRESHOLD * 0.5, 1 + DISTANCE_THRESHOLD * 0.5), m_map_end - Eigen::Vector3f(DISTANCE_THRESHOLD * 0.5, DISTANCE_THRESHOLD * 0.5, DISTANCE_THRESHOLD * 0.5));
 			fake_building.trajectory.emplace_back(m_map_end, Eigen::Vector3f(0, 0, 1));
 		}
 		return fake_building;
