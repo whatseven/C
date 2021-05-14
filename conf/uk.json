@@ -2,32 +2,33 @@
     "with_exploration": false,
     "with_reconstruction": true,
     //Reconstruction Flags
-    "with_continuous_height_flag": true,
+    "with_continuous_height_flag": false,
     "with_erosion_flag": false,
     "double_flag": true,
-    "split_flag": false,
+    "split_flag": true,
     "cluster_duplicate_flag": true,
     //Exploration Flags
     "fix_angle_flag": true,
 
     // Reconstruction parameters
-    "view_distance": 40,
-    "safe_distance": 25,
-    "vertical_overlap": 0.8,
+    "view_distance": 15,
+    "safe_distance": 10,
+    "vertical_overlap": 0.6,
     "horizontal_overlap": 0.8,
-    "split_overlap": 0.5,
-    "z_down_bounds": 40, //Optinal
+    "split_overlap": 0.8,
+    "z_down_bounds": 0, //Optinal
 
-    "fov": 53,
+    "fov": 90,
+    "ratio": 1.5,
 
-    "HEIGHT_CLIP": 12, // Effect the clustering of the buildings. Do not important here, we manually select a good point cloud for clustering
+    "HEIGHT_CLIP": 10, // Effect the clustering of the buildings. Do not important here, we manually select a good point cloud for clustering
     "MERGED_THRESHOLD": -1,
     "SPLIT_THRESHOLD": 100,
     "heightmap_resolution": 5,
-    "heightmap_dilate": 5,
-    "cluster_radius": 4,
-    "model_path": "D:\\Projects\\SEAR\\Real\\Huiyuan\\proxy\\\\szu_north_0422_points.ply",
-    "safe_zone_model_path": "D:\\Projects\\SEAR\\Real\\Huiyuan\\proxy\\\\szu_north_safe_zone.ply",
+    "heightmap_dilate": 1,
+    "cluster_radius": 2,
+    "model_path": "D:\\BACKUP\\SIG21\\ablation\\2_2\\uk\\uk_points_dense.ply",
+    "safe_zone_model_path": "D:\\BACKUP\\SIG21\\ablation\\2_2\\uk\\uk_points.ply",
 
     "is_viz": true,
     "is_viz1": false,
@@ -55,13 +56,13 @@
     // "mapper": "real_mapper",
 
     "with_interpolated": false, // Whether the algorithm output the interpolated trajectory
-    "nbv_target": "Topology_decomposition",
+    "nbv_target1": "Topology_decomposition",
     "nbv_target3": "Min_distance",
-    "nbv_target1": "Reconstruction_only",
+    "nbv_target": "Reconstruction_only",
     "nbv_target2": "Min_max_information",
     "CCPP_CELL_THRESHOLD": 5,
     "ccpp_cell_distance": 30,
 
-    "output_waypoint": true,
+    "output_waypoint": false,
     "geo_origin": [ 1.26826e7, 2.57652e6, 25 ]
 }

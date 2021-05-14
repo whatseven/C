@@ -536,6 +536,8 @@ public:
 		std::vector<Next_target> untraveled_buildings;
 		// Find with distance
 		for (int i_building = 0; i_building < v_buildings.size(); ++i_building) {
+			if (v_buildings[i_building].is_divide)
+				continue;
 			if (v_buildings[i_building].passed_trajectory.size() == 0)
 				untraveled_buildings.emplace_back(i_building, -1);
 		}
@@ -1069,14 +1071,14 @@ public:
 				for (const auto& item : topology) {
 					if (inside_box(pos, item))
 						already_traveled = true;
-					if (max_x < item.max().x())
+					if (max_x < item.max().x() - m_map_start.x())
 					{
-						max_x = item.max().x();
+						max_x = item.max().x() - m_map_start.x();
 						max_x_id = &item - &topology[0];
 					}
-					if (max_y < item.max().y())
+					if (max_y < item.max().y() - m_map_start.y())
 					{
-						max_y = item.max().y();
+						max_y = item.max().y() - m_map_start.y();
 						max_y_id = &item - &topology[0];
 					}
 				}
@@ -1227,7 +1229,7 @@ public:
 			get_next_target(v_frame_id, v_cur_pos, v_buildings, with_exploration);
 			LOG(INFO) << "Initialization target !";
 		}
-		if (m_motion_status == Motion_status::exploration || m_motion_status == Motion_status::final_check)
+		if (with_exploration && (m_motion_status == Motion_status::exploration || m_motion_status == Motion_status::final_check))
 		{
 			std::vector<int> untraveled_buildings_inside_exist_region;
 			Eigen::Vector2f cur_point_cgal(m_ccpp_trajectory[m_current_ccpp_trajectory_id].first.x(), 
@@ -3254,7 +3256,10 @@ int main(int argc, char** argv){
 	height_map.save_height_map_tiff("height_map.tiff");
 	debug_img(std::vector<cv::Mat>{height_map.m_map_dilated});
 
-	total_passed_trajectory = ensure_global_safe(total_passed_trajectory, original_height_map, args["safe_distance"].asFloat(), mapper->m_boundary);
+	if (args["output_waypoint"].asBool())
+	{
+		total_passed_trajectory = ensure_global_safe(total_passed_trajectory, original_height_map, args["safe_distance"].asFloat(), mapper->m_boundary);
+	}
 
 	// Change focus point into direction
 	for (auto& item : total_passed_trajectory)
