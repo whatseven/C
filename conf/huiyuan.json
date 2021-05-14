@@ -1,5 +1,5 @@
 {
-    "with_exploration": false,
+    "with_exploration": true,
     "with_reconstruction": true,
     //Reconstruction Flags
     "with_continuous_height_flag": true,
