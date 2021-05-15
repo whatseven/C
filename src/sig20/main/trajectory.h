@@ -797,6 +797,26 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 	float view_distance = v_params["view_distance"].asFloat();
 	float safe_distance = v_params["safe_distance"].asFloat();
 	
+	float overlap_step = view_distance * std::tanf(v_params["fov"].asFloat() / 180.f * M_PI / 2) * 2 * (1. - v_params["horizontal_overlap"].asFloat());
+	horizontal_step = overlap_step;
+
+	float vertical_surface_distance_one_view;
+	if (v_params["fov"].asFloat() < 60)
+	{
+		float total_part = std::tan((30 + v_params["fov"].asFloat() / 2) / 180.f * M_PI) * view_distance;
+		float first_part = std::tan((30 - v_params["fov"].asFloat() / 2) / 180.f * M_PI) * view_distance;
+		vertical_surface_distance_one_view = total_part - first_part;
+	}
+	else
+	{
+		float second_part = std::tan((30 + v_params["fov"].asFloat() / 2) / 180.f * M_PI) * view_distance;
+		float first_part = std::tan((v_params["fov"].asFloat() / 2 - 30) / 180.f * M_PI) * view_distance;
+		vertical_surface_distance_one_view = first_part + second_part;
+	}
+	if (v_params.isMember("ratio"))
+		vertical_surface_distance_one_view = vertical_surface_distance_one_view / v_params["ratio"].asFloat();
+	vertical_step = vertical_surface_distance_one_view * (1 - v_params["vertical_overlap"].asFloat());
+	
 	// Split building when it cannot be covered by one round flight
 	std::vector<bool> building_valid_flags(v_buildings.size(), true);
 	
@@ -816,8 +836,10 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 			{
 				continue;
 			}
-			int split_width_num = int((item_building.bounding_box_3d.box.max().x() - item_building.bounding_box_3d.box.min().x()) / min_distance + 0.5);
-			int split_length_num = int((item_building.bounding_box_3d.box.max().y() - item_building.bounding_box_3d.box.min().y()) / min_distance + 0.5);
+			int split_width_num = int((item_building.bounding_box_3d.box.max().x() - item_building.bounding_box_3d.box.min().x()) / min_distance);
+			int split_length_num = int((item_building.bounding_box_3d.box.max().y() - item_building.bounding_box_3d.box.min().y()) / min_distance);
+			split_width_num += 1;
+			split_length_num += 1;
 			if (split_width_num < 1)
 				split_width_num = 1;
 			if (split_length_num < 1)
@@ -919,8 +941,7 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 
 		bool double_flag = v_params["double_flag"].asBool();
 
-		float overlap_step = view_distance * std::tan(v_params["fov"].asFloat() / 180.f * M_PI / 2) * 2 * (1. - v_params["horizontal_overlap"].asFloat());
-		horizontal_step = overlap_step;
+		float z_up_bounds = view_distance / 3;
 		// Detect if it needs drop
 		int num_pass = 1;
 		{
@@ -931,26 +952,11 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 			//Eigen::Vector3f view_dir_camera_to_ground = (ground_pos - cur_pos).normalized();
 			if (double_flag) {
 				//if (view_dir.dot(view_dir_camera_to_ground) < std::cos(v_params.fov / 180.f * M_PI / 2)) {
-					float surface_distance_one_view;
-					if(v_params["fov"].asFloat() < 60)
-					{
-						float total_part = std::tan((30 + v_params["fov"].asFloat() / 2) / 180.f * M_PI) * view_distance;
-						float first_part = std::tan((30 - v_params["fov"].asFloat() / 2) / 180.f * M_PI) * view_distance;
-						surface_distance_one_view = total_part - first_part;
-						vertical_step = surface_distance_one_view * (1 - v_params["vertical_overlap"].asFloat());
-						num_pass = (zmax + view_distance) / vertical_step;
-					}
-					else
-					{
-						float second_part = std::tan((30 + v_params["fov"].asFloat() / 2) / 180.f * M_PI) * view_distance;
-						float first_part= std::tan((v_params["fov"].asFloat() / 2 - 30) / 180.f * M_PI) * view_distance;
-						surface_distance_one_view = first_part + second_part;
-						vertical_step = surface_distance_one_view * (1 - v_params["vertical_overlap"].asFloat());
-						num_pass = (zmax + view_distance + first_part) / vertical_step;
-					}
+					num_pass = (zmax + z_up_bounds - vertical_surface_distance_one_view) / vertical_step;
+					num_pass += 1; // Cell the division
 					if (num_pass < 0)
 						num_pass = 0;
-					num_pass += 1;
+					num_pass += 1; // Ensure
 				//}
 			}
 		}
@@ -960,10 +966,10 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 		float focus_z_corner_normal = - std::sqrtf(3.) / 3 * view_distance;
 		
 		for (int i_pass = 0; i_pass < num_pass; ++i_pass) {
-			Eigen::Vector3f cur_pos(xmin - view_distance, ymin - view_distance, zmax + view_distance);
+			Eigen::Vector3f cur_pos(xmin - view_distance, ymin - view_distance, zmax + z_up_bounds);
 			Eigen::Vector3f focus_point;
 
-			cur_pos.z() = zmax + view_distance - vertical_step * i_pass;
+			cur_pos.z() = zmax + z_up_bounds - vertical_step * i_pass;
 			
 			float delta = (xmax + view_distance - cur_pos.x()) / overlap_step;
 			delta = delta > 4 ? delta : 4;
@@ -1137,8 +1143,8 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 		if(v_params["with_continuous_height_flag"].asBool() && v_params["double_flag"].asBool())
 		{
 			int num_views = item_trajectory.size();
-			float height_max = zmax + view_distance;
-			float height_min = (zmax + view_distance) / num_pass;
+			float height_max = zmax + z_up_bounds;
+			float height_min = (zmax + z_up_bounds) / num_pass;
 
 			float height_delta = height_max - height_min;
 			float height_step = height_delta / num_views;

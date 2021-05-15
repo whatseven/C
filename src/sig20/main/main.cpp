@@ -536,6 +536,8 @@ public:
 		std::vector<Next_target> untraveled_buildings;
 		// Find with distance
 		for (int i_building = 0; i_building < v_buildings.size(); ++i_building) {
+			if (v_buildings[i_building].is_divide)
+				continue;
 			if (v_buildings[i_building].passed_trajectory.size() == 0)
 				untraveled_buildings.emplace_back(i_building, -1);
 		}
@@ -1246,7 +1248,7 @@ public:
 			get_next_target(v_frame_id, v_cur_pos, v_buildings, with_exploration);
 			LOG(INFO) << "Initialization target !";
 		}
-		if (m_motion_status == Motion_status::exploration || m_motion_status == Motion_status::final_check)
+		if (with_exploration && (m_motion_status == Motion_status::exploration || m_motion_status == Motion_status::final_check))
 		{
 			std::vector<int> untraveled_buildings_inside_exist_region;
 			Eigen::Vector2f cur_point_cgal(m_ccpp_trajectory[m_current_ccpp_trajectory_id].first.x(), 
@@ -2073,7 +2075,7 @@ public:
 	std::vector<Building> m_buildings_safe_place;
 	GT_mapper(const Json::Value& args): Mapper(args)
 	{
-		if(true)
+		if(false)
 		{
 			m_buildings_target.resize(3);
 			m_buildings_target[0].bounding_box_3d= Rotated_box(Eigen::AlignedBox3f(
@@ -3014,13 +3016,12 @@ int main(int argc, char** argv){
 	std::vector<int> trajectory_flag;
 	//debug_img(std::vector<cv::Mat>{height_map.m_map});
 
-	LOG(INFO) << "Mapping building ";
+	LOG(INFO) << "Mapping building with" <<  args["mapper"].asString();
 	Mapper* mapper;
 	if (args["mapper"] == "gt_mapper")
 		mapper = new GT_mapper(args);
 	else if (args["mapper"] == "graduate_gt_mapper")
 		mapper = new Graduate_GT_mapper(args);
-	
 	else if (args["mapper"] == "real_mapper")
 		mapper = new Real_mapper(args, airsim_client);
 	else
@@ -3059,11 +3060,13 @@ int main(int argc, char** argv){
 	std::pair<Eigen::Vector3f, Eigen::Vector3f> next_pos_direction;
 	//total_passed_trajectory.push_back(std::make_pair(current_pos.pos_mesh, Eigen::Vector3f(0,0,-1)));
 
+	//debug_img(std::vector<cv::Mat>{height_map.m_map});
 	while (!end) {
 		LOG(INFO) << "<<<<<<<<<<<<< Frame " << cur_frame_id << " <<<<<<<<<<<<<";
 
 		auto t = recordTime();
-		mapper->get_buildings(total_buildings, current_pos, cur_frame_id, height_map);
+		if(next_best_target->m_motion_status==Motion_status::exploration)
+			mapper->get_buildings(total_buildings, current_pos, cur_frame_id, height_map);
 		next_best_target->update_uncertainty(current_pos, total_buildings);
 		profileTime(t, "Height map", is_log);
 
@@ -3276,7 +3279,10 @@ int main(int argc, char** argv){
 	height_map.save_height_map_tiff("height_map.tiff");
 	debug_img(std::vector<cv::Mat>{height_map.m_map_dilated});
 
-	total_passed_trajectory = ensure_global_safe(total_passed_trajectory, original_height_map, args["safe_distance"].asFloat(), mapper->m_boundary);
+	if (args["output_waypoint"].asBool())
+	{
+		total_passed_trajectory = ensure_global_safe(total_passed_trajectory, original_height_map, args["safe_distance"].asFloat(), mapper->m_boundary);
+	}
 
 	// Change focus point into direction
 	for (auto& item : total_passed_trajectory)
@@ -3308,6 +3314,7 @@ int main(int argc, char** argv){
 		viz->m_pos = total_passed_trajectory[0].first;
 		viz->m_direction = total_passed_trajectory[0].second;
 		viz->m_trajectories.clear();
+
 		if (args["output_waypoint"].asBool())
 		{
 			viz->m_trajectories = safe_global_trajectory;
@@ -3316,6 +3323,8 @@ int main(int argc, char** argv){
 		{
 			viz->m_trajectories = total_passed_trajectory;
 		}
+		if (viz->m_is_reconstruction_status.size() == 0)
+			viz->m_is_reconstruction_status.resize(viz->m_trajectories.size(), 1);
 		viz->m_uncertainty_map.clear();
 		for (const auto& item : next_best_target->sample_points) {
 			int index = &item - &next_best_target->sample_points[0];
