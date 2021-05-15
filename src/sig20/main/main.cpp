@@ -1108,7 +1108,7 @@ public:
 		{
 			m_motion_status = Motion_status::exploration;
 			
-			if (max_x_id != max_y_id) // Current traveled is not forming a rectangle 
+			if (max_x_id != max_y_id && false) // Current traveled is not forming a rectangle 
 			{
 				Eigen::Vector3f max_point(m_map_start.x() + max_x, m_map_start.y() + max_y, 100);
 				fake_building.bounding_box_3d = Eigen::AlignedBox3f(max_point - Eigen::Vector3f(1, 1, 1), max_point);
@@ -1425,7 +1425,7 @@ public:
 				else
 					throw;
 			}
-			if (false)
+			if (true)
 			{
 				const int& cur_building_id = m_current_building_id;
 				std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> unpassed_trajectory;
@@ -1858,23 +1858,23 @@ public:
 			[&cur_point_cgal](const CGAL::Point_2<K>& p1, const CGAL::Point_2<K>& p2) {
 				return std::pow(p1.x() - cur_point_cgal.x(), 2) + std::pow(p1.y() - cur_point_cgal.y(), 2) < std::pow(p2.x() - cur_point_cgal.x(), 2) + std::pow(p2.y() - cur_point_cgal.y(), 2);
 			}) - sample_points.begin();
-			if (m_motion_status == Motion_status::exploration)
-			{
-				region_status[nearest_region_id] = region_viz_color[1];
-				already_explored[nearest_region_id] = true;
-			}
+		if (m_motion_status == Motion_status::exploration)
+		{
+			region_status[nearest_region_id] = region_viz_color[1];
+			already_explored[nearest_region_id] = true;
+		}
 
-			for (int i_point = 0; i_point < region_status.size(); i_point++) {
-				const Eigen::Vector2f p(sample_points[i_point].x(), sample_points[i_point].y());
+		/*for (int i_point = 0; i_point < region_status.size(); i_point++) {
+			const Eigen::Vector2f p(sample_points[i_point].x(), sample_points[i_point].y());
 
-				for (const auto& item_building : v_buildings) {
-					Eigen::Vector3f point(p.x(), p.y(), 0.f);
-					if (item_building.bounding_box_3d.inside_2d(point)) {
-						region_status[i_point] = color_occupied;
-						break;
-					}
+			for (const auto& item_building : v_buildings) {
+				Eigen::Vector3f point(p.x(), p.y(), 0.f);
+				if (item_building.bounding_box_3d.inside_2d(point)) {
+					region_status[i_point] = color_occupied;
+					break;
 				}
 			}
+		}*/
 	}
 
 	std::pair<Eigen::Vector3f, Eigen::Vector3f> determine_next_target(int v_frame_id, const Pos_Pack& v_cur_pos, std::vector<Building>& v_buildings, bool with_exploration, float v_threshold) override {
@@ -1894,32 +1894,18 @@ public:
 			const int& cur_building_id = m_current_building_id;
 			std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> unpassed_trajectory;
 			std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>>& passed_trajectory = v_buildings[cur_building_id].passed_trajectory;
-			std::copy_if(v_buildings[cur_building_id].trajectory.begin(), v_buildings[cur_building_id].trajectory.end(),
-				std::back_inserter(unpassed_trajectory),
-				[&passed_trajectory, v_threshold](const auto& item_new_trajectory) {
-					bool untraveled = true;
-					for (const auto& item_passed_trajectory : passed_trajectory)
-						if ((item_passed_trajectory.first - item_new_trajectory.first).norm() < v_threshold) {
-							untraveled = false;
-						}
-					return untraveled;
-				});
 
-			if (unpassed_trajectory.size() == 0) {
+			if (passed_trajectory.size() == v_buildings[cur_building_id].trajectory.size()) {
 				get_next_target(v_frame_id, v_cur_pos, v_buildings, with_exploration);
 				LOG(INFO) << "Change target !";
 				return determine_next_target(v_frame_id, v_cur_pos, v_buildings, with_exploration, v_threshold);
 			}
 			else {
-				auto it_min_distance = std::min_element(
-					unpassed_trajectory.begin(), unpassed_trajectory.end(),
-					[&v_cur_pos](const auto& t1, const auto& t2) {
-						return (t1.first - v_cur_pos.pos_mesh).norm() < (t2.first - v_cur_pos.pos_mesh).norm();
-					});
-				next_pos = *it_min_distance;
+				next_pos = v_buildings[cur_building_id].trajectory[passed_trajectory.size()];
 				passed_trajectory.push_back(next_pos);
 				return next_pos;
 			}
+			
 		}
 	}
 
@@ -3065,8 +3051,8 @@ int main(int argc, char** argv){
 		LOG(INFO) << "<<<<<<<<<<<<< Frame " << cur_frame_id << " <<<<<<<<<<<<<";
 
 		auto t = recordTime();
-		if(next_best_target->m_motion_status==Motion_status::exploration)
-			mapper->get_buildings(total_buildings, current_pos, cur_frame_id, height_map);
+		//if(next_best_target->m_motion_status==Motion_status::exploration)
+		mapper->get_buildings(total_buildings, current_pos, cur_frame_id, height_map);
 		next_best_target->update_uncertainty(current_pos, total_buildings);
 		profileTime(t, "Height map", is_log);
 
