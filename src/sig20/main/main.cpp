@@ -1984,9 +1984,9 @@ public:
 		if (m_motion_status == Motion_status::initialization) {
 			m_motion_status = Motion_status::exploration;
 			Building fake_building;
-			fake_building.bounding_box_3d = Eigen::AlignedBox3f(m_map_end - Eigen::Vector3f(1, 1, 1), m_map_end);
+			fake_building.bounding_box_3d = Eigen::AlignedBox3f(m_map_end - Eigen::Vector3f(1 + DISTANCE_THRESHOLD * 0.5, 1 + DISTANCE_THRESHOLD * 0.5, 1 + DISTANCE_THRESHOLD * 0.5), m_map_end - Eigen::Vector3f(DISTANCE_THRESHOLD * 0.5, DISTANCE_THRESHOLD * 0.5, DISTANCE_THRESHOLD * 0.5));
 			fake_building.trajectory.emplace_back(m_map_end, Eigen::Vector3f(0, 0, 1));
-			get_ccpp_trajectory(v_cur_pos.pos_mesh, fake_building, CCPP_CELL_THRESHOLD);
+			get_ccpp_trajectory(v_cur_pos.pos_mesh, fake_building, 0);
 			next_pos = std::make_pair(Eigen::Vector3f(
 				0, 0, 100),
 				Eigen::Vector3f(1, 0, 0));
