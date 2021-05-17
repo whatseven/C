@@ -1426,7 +1426,7 @@ public:
 				else
 					throw;
 			}
-			if (false)
+			if (true)
 			{
 				const int& cur_building_id = m_current_building_id;
 				std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> unpassed_trajectory;
@@ -1561,7 +1561,7 @@ public:
 				else
 				{
 					int id = v_buildings[cur_building_id].closest_trajectory_id + passed_trajectory.size();
-					if (id > v_buildings[cur_building_id].trajectory.size())
+					if (id >= v_buildings[cur_building_id].trajectory.size())
 						id -= v_buildings[cur_building_id].trajectory.size();
 					next_pos = v_buildings[cur_building_id].trajectory[id];
 					passed_trajectory.push_back(next_pos);
