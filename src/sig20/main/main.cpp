@@ -36,7 +36,7 @@ typedef CGAL::Polygon_2<K> Polygon_2;
 
 //Path
 boost::filesystem::path log_root("log");
-const Eigen::Vector3f UNREAL_START(-4000.f, 30000.f, 200.f);
+const Eigen::Vector3f UNREAL_START(0.f,0.f,0.f);
 //Camera
 const cv::Vec3b BACKGROUND_COLOR(57,181,55);
 const cv::Vec3b SKY_COLOR(161, 120, 205);
@@ -2544,19 +2544,19 @@ public:
 	}
 	std::pair<cv::RotatedRect, Point_2> get_bbox_3d(const Point_cloud& v_point_cloud)
 	{
-		std::vector<float> vertices_y;
-		std::vector<cv::Point2f> vertices_xz;
+		std::vector<float> vertices_z;
+		std::vector<cv::Point2f> vertices_xy;
 		for (auto& item_point : v_point_cloud.points())
 		{
-			vertices_y.push_back(item_point.y());
-			vertices_xz.push_back(cv::Point2f(item_point.x(), item_point.z()));
+			vertices_z.push_back(item_point.z());
+			vertices_xy.push_back(cv::Point2f(item_point.x(), item_point.y()));
 		}
-		cv::RotatedRect box = cv::minAreaRect(vertices_xz);
-		float max_y = *std::max_element(vertices_y.begin(), vertices_y.end());
-		float min_y = *std::min_element(vertices_y.begin(), vertices_y.end());
+		cv::RotatedRect box = cv::minAreaRect(vertices_xy);
+		float max_z = *std::max_element(vertices_z.begin(), vertices_z.end());
+		float min_z = *std::min_element(vertices_z.begin(), vertices_z.end());
 
 		//Note: Coordinates transformation
-		return std::make_pair(box, Point_2(min_y, max_y));
+		return std::make_pair(box, Point_2(min_z, max_z));
 	}
 	float calculate_3d_iou(const Building& building1, const Building& building2)
 	{
@@ -2653,8 +2653,6 @@ public:
 		// Input: Current_image
 		// Output: 3D Bounding Boxes(std::vector<>)
 		{
-			
-
 			bool isValid;
 			std::vector <CGAL::Bbox_2> boxes_2d;
 			std::vector <cv::RotatedRect> boxes_3d;
@@ -2675,8 +2673,8 @@ public:
 				auto box = get_bbox_3d(item_points);
 
 				// 3D Box in mesh coordinate
-				Eigen::AlignedBox3f box_3d(Eigen::Vector3f(box.first.center.x - box.first.size.width / 2, box.second.x(), box.first.center.y - box.first.size.height / 2),
-					Eigen::Vector3f(box.first.center.x + box.first.size.width / 2, box.second.y(), box.first.center.y + box.first.size.height / 2));
+				Eigen::AlignedBox3f box_3d(Eigen::Vector3f(box.first.center.x - box.first.size.width / 2, box.first.center.y - box.first.size.height / 2, box.second.x()),
+					Eigen::Vector3f(box.first.center.x + box.first.size.width / 2, box.first.center.y + box.first.size.height / 2, box.second.y()));
 
 				float angle = (-box.first.angle + 90) / 180.f * M_PI;
 
@@ -3056,11 +3054,11 @@ int main(int argc, char** argv){
 	std::map<cv::Vec3b, std::string> color_to_mesh_name_map;
 	viz->m_uncertainty_map_distance=args["ccpp_cell_distance"].asFloat();
 
-	LOG(INFO) << "Read safe zone " << args["safe_zone_model_path"].asString();
-	CGAL::Point_set_3<Point_3, Vector_3> safe_zone_point_cloud;
-	CGAL::read_ply_point_set(std::ifstream(args["safe_zone_model_path"].asString(), std::ios::binary), safe_zone_point_cloud);
-	Height_map original_height_map(safe_zone_point_cloud, args["heightmap_resolution"].asFloat(),
-		args["heightmap_dilate"].asInt());
+	//LOG(INFO) << "Read safe zone " << args["safe_zone_model_path"].asString();
+	//CGAL::Point_set_3<Point_3, Vector_3> safe_zone_point_cloud;
+	//CGAL::read_ply_point_set(std::ifstream(args["safe_zone_model_path"].asString(), std::ios::binary), safe_zone_point_cloud);
+	//Height_map original_height_map(safe_zone_point_cloud, args["heightmap_resolution"].asFloat(),
+	//	args["heightmap_dilate"].asInt());
 	
 	{
 		LOG(INFO) << "Initialization directory, airsim and reset color";
@@ -3168,6 +3166,8 @@ int main(int argc, char** argv){
 	std::pair<Eigen::Vector3f, Eigen::Vector3f> next_pos_direction;
 	//total_passed_trajectory.push_back(std::make_pair(current_pos.pos_mesh, Eigen::Vector3f(0,0,-1)));
 
+	airsim_client->adjust_pose(map_converter.get_pos_pack_from_unreal(Eigen::Vector3f(-4080.f, -20940.f, 7000.f), 0, 0));
+	
 	//debug_img(std::vector<cv::Mat>{height_map.m_map});
 	while (!end) {
 		LOG(INFO) << "<<<<<<<<<<<<< Frame " << cur_frame_id << " <<<<<<<<<<<<<";
@@ -3185,7 +3185,7 @@ int main(int argc, char** argv){
 			// Input: Building vectors (std::vector<Building>)
 			// Output: Modified Building.trajectory and return the whole trajectory
 
-			current_trajectory = generate_trajectory(args, total_buildings, args["mapper"].asString()=="gt_mapper"? original_height_map:height_map,
+			current_trajectory = generate_trajectory(args, total_buildings, args["mapper"].asString()=="gt_mapper"? height_map:height_map,
 				vertical_step, horizontal_step, split_min_distance);
 			LOG(INFO) << "New trajectory ??!";
 
@@ -3256,13 +3256,14 @@ int main(int argc, char** argv){
 		// Output: current_pos
 		{
 			Eigen::Vector3f direction = next_pos_direction.first - current_pos.pos_mesh;
-			Eigen::Vector3f next_direction;
+			Eigen::Vector3f next_direction, next_direction_temp;
 			Eigen::Vector3f next_pos;
 			int interpolated_num = int(direction.norm() /  DRONE_STEP);
 			if (direction.norm() < 2 * DRONE_STEP||!with_interpolated)
 			{
 				//next_direction = next_pos_direction.second.normalized();
-				next_direction = next_pos_direction.second;
+				next_direction_temp = next_pos_direction.second;
+				next_direction = (next_pos_direction.second - next_pos_direction.first).normalized();
 				next_pos = next_pos_direction.first;
 				is_interpolated = false;
 			}
@@ -3309,9 +3310,9 @@ int main(int argc, char** argv){
 				next_direction.normalize();
 				is_interpolated = true;
 			}
-			total_passed_trajectory.push_back(std::make_pair(next_pos, next_direction));
+			total_passed_trajectory.push_back(std::make_pair(next_pos, next_direction_temp));
 			std::ofstream pose("D:/test_data/" + std::to_string(cur_frame_id) + ".txt");
-			pose << next_pos << next_direction;
+			pose << next_pos << next_direction_temp;
 			pose.close();
 			if(next_best_target->m_motion_status==Motion_status::exploration|| next_best_target->m_motion_status == Motion_status::final_check)
 				trajectory_flag.push_back(0);
@@ -3319,7 +3320,7 @@ int main(int argc, char** argv){
 				trajectory_flag.push_back(1);
 			float pitch = -std::atan2f(next_direction[2], std::sqrtf(next_direction[0] * next_direction[0] + next_direction[1] * next_direction[1]));
 			float yaw = std::atan2f(next_direction[1], next_direction[0]);
-			current_pos = map_converter.get_pos_pack_from_mesh(next_pos, yaw, -pitch);
+			current_pos = map_converter.get_pos_pack_from_mesh(next_pos, yaw, pitch);
 			cur_frame_id++;
 		}
 		profileTime(t, "Find next move", is_log);
@@ -3390,7 +3391,7 @@ int main(int argc, char** argv){
 
 	if (args["output_waypoint"].asBool())
 	{
-		total_passed_trajectory = ensure_global_safe(total_passed_trajectory, original_height_map, args["safe_distance"].asFloat(), mapper->m_boundary);
+		total_passed_trajectory = ensure_global_safe(total_passed_trajectory, height_map, args["safe_distance"].asFloat(), mapper->m_boundary);
 	}
 
 	// Change focus point into direction
