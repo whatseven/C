@@ -254,8 +254,8 @@ public:
                 int index = &item_trajectory - &m_trajectories_spline[0];
 
                 Eigen::Vector4f color(250./255, 157./255, 0./255, 1);
-                if (m_is_reconstruction_status[index] == 1)
-                    color = Eigen::Vector4f( 23./255, 73./255, 179./255, 1);
+                //if (m_is_reconstruction_status[index] == 1)
+                 //   color = Eigen::Vector4f( 23./255, 73./255, 179./255, 1);
                 
                 //draw_cube(Eigen::AlignedBox3f(item_trajectory.first - Eigen::Vector3f(1.f, 1.f, 1.f), item_trajectory.first + Eigen::Vector3f(1.f, 1.f, 1.f)),
                 //    Eigen::Vector4f(0.f, 1.f, 0.f, 1.f));

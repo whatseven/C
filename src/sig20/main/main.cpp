@@ -1045,20 +1045,20 @@ public:
 			start_pos_on_map, end_pos_on_map, m_arg["CCPP_Obstacle_weight"].asFloat());
 
 		//std::cout << "  " << std::endl;
-		cv::Mat viz_ccpp = ccpp_map.clone();
+		//cv::Mat viz_ccpp = ccpp_map.clone();
 
 		float iter_trajectory = 0;
 		for (const Eigen::Vector2i& item : map_trajectory) {
 			// todo: invert x,y!!!!!!!!!!!!!
-			viz_ccpp.at<cv::uint8_t>(item.x(), item.y()) = iter_trajectory++ * 255. / map_trajectory.size();
+			//viz_ccpp.at<cv::uint8_t>(item.x(), item.y()) = iter_trajectory++ * 255. / map_trajectory.size();
 			Eigen::Vector3f t3 = m_map_start + DISTANCE_THRESHOLD * Eigen::Vector3f(item.y(), item.x(), 0.f);
 			t3.z() = 100;
 			m_ccpp_trajectory.emplace_back(
 				t3,
 				Eigen::Vector3f(0, 0, -1)
 			);
-			if (iter_trajectory < map_trajectory.size())
-				dummy3 += (map_trajectory[iter_trajectory] - map_trajectory[iter_trajectory - 1]).norm();
+			//if (iter_trajectory < map_trajectory.size())
+			//	dummy3 += (map_trajectory[iter_trajectory] - map_trajectory[iter_trajectory - 1]).norm();
 		}
 		next_point.z() = 100;
 		//m_ccpp_trajectory.emplace_back(
@@ -1066,6 +1066,7 @@ public:
 		//	Eigen::Vector3f(0, 0, -1)
 		//);
 		//cv::imwrite("log/ccpp_map/"+std::to_string(dummy1++) + "_ccpp.png", viz_ccpp);
+		// BUG
 		return true;
 	}
 
