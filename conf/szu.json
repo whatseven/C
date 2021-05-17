@@ -5,16 +5,17 @@
     "with_continuous_height_flag": true,
     "with_erosion_flag": false,
     "double_flag": true,
-    "split_flag": true,
+    "split_flag": false,
     "cluster_duplicate_flag": true,
     //Exploration Flags
     "fix_angle_flag": true,
+    "explore_multi_angle": false,
 
     // Reconstruction parameters
     "view_distance": 40,
     "safe_distance": 25,
     "vertical_overlap": 0.4,
-    "horizontal_overlap": 0.6,
+    "horizontal_overlap": 0.1,
     "split_overlap": 0.5,
     "z_down_bounds": 40, //Optinal
 
@@ -26,8 +27,8 @@
     "heightmap_resolution": 5,
     "heightmap_dilate": 5,
     "cluster_radius": 4,
-    "model_path": "D:\\Projects\\SEAR\\Real\\SZU\\centralize_points.ply",
-    "safe_zone_model_path": "D:\\Projects\\SEAR\\Real\\SZU\\centralize_points_safe_zone.ply",
+    "model_path": "F:\\Sig\\Real\\centralize_points.ply",
+    "safe_zone_model_path": "F:\\Sig\\Real\\SZU_0509.ply",
     "boundary": [
         113.92798662185669,
         22.542121410369873,
@@ -130,7 +131,7 @@
     ],
     "is_viz": true,
     "is_viz1": false,
-    "is_log": false,
+    "is_log": true,
 
     //
     // These are all unreal coordinates
@@ -160,6 +161,7 @@
     "nbv_target2": "Min_max_information",
     "CCPP_CELL_THRESHOLD": 5,
     "ccpp_cell_distance": 30,
+    "CCPP_Obstacle_weight": 2.5,
 
     "output_waypoint": true,
     "geo_origin": [ 1.26826e7, 2.57652e6, 0 ]

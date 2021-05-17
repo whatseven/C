@@ -57,6 +57,10 @@ struct Rotated_box
 	{
 		cv_box = cv::RotatedRect(cv::Point2f(v_box.center().x(), v_box.center().y()), cv::Size2f(v_box.sizes().x(), v_box.sizes().y()),0.f);
 	}
+	Rotated_box(const Eigen::AlignedBox3f& v_box, float v_angle) :box(v_box), angle(v_angle)
+	{
+		cv_box = cv::RotatedRect(cv::Point2f(v_box.center().x(), v_box.center().y()), cv::Size2f(v_box.sizes().x(), v_box.sizes().y()), angle);
+	}
 
 	bool inside_2d(const Eigen::Vector3f& v_point) const
 	{
