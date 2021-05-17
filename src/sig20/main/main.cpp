@@ -1426,7 +1426,7 @@ public:
 				else
 					throw;
 			}
-			if (true)
+			if (false)
 			{
 				const int& cur_building_id = m_current_building_id;
 				std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> unpassed_trajectory;
@@ -1455,7 +1455,7 @@ public:
 							float angle = std::acos(dot_product) / M_PI * 180;
 							if (angle >= 180)
 								angle = 0;
-							if ((item_passed_trajectory.first - item_new_trajectory.first).norm() < v_threshold && angle < 5) {
+							if ((item_passed_trajectory.first - item_new_trajectory.first).norm() < v_threshold && angle < 0.1) {
 								untraveled = false;
 								/*if (unpassed_trajectory.size() - start_pos_id < one_pass_trajectory_num / 2)
 									start_pos_id = unpassed_trajectory.size();
@@ -1481,7 +1481,7 @@ public:
 							float angle = std::acos(dot_product) / M_PI * 180;
 							if (angle >= 180)
 								angle = 0;
-							if ((item_passed_trajectory.first - item_new_trajectory.first).norm() < v_threshold && angle < 5) {
+							if ((item_passed_trajectory.first - item_new_trajectory.first).norm() < v_threshold && angle < 0.1) {
 								untraveled = false;
 								/*if (unpassed_trajectory.size() - start_pos_id < one_pass_trajectory_num / 2)
 									start_pos_id = unpassed_trajectory.size();
@@ -1529,6 +1529,16 @@ public:
 			{
 				const int& cur_building_id = m_current_building_id;
 				std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>>& passed_trajectory = v_buildings[cur_building_id].passed_trajectory;
+				if (passed_trajectory.size() == 0)
+				{
+					int id_closest_trajectory = std::min_element(v_buildings[cur_building_id].trajectory.begin(), v_buildings[cur_building_id].trajectory.end(),
+						[&v_cur_pos](const auto& tra1, const auto& tra2) {
+							return (tra1.first - v_cur_pos.pos_mesh).norm() < (tra2.first - v_cur_pos.pos_mesh).norm();
+						}) - v_buildings[cur_building_id].trajectory.begin();
+						v_buildings[cur_building_id].closest_trajectory_id = id_closest_trajectory;
+				}
+				
+				std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>>& passed_trajectory = v_buildings[cur_building_id].passed_trajectory;
 				if(passed_trajectory.size() == v_buildings[cur_building_id].trajectory.size()) // Exit reconstruction mode
 				{
 					if (with_exploration)
@@ -1551,7 +1561,10 @@ public:
 				}
 				else
 				{
-					next_pos = v_buildings[cur_building_id].trajectory[passed_trajectory.size()];
+					int id = v_buildings[cur_building_id].closest_trajectory_id + passed_trajectory.size();
+					if (id > v_buildings[cur_building_id].trajectory.size())
+						id -= v_buildings[cur_building_id].trajectory.size();
+					next_pos = v_buildings[cur_building_id].trajectory[id];
 					passed_trajectory.push_back(next_pos);
 					return next_pos;
 
