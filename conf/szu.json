@@ -14,9 +14,9 @@
     // Reconstruction parameters
     "view_distance": 40,
     "safe_distance": 25,
-    "vertical_overlap": 0.4,
-    "horizontal_overlap": 0.1,
-    "split_overlap": 0.5,
+    "vertical_overlap": 0.5,
+    "horizontal_overlap": 0.8,
+    "split_overlap": 0.4,
     "z_down_bounds": 40, //Optinal
 
     "fov": 53,
@@ -137,8 +137,8 @@
     // These are all unreal coordinates
     // Y axis in invert, min y in unreal is max y in mesh
     //
-    "START_X": -38000.0,
-    "START_Y": 129900.0,
+    "START_X": -27000.0,
+    "START_Y": 143000.0,
     "START_Z": 4000.0,
     "MAP_START_UNREAL_X": -54000.0,
     "MAP_START_UNREAL_Y": -16000.0,
@@ -164,6 +164,6 @@
     "ccpp_cell_distance": 30,
     "CCPP_Obstacle_weight": 2.5,
 
-    "output_waypoint": true,
+    "output_waypoint": false,
     "geo_origin": [ 1.26826e7, 2.57652e6, 0 ]
 }

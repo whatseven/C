@@ -641,6 +641,7 @@ public:
 				Eigen::Vector3f(0, 0, -1)
 			);
 		}
+		
 		//Eigen::Vector3f next_point(m_map_end.x()-60, m_map_end.y() - 60,100);
 		//m_ccpp_trajectory.emplace_back(
 		//	next_point,
@@ -1060,6 +1061,12 @@ public:
 			//if (iter_trajectory < map_trajectory.size())
 			//	dummy3 += (map_trajectory[iter_trajectory] - map_trajectory[iter_trajectory - 1]).norm();
 		}
+		// Bug:
+		//if(m_boundary.bounded_side(Point_2(
+		//	m_ccpp_trajectory[m_ccpp_trajectory.size() - 1].first.x(),
+		//	m_ccpp_trajectory[m_ccpp_trajectory.size() - 1].first.y()
+		//)) != CGAL::ON_BOUNDED_SIDE)
+		//	m_ccpp_trajectory.pop_back();
 		next_point.z() = 100;
 		//m_ccpp_trajectory.emplace_back(
 		//	next_point,
@@ -1105,7 +1112,7 @@ public:
 		}
 
 		Building fake_building;
-		if (num_already_travelled_cell > 0.1 * sample_points.size() && (m_map_start.x() + max_x + DISTANCE_THRESHOLD * CCPP_CELL_THRESHOLD < m_map_end.x()
+		if (num_already_travelled_cell > 0.5 * sample_points.size() && (m_map_start.x() + max_x + DISTANCE_THRESHOLD * CCPP_CELL_THRESHOLD < m_map_end.x()
 			|| m_map_start.y() + max_y + DISTANCE_THRESHOLD * CCPP_CELL_THRESHOLD < m_map_end.y())) // Expand in default size
 		{
 			m_motion_status = Motion_status::exploration;
