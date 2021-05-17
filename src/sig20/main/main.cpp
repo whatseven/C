@@ -2259,7 +2259,7 @@ public:
 	std::vector<Building> m_buildings_safe_place;
 	Graduate_GT_mapper(const Json::Value& args) : Mapper(args)
 	{
-		if (true)
+		if (false)
 		{
 			m_buildings_target.resize(5);
 			m_buildings_target[0].bounding_box_3d = Rotated_box(Eigen::AlignedBox3f(
