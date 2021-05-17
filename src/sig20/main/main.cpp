@@ -2259,9 +2259,9 @@ public:
 	std::vector<Building> m_buildings_safe_place;
 	Graduate_GT_mapper(const Json::Value& args) : Mapper(args)
 	{
-		if (false)
+		if (true)
 		{
-			m_buildings_target.resize(4);
+			m_buildings_target.resize(5);
 			m_buildings_target[0].bounding_box_3d = Rotated_box(Eigen::AlignedBox3f(
 				Eigen::Vector3f(130 * 4 - 10, 130 * 6 - 10, 0),
 				Eigen::Vector3f(130 * 4 + 10, 130 * 6 + 10, 50)
@@ -2278,6 +2278,10 @@ public:
 			m_buildings_target[3].bounding_box_3d = Rotated_box(Eigen::AlignedBox3f(
 				Eigen::Vector3f(130 * 12 - 10, 130 * 7 - 10, 0),
 				Eigen::Vector3f(130 * 12 + 10, 130 * 7 + 10, 50)
+			));
+			m_buildings_target[4].bounding_box_3d = Rotated_box(Eigen::AlignedBox3f(
+				Eigen::Vector3f(130 * 14 - 10, 130 * 1 - 10, 0),
+				Eigen::Vector3f(130 * 14 + 10, 130 * 1 + 10, 50)
 			));
 
 
@@ -2695,7 +2699,6 @@ public:
 		//	m_unreal_object_detector->get_bounding_box(current_image, color_map, current_buildings);
 		//	LOG(INFO) << "Object detection done";
 		//}
-
 		//// SLAM
 		//// Input: Image(cv::Mat), Camera matrix(cv::Iso)
 		//// Output: Vector of building with Point cloud in camera frames (std::vector<Building>)
@@ -2705,7 +2708,6 @@ public:
 		//	m_synthetic_SLAM->get_points(current_image, color_map, current_buildings);
 		//	LOG(INFO) << "Sparse point cloud generation and building cluster done";
 		//}
-
 		//// Post process point cloud
 		//// Input: Vector of building (std::vector<Building>)
 		//// Output: Vector of building with point cloud in world space (std::vector<Building>)
@@ -2734,7 +2736,6 @@ public:
 		//	num_building_current_frame = current_buildings.size();
 		//	//CGAL::write_ply_point_set(std::ofstream(std::to_string(v_cur_frame_id) + "_world_points.ply"), cur_frame_total_points_in_world_coordinates);
 		//}
-
 		//// Mapping
 		//// Input: *
 		//// Output: Vector of building with 3D bounding box (std::vector<Building>)
@@ -2754,21 +2755,17 @@ public:
 		//						return a.z() < b.z();
 		//					})->z();
 		//		}
-
 		//		// Calculate height of the building, Get 3D bbox world space
 		//		for (auto& item_building : current_buildings) {
 		//			size_t cluster_index = &item_building - &current_buildings[0];
 		//			float min_distance = z_mins[cluster_index];
 		//			float max_distance = z_maxs[cluster_index];
 		//			float y_min_2d = item_building.bounding_box_2d.ymin();
-
 		//			Eigen::Vector3f point_pos_img(0, y_min_2d, 1);
 		//			Eigen::Vector3f point_pos_camera_XZ = INTRINSIC.inverse() * point_pos_img;
-
 		//			float distance_candidate = min_distance;
 		//			float scale = distance_candidate / point_pos_camera_XZ[2];
 		//			Eigen::Vector3f point_pos_world = v_current_pos.camera_matrix.inverse() * (scale * point_pos_camera_XZ);
-
 		//			float final_height = point_pos_world[2];
 		//			// Shorter than camera, recalculate using max distance
 		//			if (final_height < v_current_pos.pos_mesh[2]) {
@@ -2777,14 +2774,12 @@ public:
 		//				point_pos_world = v_current_pos.camera_matrix.inverse() * (scale * point_pos_camera_XZ);
 		//				final_height = point_pos_world[2];
 		//			}
-
 		//			item_building.bounding_box_3d = get_bounding_box(item_building.points_world_space);
 		//			item_building.bounding_box_3d.box.min()[2] = 0;
 		//			item_building.bounding_box_3d.box.max()[2] = final_height;
 		//		}
 		//	}
 		//	LOG(INFO) << "2D Bbox to 3D Bbox done";
-
 		//}
 
 		// Merging
@@ -2792,9 +2787,9 @@ public:
 		// Output: Total building vectors (std::vector<Building>)
 		{
 			float max_iou = 0;
-			float max_id = 0;
+			int max_id = 0;
 			std::vector<bool> need_register(num_building_current_frame, false);
-			for (const auto& item_current_building : current_buildings) {
+			for (auto& item_current_building : current_buildings) {
 				size_t index_box = &item_current_building - &current_buildings[0];
 				for (auto& item_building : v_buildings) {
 					size_t index_total_box = &item_building - &v_buildings[0];
@@ -2805,7 +2800,10 @@ public:
 				if (max_iou <= m_args["IOU_threshold"].asFloat())
 					need_register[index_box] = true;
 				else
+				{
+					item_current_building.passed_trajectory = v_buildings[max_id].passed_trajectory;
 					v_buildings[max_id] = item_current_building;
+				}
 			}
 			for (int i = 0; i < need_register.size(); ++i) {
 				if (need_register[i]) {
@@ -3165,8 +3163,6 @@ int main(int argc, char** argv){
 	bool is_interpolated = false;
 	std::pair<Eigen::Vector3f, Eigen::Vector3f> next_pos_direction;
 	//total_passed_trajectory.push_back(std::make_pair(current_pos.pos_mesh, Eigen::Vector3f(0,0,-1)));
-
-	//airsim_client->adjust_pose(map_converter.get_pos_pack_from_unreal(Eigen::Vector3f(-4080.f, -20940.f, 7000.f), 0, 0));
 	
 	//debug_img(std::vector<cv::Mat>{height_map.m_map});
 	while (!end) {
@@ -3343,7 +3339,27 @@ int main(int argc, char** argv){
 		}
 		//debug_img(std::vector<cv::Mat>{height_map.m_map_dilated});
 	}
-	total_passed_trajectory.pop_back();
+	{
+		viz->lock();
+		viz->m_buildings = total_buildings;
+		viz->m_pos = total_passed_trajectory[total_passed_trajectory.size()-1].first;
+		viz->m_direction = Eigen::Vector3f(0,0,1);
+		viz->m_trajectories.clear();
+		viz->m_trajectories = total_passed_trajectory;
+
+		if (viz->m_is_reconstruction_status.size() == 0)
+			viz->m_is_reconstruction_status.resize(viz->m_trajectories.size(), 1);
+		viz->m_uncertainty_map.clear();
+		for (const auto& item : next_best_target->sample_points) {
+			int index = &item - &next_best_target->sample_points[0];
+			viz->m_uncertainty_map.emplace_back(Eigen::Vector2f(item.x(), item.y()), next_best_target->region_status[index]);
+		}
+		viz->calculate_pitch();
+		viz->unlock();
+		//override_sleep(100);
+		//debug_img(std::vector<cv::Mat>{height_map.m_map_dilated});
+	}
+	//total_passed_trajectory.pop_back();
 
 	std::vector<Rotated_box> boxes;
 	for (const auto& item : total_buildings)
