@@ -2259,7 +2259,7 @@ public:
 	std::vector<Building> m_buildings_safe_place;
 	Graduate_GT_mapper(const Json::Value& args) : Mapper(args)
 	{
-		if (false)
+		if (true)
 		{
 			m_buildings_target.resize(4);
 			m_buildings_target[0].bounding_box_3d = Rotated_box(Eigen::AlignedBox3f(
@@ -3342,7 +3342,27 @@ int main(int argc, char** argv){
 		}
 		//debug_img(std::vector<cv::Mat>{height_map.m_map_dilated});
 	}
-	total_passed_trajectory.pop_back();
+	{
+		viz->lock();
+		viz->m_buildings = total_buildings;
+		viz->m_pos = total_passed_trajectory[total_passed_trajectory.size()-1].first;
+		viz->m_direction = Eigen::Vector3f(0,0,1);
+		viz->m_trajectories.clear();
+		viz->m_trajectories = total_passed_trajectory;
+
+		if (viz->m_is_reconstruction_status.size() == 0)
+			viz->m_is_reconstruction_status.resize(viz->m_trajectories.size(), 1);
+		viz->m_uncertainty_map.clear();
+		for (const auto& item : next_best_target->sample_points) {
+			int index = &item - &next_best_target->sample_points[0];
+			viz->m_uncertainty_map.emplace_back(Eigen::Vector2f(item.x(), item.y()), next_best_target->region_status[index]);
+		}
+		viz->calculate_pitch();
+		viz->unlock();
+		//override_sleep(100);
+		//debug_img(std::vector<cv::Mat>{height_map.m_map_dilated});
+	}
+	//total_passed_trajectory.pop_back();
 
 	std::vector<Rotated_box> boxes;
 	for (const auto& item : total_buildings)
