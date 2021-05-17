@@ -1538,7 +1538,6 @@ public:
 						v_buildings[cur_building_id].closest_trajectory_id = id_closest_trajectory;
 				}
 				
-				std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>>& passed_trajectory = v_buildings[cur_building_id].passed_trajectory;
 				if(passed_trajectory.size() == v_buildings[cur_building_id].trajectory.size()) // Exit reconstruction mode
 				{
 					if (with_exploration)
