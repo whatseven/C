@@ -29,8 +29,8 @@
     "cluster_radius": 10,
     "model_path": "D:\\BACKUP\\SIG21_Local\\2_3_global\\Suzhou_points.ply",
     "safe_zone_model_path": "D:\\BACKUP\\SIG21_Local\\2_3_global\\Suzhou_points.ply",
-    "is_viz1": true,
-    "is_viz": false,
+    "is_viz": true,
+    "is_viz1": false,
     "is_log": true,
 
     "START_X": -100000,
@@ -67,6 +67,6 @@
     "ccpp_cell_distance": 60,
     //"ccpp_cell_distance": 150,
 
-    "output_waypoint": true,
+    "output_waypoint": false,
     "geo_origin": []
 }

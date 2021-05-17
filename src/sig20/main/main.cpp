@@ -3166,7 +3166,7 @@ int main(int argc, char** argv){
 	std::pair<Eigen::Vector3f, Eigen::Vector3f> next_pos_direction;
 	//total_passed_trajectory.push_back(std::make_pair(current_pos.pos_mesh, Eigen::Vector3f(0,0,-1)));
 
-	airsim_client->adjust_pose(map_converter.get_pos_pack_from_unreal(Eigen::Vector3f(-4080.f, -20940.f, 7000.f), 0, 0));
+	//airsim_client->adjust_pose(map_converter.get_pos_pack_from_unreal(Eigen::Vector3f(-4080.f, -20940.f, 7000.f), 0, 0));
 	
 	//debug_img(std::vector<cv::Mat>{height_map.m_map});
 	while (!end) {
