@@ -1252,8 +1252,8 @@ public:
 		if (with_exploration && (m_motion_status == Motion_status::exploration || m_motion_status == Motion_status::final_check))
 		{
 			std::vector<int> untraveled_buildings_inside_exist_region;
-			Eigen::Vector2f cur_point_cgal(m_ccpp_trajectory[m_current_ccpp_trajectory_id + 1].first.x(), 
-				m_ccpp_trajectory[m_current_ccpp_trajectory_id + 1].first.y());
+			Eigen::Vector2f cur_point_cgal(m_ccpp_trajectory[m_current_ccpp_trajectory_id].first.x(), 
+				m_ccpp_trajectory[m_current_ccpp_trajectory_id].first.y());
 			for (int i_building = 0; i_building < v_buildings.size(); ++i_building) {
 				if (v_buildings[i_building].is_divide)
 					continue;
