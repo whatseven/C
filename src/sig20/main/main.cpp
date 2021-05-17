@@ -1426,7 +1426,7 @@ public:
 				else
 					throw;
 			}
-			if (true)
+			if (false)
 			{
 				const int& cur_building_id = m_current_building_id;
 				std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> unpassed_trajectory;

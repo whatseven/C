@@ -59,8 +59,8 @@
     "nbv_target1": "Min_max_information",
 
     // Ablation study
-    "nbv_target1": "Exploration_first",
-    "nbv_target3": "Random_min_distance",
+    "nbv_target3": "Exploration_first",
+    "nbv_target1": "Random_min_distance",
 
     "CCPP_CELL_THRESHOLD": 5,
     "CCPP_Obstacle_weight": 2.5,
