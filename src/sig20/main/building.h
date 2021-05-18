@@ -50,7 +50,12 @@ struct Next_target {
 	}
 };
 
-struct viewpoint
+struct Viewpoint
 {
-	
+	Eigen::Vector3f pos_mesh;
+	Eigen::Vector3f direction; // Normalized
+	Eigen::Vector3f focus_point;
+	float pitch; // right -> x, forwards -> z, towards up -> + pitch
+	float yaw;   //
+	bool is_towards_reconstruction;
 };
