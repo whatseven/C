@@ -29,7 +29,26 @@
     "cluster_radius": 3,
     "model_path": "D:\\BACKUP\\SIG21\\Model\\yingrenshi_points.ply",
     "safe_zone_model_path": "D:\\BACKUP\\SIG21\\Model\\yingrenshi_points.ply",
-
+    "boundary": [
+        113.921700252278,
+        22.64593735439954,
+        0,
+        113.9216536793648,
+        22.64347767816065,
+        0,
+        113.9235450581638,
+        22.6416,
+        0,
+        113.9246,
+        22.64265098554531,
+        0,
+        113.9231805691334,
+        22.64596686147909,
+        0,
+        113.921700252278,
+        22.64593735439954,
+        0
+    ],
     "is_viz": true,
     "is_viz1": false,
     "is_log": true,
@@ -41,11 +60,11 @@
     "START_X": 2430.0,
     "START_Y": 28900.0,
     "START_Z": 4000,
-    "MAP_START_UNREAL_X": -16000,
-    "MAP_START_UNREAL_Y": -21000,
+    "MAP_START_UNREAL_X": -22000,
+    "MAP_START_UNREAL_Y": -27000,
     "MAP_START_UNREAL_Z": -500,
-    "MAP_END_UNREAL_X": 14000,
-    "MAP_END_UNREAL_Y": 27000,
+    "MAP_END_UNREAL_X": 20000,
+    "MAP_END_UNREAL_Y": 33000,
     "MAP_END_UNREAL_Z": 7000,
     "DRONE_STEP": 10,
 
@@ -64,5 +83,5 @@
     "ccpp_cell_distance": 30,
 
     "output_waypoint": false,
-    "geo_origin": [ 1.26826e7, 2.57652e6, 25 ]
+    "geo_origin": [ 12681886,2589057.5, 25 ]
 }
