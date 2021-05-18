@@ -921,7 +921,7 @@ public:
 	float dummy3 = 0;
 
 	Next_best_target_topology_exploration(const Eigen::Vector3f& v_map_start_mesh, const Eigen::Vector3f& v_map_end_mesh,
-		int v_CCPP_CELL_THRESHOLD,const Polygon_2& m_boundary,float v_ccpp_cell_distance, const Json::Value& v_arg):CCPP_CELL_THRESHOLD(v_CCPP_CELL_THRESHOLD), m_arg(v_arg),
+		int v_CCPP_CELL_THRESHOLD,const Polygon_2& v_boundary,float v_ccpp_cell_distance, const Json::Value& v_arg):CCPP_CELL_THRESHOLD(v_CCPP_CELL_THRESHOLD), m_arg(v_arg),
 		Next_best_target(v_map_start_mesh, v_map_end_mesh, v_ccpp_cell_distance)
 	{
 		//color_reconstruction = region_viz_color[2];
@@ -930,14 +930,14 @@ public:
 		color_reconstruction = cv::Vec3b(0, 255, 0);
 		color_occupied = cv::Vec3b(0, 255, 0);
 		color_unobserved = cv::Vec3b(205, 205, 209);
-		
+		this->m_boundary = v_boundary;
 		region_status.clear();
 		region_status.resize(sample_points.size(), color_unobserved);
 
-		if(m_boundary.size()!=0){
+		if(v_boundary.size()!=0){
 			for (int i_sample_point = 0; i_sample_point < sample_points.size(); ++i_sample_point) {
-				if (m_boundary.bounded_side(sample_points[i_sample_point]) != CGAL::ON_BOUNDED_SIDE) {
-					//LOG(INFO) << m_boundary.is_simple();
+				if (v_boundary.bounded_side(sample_points[i_sample_point]) != CGAL::ON_BOUNDED_SIDE) {
+					//LOG(INFO) << v_boundary.is_simple();
 					region_status[i_sample_point] = color_occupied;
 				}
 			}
@@ -945,7 +945,7 @@ public:
 		
 		m_current_color_id = 0;
 		m_current_ccpp_trajectory_id = 0;
-		region_status[0] = region_viz_color[m_current_color_id];
+		//region_status[0] = region_viz_color[m_current_color_id];
 		
 		//topology.emplace_back(Eigen::Vector2f(m_map_start.x(), m_map_start.y()), 
 		//	Eigen::Vector2f(m_map_start.x()+1, m_map_start.y()+1));
@@ -1228,7 +1228,8 @@ public:
 			for(auto item:topology)
 				if(inside_box(Eigen::Vector2f(sample_points[nearest_region_id].x(), sample_points[nearest_region_id].y()), item))
 					inside = true;
-			if(inside)
+			
+			if(inside && m_boundary.bounded_side(sample_points[nearest_region_id]) == CGAL::ON_BOUNDED_SIDE)
 				region_status[nearest_region_id] = region_viz_color[m_current_color_id % region_viz_color.size()];
 		}
 		
