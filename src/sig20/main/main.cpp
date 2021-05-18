@@ -3191,7 +3191,8 @@ int main(int argc, char** argv){
 		auto t = recordTime();
 		//if(next_best_target->m_motion_status==Motion_status::exploration)
 		mapper->get_buildings(total_buildings, current_pos, cur_frame_id, height_map);
-		next_best_target->update_uncertainty(current_pos, total_buildings);
+		if (cur_frame_id != 0)
+			next_best_target->update_uncertainty(current_pos, total_buildings);
 		profileTime(t, "Height map", is_log);
 
 		std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> current_trajectory;

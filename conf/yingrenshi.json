@@ -13,12 +13,12 @@
     // Reconstruction parameters
     "view_distance": 40,
     "safe_distance": 25,
-    "vertical_overlap": 0.6,
+    "vertical_overlap": 0.4,
     "horizontal_overlap": 0.8,
-    "split_overlap": 0.1,
+    "split_overlap": 0.5,
     "z_down_bounds": 0, //Optinal
 
-    "fov": 84,
+    "fov": 53,
     "ratio": 1.5,
 
     "HEIGHT_CLIP": 18, // Effect the clustering of the buildings. Do not important here, we manually select a good point cloud for clustering
