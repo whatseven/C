@@ -108,16 +108,16 @@ std::vector<Polygon_2> get_polygons(std::string file_path);
 class Height_map {
 	
 public:
-    Height_map(const Point_set& v_point_cloud, const float v_resolution,int v_dilate)
-	:m_resolution(v_resolution), m_dilate(v_dilate){
+    Height_map(const Point_set& v_point_cloud, const float v_resolution,int v_dilate,float v_default_height= -610610.610610)
+	:m_resolution(v_resolution), m_dilate(v_dilate),m_default_height(v_default_height){
         Eigen::AlignedBox3f bounds = get_bounding_box(v_point_cloud);
         m_start = bounds.min();
         Eigen::Vector3f end(bounds.max());
         Eigen::Vector3f delta = (end - m_start) / m_resolution;
         m_map = cv::Mat((int)delta[1] + 1, (int)delta[0] + 1,CV_32FC1);
-        m_map.setTo(-99999);
+        m_map.setTo(std::numeric_limits<float>::lowest());
         m_map_dilated = cv::Mat((int)delta[1] + 1, (int)delta[0] + 1, CV_32FC1);
-        m_map_dilated.setTo(-99999);
+        m_map_dilated.setTo(std::numeric_limits<float>::lowest());
     	
         for (const auto& id_point : v_point_cloud) {
             const Point_3& point = v_point_cloud.point(id_point);
@@ -134,11 +134,13 @@ public:
             m_map_dilated = m_map;
     }
 
-    Height_map(const Eigen::Vector3f& v_min, const Eigen::Vector3f& v_max, const float v_resolution, int v_dilate)
-	:m_resolution(v_resolution),m_start(v_min), m_dilate(v_dilate) {
+    Height_map(const Eigen::Vector3f& v_min, const Eigen::Vector3f& v_max, const float v_resolution, int v_dilate, float v_default_height = -610610.610610)
+	:m_resolution(v_resolution),m_start(v_min), m_dilate(v_dilate), m_default_height(v_default_height){
         Eigen::Vector3f delta = (v_max - m_start) / m_resolution;
         m_map = cv::Mat((int)delta[1] + 1, (int)delta[0] + 1, CV_32FC1);
         m_map.setTo(std::numeric_limits<float>::lowest());
+        m_map_dilated = cv::Mat((int)delta[1] + 1, (int)delta[0] + 1, CV_32FC1);
+        m_map_dilated.setTo(std::numeric_limits<float>::lowest());
     }
 
 	float get_height(float x,float y) const
@@ -146,7 +148,7 @@ public:
         int m_y = (int)((y - m_start[1]) / m_resolution);
         int m_x = (int)((x - m_start[0]) / m_resolution);
         if (!(0 <= m_y && 0 <= m_x && m_y < m_map.rows && m_x < m_map.cols))
-            return 0;
+            return m_default_height;
         return m_map_dilated.at<float>(m_y, m_x);
     }
 
@@ -155,7 +157,7 @@ public:
         int m_y = (int)((y - m_start[1]) / m_resolution);
         int m_x = (int)((x - m_start[0]) / m_resolution);
         if (!(0 <= m_y && 0 <= m_x && m_y < m_map.rows && m_x < m_map.cols))
-            return 0;
+            return m_default_height;
         return m_map.at<float>(m_y, m_x);
     }
 
@@ -219,7 +221,8 @@ public:
         //std::cout << m_map.rows() << "," << m_map.cols() << std::endl;
         cv::imwrite(v_path, m_map);
     }
-	
+
+    float m_default_height;
     int m_dilate;
     Eigen::Vector3f m_start;
     float m_resolution;

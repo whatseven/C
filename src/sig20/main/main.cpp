@@ -36,13 +36,10 @@ typedef CGAL::Polygon_2<K> Polygon_2;
 
 //Path
 boost::filesystem::path log_root("log");
-const Eigen::Vector3f UNREAL_START(0.f,0.f,0.f);
 //Camera
 const cv::Vec3b BACKGROUND_COLOR(57,181,55);
 const cv::Vec3b SKY_COLOR(161, 120, 205);
 const int MAX_FEATURES = 100000;
-
-Eigen::Matrix3f INTRINSIC;
 
 MapConverter map_converter;
 
@@ -238,43 +235,43 @@ public:
 	}
 
 };
-
-class Synthetic_SLAM {
-public:
-
-	Synthetic_SLAM() {
-
-	}
-
-	void get_points(const std::map<std::string, cv::Mat>& v_img,const std::vector<cv::Vec3b>& v_color_map, std::vector<Building>& v_buildings) {
-		std::vector<cv::KeyPoint> keypoints;
-		cv::Mat rgb = v_img.at("rgb").clone();
-		auto orb = cv::ORB::create(200);
-		//orb->detect(rgb, keypoints, v_img.at("roi_mask"));
-		orb->detect(rgb, keypoints);
-		cv::drawKeypoints(rgb, keypoints, rgb);
-		for (auto it = keypoints.begin(); it != keypoints.end(); it++) {
-			cv::Vec3b point_color = v_img.at("segmentation").at<cv::Vec3b>(it->pt.y, it->pt.x);
-			if (point_color == BACKGROUND_COLOR)
-				continue;
-			Eigen::Vector3f point(it->pt.x, it->pt.y, 1.f);
-			point = INTRINSIC.inverse() * point;
-			point *= v_img.at("depth_planar").at<float>(it->pt.y, it->pt.x) / point[2];
-
-			auto find_result = std::find(v_color_map.begin(), v_color_map.end(), point_color);
-			if (find_result == v_color_map.end()) {
-				LOG(INFO) << "It's not a building.";
-				//throw "";
-			}
-			else {
-				v_buildings[&*find_result - &v_color_map[0]].points_camera_space.insert(Point_3(point(0), point(1), point(2)));
-			}
-		}
-		//for (const auto& item : v_buildings)
-			//CGAL::write_ply_point_set(std::ofstream(std::to_string(&item - &v_buildings[0]) + "_camera.ply"), item.points_camera_space);
-		//debug_img(std::vector{ rgb });
-	}
-};
+//
+//class Synthetic_SLAM {
+//public:
+//
+//	Synthetic_SLAM() {
+//
+//	}
+//
+//	void get_points(const std::map<std::string, cv::Mat>& v_img,const std::vector<cv::Vec3b>& v_color_map, std::vector<Building>& v_buildings) {
+//		std::vector<cv::KeyPoint> keypoints;
+//		cv::Mat rgb = v_img.at("rgb").clone();
+//		auto orb = cv::ORB::create(200);
+//		//orb->detect(rgb, keypoints, v_img.at("roi_mask"));
+//		orb->detect(rgb, keypoints);
+//		cv::drawKeypoints(rgb, keypoints, rgb);
+//		for (auto it = keypoints.begin(); it != keypoints.end(); it++) {
+//			cv::Vec3b point_color = v_img.at("segmentation").at<cv::Vec3b>(it->pt.y, it->pt.x);
+//			if (point_color == BACKGROUND_COLOR)
+//				continue;
+//			Eigen::Vector3f point(it->pt.x, it->pt.y, 1.f);
+//			point = INTRINSIC.inverse() * point;
+//			point *= v_img.at("depth_planar").at<float>(it->pt.y, it->pt.x) / point[2];
+//
+//			auto find_result = std::find(v_color_map.begin(), v_color_map.end(), point_color);
+//			if (find_result == v_color_map.end()) {
+//				LOG(INFO) << "It's not a building.";
+//				//throw "";
+//			}
+//			else {
+//				v_buildings[&*find_result - &v_color_map[0]].points_camera_space.insert(Point_3(point(0), point(1), point(2)));
+//			}
+//		}
+//		//for (const auto& item : v_buildings)
+//			//CGAL::write_ply_point_set(std::ofstream(std::to_string(&item - &v_buildings[0]) + "_camera.ply"), item.points_camera_space);
+//		//debug_img(std::vector{ rgb });
+//	}
+//};
 
 enum Motion_status { initialization,exploration,reconstruction,done, final_check,reconstruction_in_exploration};
 
@@ -2482,7 +2479,7 @@ public:
 class Virtual_mapper:public Mapper {
 public:
 	Unreal_object_detector* m_unreal_object_detector;
-	Synthetic_SLAM* m_synthetic_SLAM;
+	//Synthetic_SLAM* m_synthetic_SLAM;
 	Airsim_tools* m_airsim_client;
 	std::map<cv::Vec3b, std::string> m_color_to_mesh_name_map;
 	// Read Mesh
@@ -2847,14 +2844,14 @@ class Real_mapper :public Mapper
 public:
 	Real_object_detector* m_real_object_detector;
 	cv::Ptr<cv::Feature2D> orb;
-	Synthetic_SLAM* m_synthetic_SLAM;
+	//Synthetic_SLAM* m_synthetic_SLAM;
 	//zxm::ISLAM* slam = GetInstanceOfSLAM();
 	Airsim_tools* m_airsim_client;
 	Real_mapper(const Json::Value& args, Airsim_tools* v_airsim_client)
 		: Mapper(args), m_airsim_client(v_airsim_client) {
 			m_real_object_detector = new Real_object_detector;
 			orb = cv::ORB::create(MAX_FEATURES);
-			m_synthetic_SLAM = new Synthetic_SLAM;
+			//m_synthetic_SLAM = new Synthetic_SLAM;
 	}
 	
 	void get_buildings(std::vector<Building>& v_buildings, const Pos_Pack& v_current_pos, const int v_cur_frame_id,
@@ -2893,7 +2890,7 @@ public:
 		//		   Refined Camera matrix(cv::Iso)
 		//		   num of clusters (int)
 		{
-			m_synthetic_SLAM->get_points(current_image, color_map, current_buildings);
+			//m_synthetic_SLAM->get_points(current_image, color_map, current_buildings);
 			LOG(INFO) << "Sparse point cloud generation and building cluster done";
 		}
 
@@ -2966,7 +2963,9 @@ public:
 					float y_min_2d = item_building.bounding_box_2d.ymin();
 
 					Eigen::Vector3f point_pos_img(0, y_min_2d, 1);
-					Eigen::Vector3f point_pos_camera_XZ = INTRINSIC.inverse() * point_pos_img;
+					// BUG HERE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+					//Eigen::Vector3f point_pos_camera_XZ = INTRINSIC.inverse() * point_pos_img;
+					Eigen::Vector3f point_pos_camera_XZ = point_pos_img;
 
 					float distance_candidate = min_distance;
 					float scale = distance_candidate / point_pos_camera_XZ[2];
@@ -3033,7 +3032,6 @@ public:
 };
 
 int main(int argc, char** argv){
-	// Read arguments
 	std::cout << "Read config " << argv[2] << std::endl;
 	Json::Value args;
 	{
@@ -3063,24 +3061,17 @@ int main(int argc, char** argv){
 			exit(0);
 		}
 	}
-	bool is_log = args["is_log"].asBool();
-	FLAGS_logtostderr = int(is_log);
-
-	// Prepare environment
-	// Reset segmentation color, initialize map converter
-	Airsim_tools* airsim_client;
-	Visualizer* viz = new Visualizer;
-	std::map<cv::Vec3b, std::string> color_to_mesh_name_map;
-	viz->m_uncertainty_map_distance=args["ccpp_cell_distance"].asFloat();
-
-	//LOG(INFO) << "Read safe zone " << args["safe_zone_model_path"].asString();
-	//CGAL::Point_set_3<Point_3, Vector_3> safe_zone_point_cloud;
-	//CGAL::read_ply_point_set(std::ifstream(args["safe_zone_model_path"].asString(), std::ios::binary), safe_zone_point_cloud);
-	//Height_map original_height_map(safe_zone_point_cloud, args["heightmap_resolution"].asFloat(),
-	//	args["heightmap_dilate"].asInt());
+	bool software_parameter_is_log = args["is_log"].asBool();
+	bool software_parameter_is_viz = args["is_viz"].asBool();
+	FLAGS_logtostderr = int(software_parameter_is_log);
 	
+	Visualizer* viz = new Visualizer;
+	viz->m_uncertainty_map_distance = args["ccpp_cell_distance"].asFloat();
+
+	LOG(INFO) << "Initialization directory, airsim,map converter  and reset color";
+	Airsim_tools* airsim_client;
+	std::map<cv::Vec3b, std::string> color_to_mesh_name_map; // Color (RGB) to mesh name
 	{
-		LOG(INFO) << "Initialization directory, airsim and reset color";
 		if (boost::filesystem::exists(log_root))
 			boost::filesystem::remove_all(log_root);
 		boost::filesystem::create_directories(log_root);
@@ -3090,13 +3081,17 @@ int main(int argc, char** argv){
 		boost::filesystem::create_directories(log_root/"ccpp_map");
 		boost::filesystem::create_directories(log_root/"wgs_log");
 		boost::filesystem::create_directories(log_root/"gradually_results");
-		
-		map_converter.initDroneStart(UNREAL_START);
-		INTRINSIC << 400, 0, 400, 0, 400, 400, 0, 0, 1;
+
+		Eigen::Vector3f unreal_start = Eigen::Vector3f(
+			args["unreal_player_start"][0].asFloat(),
+			args["unreal_player_start"][1].asFloat(),
+			args["unreal_player_start"][2].asFloat()
+		);
+		map_converter.initDroneStart(unreal_start);
 
 		if(args["mapper"].asString()!="gt_mapper" && args["mapper"].asString() != "graduate_gt_mapper")
 		{
-			airsim_client = new Airsim_tools(UNREAL_START);
+			airsim_client = new Airsim_tools(unreal_start);
 			airsim_client->reset_color("building");
 			//	airsim_client.m_agent->simSetSegmentationObjectID("BP_Sky_Sphere", 0);
 
@@ -3118,30 +3113,7 @@ int main(int argc, char** argv){
 		}
 	}
 
-	// Some global structure
-	bool end = false;
-	bool is_viz=args["is_viz"].asBool();
-	float DRONE_STEP = args["DRONE_STEP"].asFloat();
-	bool with_interpolated =args["with_interpolated"].asBool();
-	const Eigen::Vector3f map_start_unreal(args["MAP_START_UNREAL_X"].asFloat(), args["MAP_START_UNREAL_Y"].asFloat(), args["MAP_START_UNREAL_Z"].asFloat());
-	const Eigen::Vector3f map_end_unreal(args["MAP_END_UNREAL_X"].asFloat(), args["MAP_END_UNREAL_Y"].asFloat(), args["MAP_END_UNREAL_Z"].asFloat());
-	const Eigen::Vector3f map_start_mesh(map_start_unreal.x() / 100.f, -map_end_unreal.y() / 100.f, map_start_unreal.z() / 100.f) ;
-	const Eigen::Vector3f map_end_mesh(map_end_unreal.x() / 100.f, -map_start_unreal.y() / 100.f, map_end_unreal.z() / 100.f);
-	Height_map height_map(map_start_mesh,map_end_mesh,
-		args["heightmap_resolution"].asFloat(),
-		args["heightmap_dilate"].asInt()
-		);
-	std::vector<Building> total_buildings;
-	Pos_Pack current_pos = map_converter.get_pos_pack_from_unreal(
-		Eigen::Vector3f(args["START_X"].asFloat(), 
-			args["START_Y"].asFloat(), 
-			args["START_Z"].asFloat()),  -M_PI / 2, 60 / 180.f * M_PI);
-	int cur_frame_id = 0;
-	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> total_passed_trajectory;
-	std::vector<int> trajectory_flag;
-	//debug_img(std::vector<cv::Mat>{height_map.m_map});
-
-	LOG(INFO) << "Mapping building with" <<  args["mapper"].asString();
+	LOG(INFO) << "Mapping building with " << args["mapper"].asString();
 	Mapper* mapper;
 	if (args["mapper"] == "gt_mapper")
 		mapper = new GT_mapper(args);
@@ -3152,10 +3124,19 @@ int main(int argc, char** argv){
 	else
 		mapper = new Virtual_mapper(args, airsim_client, color_to_mesh_name_map);
 	
+	// Some global structure
+	bool end = false;
+	float DRONE_STEP = args["DRONE_STEP"].asFloat();
+	bool with_interpolated =args["with_interpolated"].asBool();
+	const Eigen::Vector3f map_start_unreal(args["MAP_START_UNREAL_X"].asFloat(), args["MAP_START_UNREAL_Y"].asFloat(), args["MAP_START_UNREAL_Z"].asFloat());
+	const Eigen::Vector3f map_end_unreal(args["MAP_END_UNREAL_X"].asFloat(), args["MAP_END_UNREAL_Y"].asFloat(), args["MAP_END_UNREAL_Z"].asFloat());
+	const Eigen::Vector3f map_start_mesh(map_start_unreal.x() / 100.f, -map_end_unreal.y() / 100.f, map_start_unreal.z() / 100.f) ;
+	const Eigen::Vector3f map_end_mesh(map_end_unreal.x() / 100.f, -map_start_unreal.y() / 100.f, map_end_unreal.z() / 100.f);
+
 	Next_best_target* next_best_target;
 	if (args["nbv_target"] == "Topology_decomposition")
-		next_best_target = new Next_best_target_topology_exploration(map_start_mesh, map_end_mesh, 
-			args["CCPP_CELL_THRESHOLD"].asInt(), mapper->m_boundary, args["ccpp_cell_distance"].asFloat(),args);
+		next_best_target = new Next_best_target_topology_exploration(map_start_mesh, map_end_mesh,
+			args["CCPP_CELL_THRESHOLD"].asInt(), mapper->m_boundary, args["ccpp_cell_distance"].asFloat(), args);
 	else if (args["nbv_target"] == "Min_distance")
 		next_best_target = new Next_best_target_min_distance_ccpp(map_start_mesh, map_end_mesh, args["ccpp_cell_distance"].asFloat());
 	else if (args["nbv_target"] == "Random_min_distance")
@@ -3163,7 +3144,6 @@ int main(int argc, char** argv){
 	else if (args["nbv_target"] == "Exploration_first")
 		next_best_target = new Next_best_target_exploration_first(map_start_mesh, map_end_mesh,
 			args["CCPP_CELL_THRESHOLD"].asInt(), mapper->m_boundary, args["ccpp_cell_distance"].asFloat(), args);
-	
 	else if (args["nbv_target"] == "Min_max_information")
 		next_best_target = new Next_best_target_min_max_information(map_start_mesh, map_end_mesh, args["ccpp_cell_distance"].asFloat());
 	else if (args["nbv_target"] == "First_building_next_region")
@@ -3174,27 +3154,55 @@ int main(int argc, char** argv){
 		next_best_target = new Next_best_target_exploration_only(map_start_mesh, map_end_mesh, args["ccpp_cell_distance"].asFloat());
 	else
 		throw;
+
+	LOG(INFO) << "Initialize height map";
+	Height_map runtime_height_map(map_start_mesh,map_end_mesh,
+		args["heightmap_resolution"].asFloat(),
+		args["heightmap_dilate"].asInt()
+		);
+	Height_map safezone_height_map = runtime_height_map;
+	bool has_safe_zone = args.isMember("safe_zone_model_path");
+	if(has_safe_zone)
+	{
+		LOG(INFO) << "Read safe zone " << args["safe_zone_model_path"].asString();
+		CGAL::Point_set_3<Point_3, Vector_3> safe_zone_point_cloud;
+		CGAL::read_ply_point_set(std::ifstream(args["safe_zone_model_path"].asString(), std::ios::binary), safe_zone_point_cloud);
+		Height_map original_height_map(safe_zone_point_cloud, args["heightmap_resolution"].asFloat(),
+			args["heightmap_dilate"].asInt());
+	}
+
 	bool with_exploration = args["with_exploration"].asBool();
+	bool with_reconstruction = args["with_reconstruction"].asBool();
+	bool is_interpolated = false;
+	if (!with_exploration && !with_reconstruction)
+		throw;
+	
+	std::vector<Building> total_buildings; // Map result
+	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> total_passed_trajectory; // Trajectory result
+	std::vector<int> trajectory_flag; // Trajectory flag result: 0: Exploration, 1: Reconstruction
+	float vertical_step = 0, horizontal_step = 0, split_min_distance = 0; // Calculated trajectory intrinsic
 	float reconstruction_length = 0.f;
 	float exploration_length = 0.f;
 	float max_turn = 0.f;
+
+	Pos_Pack current_pos = map_converter.get_pos_pack_from_unreal(
+		Eigen::Vector3f(args["START_X"].asFloat(), 
+			args["START_Y"].asFloat(), 
+			args["START_Z"].asFloat()),  -M_PI / 2, 63 / 180.f * M_PI);
+	int cur_frame_id = 0;
 	int building_num_record = -1;
 	int current_building_num= 0;
-	float vertical_step = 0, horizontal_step = 0, split_min_distance = 0;
-	bool is_interpolated = false;
 	std::pair<Eigen::Vector3f, Eigen::Vector3f> next_pos_direction;
-	//total_passed_trajectory.push_back(std::make_pair(current_pos.pos_mesh, Eigen::Vector3f(0,0,-1)));
 	
-	//debug_img(std::vector<cv::Mat>{height_map.m_map});
 	while (!end) {
 		LOG(INFO) << "<<<<<<<<<<<<< Frame " << cur_frame_id << " <<<<<<<<<<<<<";
 
 		auto t = recordTime();
 		//if(next_best_target->m_motion_status==Motion_status::exploration)
-		mapper->get_buildings(total_buildings, current_pos, cur_frame_id, height_map);
+		mapper->get_buildings(total_buildings, current_pos, cur_frame_id, runtime_height_map);
 		if (cur_frame_id != 0)
 			next_best_target->update_uncertainty(current_pos, total_buildings);
-		profileTime(t, "Height map", is_log);
+		profileTime(t, "Height map", software_parameter_is_log);
 
 		std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> current_trajectory;
 		if(!with_interpolated||(with_interpolated&& !is_interpolated))
@@ -3203,7 +3211,7 @@ int main(int argc, char** argv){
 			// Input: Building vectors (std::vector<Building>)
 			// Output: Modified Building.trajectory and return the whole trajectory
 
-			current_trajectory = generate_trajectory(args, total_buildings, args["mapper"].asString()=="gt_mapper"? height_map:height_map,
+			current_trajectory = generate_trajectory(args, total_buildings, args["mapper"].asString()=="gt_mapper"? runtime_height_map:runtime_height_map,
 				vertical_step, horizontal_step, split_min_distance);
 			LOG(INFO) << "New trajectory ??!";
 
@@ -3221,7 +3229,7 @@ int main(int argc, char** argv){
 			LOG(INFO) << (boost::format("Current mode: %s. Building progress: %d/%d") % std::to_string(next_best_target->m_motion_status) % current_building_num % total_buildings.size()).str();
 
 		}
-		profileTime(t, "Generate trajectory", is_log);
+		profileTime(t, "Generate trajectory", software_parameter_is_log);
 
 		// Statics
 		{
@@ -3242,7 +3250,7 @@ int main(int argc, char** argv){
 
 		// Visualize
 		//debug_img(std::vector<cv::Mat>{original_height_map.m_map_dilated});
-		if(is_viz)
+		if(software_parameter_is_viz)
 		{
 			viz->lock();
 			viz->m_buildings = total_buildings;
@@ -3266,7 +3274,7 @@ int main(int argc, char** argv){
 			//debug_img(std::vector<cv::Mat>{height_map.m_map_dilated});
 		}
 		//debug_img(std::vector<cv::Mat>{original_height_map.m_map_dilated});
-		profileTime(t, "Viz", is_log);
+		profileTime(t, "Viz", software_parameter_is_log);
 
 		//
 		// Prepare next move
@@ -3341,7 +3349,7 @@ int main(int argc, char** argv){
 			current_pos = map_converter.get_pos_pack_from_mesh(next_pos, yaw, pitch);
 			cur_frame_id++;
 		}
-		profileTime(t, "Find next move", is_log);
+		profileTime(t, "Find next move", software_parameter_is_log);
 		LOG(INFO) << "<<<<<<<<<<<<< Frame " << cur_frame_id - 1 << " done! <<<<<<<<<<<<<";
 		LOG(INFO) << "";
 		//if (cur_frame_id > 1000)
@@ -3424,12 +3432,12 @@ int main(int argc, char** argv){
 	LOG(ERROR) << "Vertical step: " << vertical_step;
 	LOG(ERROR) << "Horizontal step: " << horizontal_step;
 	LOG(ERROR) << "Split minimum distance: " << split_min_distance;
-	height_map.save_height_map_tiff("height_map.tiff");
-	debug_img(std::vector<cv::Mat>{height_map.m_map_dilated});
+	runtime_height_map.save_height_map_tiff("height_map.tiff");
+	debug_img(std::vector<cv::Mat>{runtime_height_map.m_map_dilated});
 
 	if (args["output_waypoint"].asBool())
 	{
-		total_passed_trajectory = ensure_global_safe(total_passed_trajectory, height_map, args["safe_distance"].asFloat(), mapper->m_boundary);
+		total_passed_trajectory = ensure_global_safe(total_passed_trajectory, runtime_height_map, args["safe_distance"].asFloat(), mapper->m_boundary);
 	}
 
 	// Change focus point into direction
@@ -3482,7 +3490,7 @@ int main(int argc, char** argv){
 		//override_sleep(100);
 		//debug_img(std::vector<cv::Mat>{height_map.m_map_dilated});
 	}
-	debug_img(std::vector<cv::Mat>{height_map.m_map_dilated});
+	debug_img(std::vector<cv::Mat>{runtime_height_map.m_map_dilated});
 
 	return 0;
 }

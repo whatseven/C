@@ -49,3 +49,8 @@ struct Next_target {
 		:origin_index_in_building_vector(v_origin_index_in_building_vector), origin_index_in_untraveled_pointset(v_origin_index_in_untraveled_pointset) {
 	}
 };
+
+struct viewpoint
+{
+	
+};

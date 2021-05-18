@@ -1,14 +1,24 @@
 {
+    // Software parameters
+    "is_viz": true,
+    "is_log": true,
+
+    // Mission flags
     "with_exploration": true,
     "with_reconstruction": true,
-    //Reconstruction Flags
+    // Reconstruction Flags
     "with_continuous_height_flag": true,
     "with_erosion_flag": false,
     "double_flag": true,
     "split_flag": true,
     "cluster_duplicate_flag": true,
-    //Exploration Flags
+    // Exploration Flags
     "fix_angle_flag": false,
+    "ccpp_cell_distance": 30,
+
+    // Unreal and Airsim
+    "unreal_player_start": [ 0, 0, 0 ],
+
 
     // Reconstruction parameters
     "view_distance": 40,
@@ -49,9 +59,7 @@
         22.64593735439954,
         0
     ],
-    "is_viz": true,
-    "is_viz1": false,
-    "is_log": true,
+
 
     //
     // These are all unreal coordinates
@@ -80,8 +88,7 @@
     "nbv_target1": "Reconstruction_only",
     "nbv_target2": "Min_max_information",
     "CCPP_CELL_THRESHOLD": 5,
-    "ccpp_cell_distance": 30,
 
     "output_waypoint": false,
-    "geo_origin": [ 12681886,2589057.5, 25 ]
+    "geo_origin": [ 12681886, 2589057.5, 25 ]
 }
