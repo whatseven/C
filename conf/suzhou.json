@@ -29,8 +29,8 @@
     "cluster_radius": 10,
     "model_path": "D:\\BACKUP\\SIG21_Local\\2_3_global\\Suzhou_points.ply",
     "safe_zone_model_path": "D:\\BACKUP\\SIG21_Local\\2_3_global\\Suzhou_points.ply",
-    "is_viz1": true,
-    "is_viz": false,
+    "is_viz": true,
+    "is_viz1": false,
     "is_log": true,
 
     "START_X": -100000,
@@ -53,20 +53,20 @@
     // "mapper": "Virtual_mapper",
     // "mapper": "real_mapper",
 
-    "nbv_target1": "Topology_decomposition",
+    "nbv_target": "Topology_decomposition",
     "nbv_target1": "Min_distance",
     "nbv_target1": "Reconstruction_only",
     "nbv_target1": "Min_max_information",
 
     // Ablation study
-    "nbv_target": "Exploration_first",
-    "nbv_target3": "Random_min_distance",
+    "nbv_target3": "Exploration_first",
+    "nbv_target1": "Random_min_distance",
 
     "CCPP_CELL_THRESHOLD": 5,
     "CCPP_Obstacle_weight": 2.5,
     "ccpp_cell_distance": 60,
     //"ccpp_cell_distance": 150,
 
-    "output_waypoint": true,
+    "output_waypoint": false,
     "geo_origin": []
 }

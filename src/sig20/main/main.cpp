@@ -641,6 +641,7 @@ public:
 				Eigen::Vector3f(0, 0, -1)
 			);
 		}
+		
 		//Eigen::Vector3f next_point(m_map_end.x()-60, m_map_end.y() - 60,100);
 		//m_ccpp_trajectory.emplace_back(
 		//	next_point,
@@ -920,7 +921,7 @@ public:
 	float dummy3 = 0;
 
 	Next_best_target_topology_exploration(const Eigen::Vector3f& v_map_start_mesh, const Eigen::Vector3f& v_map_end_mesh,
-		int v_CCPP_CELL_THRESHOLD,const Polygon_2& m_boundary,float v_ccpp_cell_distance, const Json::Value& v_arg):CCPP_CELL_THRESHOLD(v_CCPP_CELL_THRESHOLD), m_arg(v_arg),
+		int v_CCPP_CELL_THRESHOLD,const Polygon_2& v_boundary,float v_ccpp_cell_distance, const Json::Value& v_arg):CCPP_CELL_THRESHOLD(v_CCPP_CELL_THRESHOLD), m_arg(v_arg),
 		Next_best_target(v_map_start_mesh, v_map_end_mesh, v_ccpp_cell_distance)
 	{
 		//color_reconstruction = region_viz_color[2];
@@ -929,14 +930,14 @@ public:
 		color_reconstruction = cv::Vec3b(0, 255, 0);
 		color_occupied = cv::Vec3b(0, 255, 0);
 		color_unobserved = cv::Vec3b(205, 205, 209);
-		
+		this->m_boundary = v_boundary;
 		region_status.clear();
 		region_status.resize(sample_points.size(), color_unobserved);
 
-		if(m_boundary.size()!=0){
+		if(v_boundary.size()!=0){
 			for (int i_sample_point = 0; i_sample_point < sample_points.size(); ++i_sample_point) {
-				if (m_boundary.bounded_side(sample_points[i_sample_point]) != CGAL::ON_BOUNDED_SIDE) {
-					//LOG(INFO) << m_boundary.is_simple();
+				if (v_boundary.bounded_side(sample_points[i_sample_point]) != CGAL::ON_BOUNDED_SIDE) {
+					//LOG(INFO) << v_boundary.is_simple();
 					region_status[i_sample_point] = color_occupied;
 				}
 			}
@@ -944,7 +945,7 @@ public:
 		
 		m_current_color_id = 0;
 		m_current_ccpp_trajectory_id = 0;
-		region_status[0] = region_viz_color[m_current_color_id];
+		//region_status[0] = region_viz_color[m_current_color_id];
 		
 		//topology.emplace_back(Eigen::Vector2f(m_map_start.x(), m_map_start.y()), 
 		//	Eigen::Vector2f(m_map_start.x()+1, m_map_start.y()+1));
@@ -1045,27 +1046,34 @@ public:
 			start_pos_on_map, end_pos_on_map, m_arg["CCPP_Obstacle_weight"].asFloat());
 
 		//std::cout << "  " << std::endl;
-		cv::Mat viz_ccpp = ccpp_map.clone();
+		//cv::Mat viz_ccpp = ccpp_map.clone();
 
 		float iter_trajectory = 0;
 		for (const Eigen::Vector2i& item : map_trajectory) {
 			// todo: invert x,y!!!!!!!!!!!!!
-			viz_ccpp.at<cv::uint8_t>(item.x(), item.y()) = iter_trajectory++ * 255. / map_trajectory.size();
+			//viz_ccpp.at<cv::uint8_t>(item.x(), item.y()) = iter_trajectory++ * 255. / map_trajectory.size();
 			Eigen::Vector3f t3 = m_map_start + DISTANCE_THRESHOLD * Eigen::Vector3f(item.y(), item.x(), 0.f);
 			t3.z() = 100;
 			m_ccpp_trajectory.emplace_back(
 				t3,
 				Eigen::Vector3f(0, 0, -1)
 			);
-			if (iter_trajectory < map_trajectory.size())
-				dummy3 += (map_trajectory[iter_trajectory] - map_trajectory[iter_trajectory - 1]).norm();
+			//if (iter_trajectory < map_trajectory.size())
+			//	dummy3 += (map_trajectory[iter_trajectory] - map_trajectory[iter_trajectory - 1]).norm();
 		}
+		// Bug:
+		//if(m_boundary.bounded_side(Point_2(
+		//	m_ccpp_trajectory[m_ccpp_trajectory.size() - 1].first.x(),
+		//	m_ccpp_trajectory[m_ccpp_trajectory.size() - 1].first.y()
+		//)) != CGAL::ON_BOUNDED_SIDE)
+		//	m_ccpp_trajectory.pop_back();
 		next_point.z() = 100;
 		//m_ccpp_trajectory.emplace_back(
 		//	next_point,
 		//	Eigen::Vector3f(0, 0, -1)
 		//);
 		//cv::imwrite("log/ccpp_map/"+std::to_string(dummy1++) + "_ccpp.png", viz_ccpp);
+		// BUG
 		return true;
 	}
 
@@ -1104,7 +1112,7 @@ public:
 		}
 
 		Building fake_building;
-		if (num_already_travelled_cell > 0.1 * sample_points.size() && (m_map_start.x() + max_x + DISTANCE_THRESHOLD * CCPP_CELL_THRESHOLD < m_map_end.x()
+		if (num_already_travelled_cell > 0.5 * sample_points.size() && (m_map_start.x() + max_x + DISTANCE_THRESHOLD * CCPP_CELL_THRESHOLD < m_map_end.x()
 			|| m_map_start.y() + max_y + DISTANCE_THRESHOLD * CCPP_CELL_THRESHOLD < m_map_end.y())) // Expand in default size
 		{
 			m_motion_status = Motion_status::exploration;
@@ -1220,7 +1228,8 @@ public:
 			for(auto item:topology)
 				if(inside_box(Eigen::Vector2f(sample_points[nearest_region_id].x(), sample_points[nearest_region_id].y()), item))
 					inside = true;
-			if(inside)
+			
+			if(inside && m_boundary.bounded_side(sample_points[nearest_region_id]) == CGAL::ON_BOUNDED_SIDE)
 				region_status[nearest_region_id] = region_viz_color[m_current_color_id % region_viz_color.size()];
 		}
 		
@@ -1426,7 +1435,7 @@ public:
 				else
 					throw;
 			}
-			if (false)
+			if (true)
 			{
 				const int& cur_building_id = m_current_building_id;
 				std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> unpassed_trajectory;
@@ -3304,7 +3313,8 @@ int main(int argc, char** argv){
 		//if(next_best_target->m_motion_status==Motion_status::exploration)
 		mapper->m_motion_status = next_best_target->m_motion_status;
 		mapper->get_buildings(total_buildings, current_pos, cur_frame_id, height_map);
-		next_best_target->update_uncertainty(current_pos, total_buildings);
+		if (cur_frame_id != 0)
+			next_best_target->update_uncertainty(current_pos, total_buildings);
 		profileTime(t, "Height map", is_log);
 
 		std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> current_trajectory;

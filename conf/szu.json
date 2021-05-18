@@ -5,7 +5,7 @@
     "with_continuous_height_flag": true,
     "with_erosion_flag": false,
     "double_flag": true,
-    "split_flag": false,
+    "split_flag": true,
     "cluster_duplicate_flag": true,
     //Exploration Flags
     "fix_angle_flag": true,
@@ -14,9 +14,9 @@
     // Reconstruction parameters
     "view_distance": 40,
     "safe_distance": 25,
-    "vertical_overlap": 0.4,
-    "horizontal_overlap": 0.1,
-    "split_overlap": 0.5,
+    "vertical_overlap": 0.5,
+    "horizontal_overlap": 0.8,
+    "split_overlap": 0.4,
     "z_down_bounds": 40, //Optinal
 
     "fov": 53,
@@ -27,8 +27,8 @@
     "heightmap_resolution": 5,
     "heightmap_dilate": 5,
     "cluster_radius": 4,
-    "model_path": "F:\\Sig\\Real\\centralize_points.ply",
-    "safe_zone_model_path": "F:\\Sig\\Real\\SZU_0509.ply",
+    "model_path": "D:\\Projects\\SEAR\\Real\\SZU\\centralize_points.ply",
+    "safe_zone_model_path": "D:\\Projects\\SEAR\\Real\\SZU\\centralize_points_safe_zone.ply",
     "boundary": [
         113.92798662185669,
         22.542121410369873,
@@ -137,21 +137,22 @@
     // These are all unreal coordinates
     // Y axis in invert, min y in unreal is max y in mesh
     //
-    "START_X": -38000.0,
-    "START_Y": 129900.0,
+    "START_X": -27000.0,
+    "START_Y": 143000.0,
     "START_Z": 4000.0,
     "MAP_START_UNREAL_X": -54000.0,
-    "MAP_START_UNREAL_Y": -16700.0,
+    "MAP_START_UNREAL_Y": -16000.0,
     "MAP_START_UNREAL_Z": -500.0,
-    "MAP_END_UNREAL_X": 92100.0,
-    "MAP_END_UNREAL_Y": 142600.0,
+    "MAP_END_UNREAL_X": 93000.0,
+    "MAP_END_UNREAL_Y": 143000.0,
     "MAP_END_UNREAL_Z": 9000.0,
     "DRONE_STEP": 10,
     "with_interpolated": false,
 
     "SYNTHETIC_POINT_CLOUD": true,
     "MAP_2D_BOX_TO_3D": true,
-    "mapper": "gt_mapper",
+    //"mapper": "gt_mapper",
+    "mapper": "graduate_gt_mapper",
     // "mapper": "Virtual_mapper",
     // "mapper": "real_mapper",
 
@@ -163,6 +164,6 @@
     "ccpp_cell_distance": 30,
     "CCPP_Obstacle_weight": 2.5,
 
-    "output_waypoint": true,
+    "output_waypoint": false,
     "geo_origin": [ 1.26826e7, 2.57652e6, 0 ]
 }
