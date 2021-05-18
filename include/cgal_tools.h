@@ -47,6 +47,8 @@ typedef CGAL::AABB_traits<K2, Primitive_tri> AABB_triangle_traits;
 typedef CGAL::AABB_tree<AABB_triangle_traits> Tree_tri;
 typedef boost::optional<Tree_tri::Intersection_and_primitive_id<Segment>::Type > Segment_intersection;
 
+#define M_PI 3.14159265358
+
 struct Rotated_box
 {
 	cv::RotatedRect cv_box;
@@ -57,9 +59,9 @@ struct Rotated_box
 	{
 		cv_box = cv::RotatedRect(cv::Point2f(v_box.center().x(), v_box.center().y()), cv::Size2f(v_box.sizes().x(), v_box.sizes().y()),0.f);
 	}
-	Rotated_box(const Eigen::AlignedBox3f& v_box, float v_angle) :box(v_box), angle(v_angle)
+	Rotated_box(const Eigen::AlignedBox3f& v_box, float v_angle) :box(v_box), angle(v_angle / 180.f * M_PI)
 	{
-		cv_box = cv::RotatedRect(cv::Point2f(v_box.center().x(), v_box.center().y()), cv::Size2f(v_box.sizes().x(), v_box.sizes().y()), angle);
+		cv_box = cv::RotatedRect(cv::Point2f(v_box.center().x(), v_box.center().y()), cv::Size2f(v_box.sizes().x(), v_box.sizes().y()), v_angle);
 	}
 
 	bool inside_2d(const Eigen::Vector3f& v_point) const

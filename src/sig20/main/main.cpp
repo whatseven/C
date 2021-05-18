@@ -1561,12 +1561,11 @@ public:
 				else
 				{
 					int id = v_buildings[cur_building_id].closest_trajectory_id + passed_trajectory.size();
-					if (id > v_buildings[cur_building_id].trajectory.size())
+					if (id >= v_buildings[cur_building_id].trajectory.size())
 						id -= v_buildings[cur_building_id].trajectory.size();
 					next_pos = v_buildings[cur_building_id].trajectory[id];
 					passed_trajectory.push_back(next_pos);
 					return next_pos;
-
 				}
 			}
 			
@@ -2047,6 +2046,7 @@ class Mapper
 public:
 	Json::Value m_args;
 	Polygon_2 m_boundary;
+	Motion_status m_motion_status;
 	Mapper(const Json::Value& v_args):m_args(v_args)
 	{
 		std::vector<Point_2> points;
@@ -2644,6 +2644,94 @@ public:
 			}
 		}
 	}
+	void process_cpr_data(std::string input, std::vector<Building>& current_buildings, const Pos_Pack& v_current_pos, int& num_building_current_frame)
+	{
+		if (input == "")
+			return;
+		std::string now_string = input;
+		std::vector<std::string> labels;
+		std::string::size_type position = now_string.find("], ");
+		while (position != now_string.npos)
+		{
+			labels.push_back(now_string.substr(0, position + 3));
+			now_string = now_string.substr(position + 3);
+			position = now_string.find("], ");
+		}
+		if (now_string.length() > 10)
+			labels.push_back(now_string);
+		std::vector<cv::Rect2f> result;
+		for (auto label : labels)
+		{
+			now_string = label;
+			cv::Rect2f box;
+			std::string::size_type position1 = now_string.find_first_of("[");
+			std::string::size_type position2 = now_string.find_first_of(",");
+			float x_min_2d = atof((now_string.substr(position1 + 1, position2 - position1 - 1)).c_str());
+			now_string = now_string.substr(position2 + 2);
+
+			position2 = now_string.find_first_of(",");
+			float y_min_2d = atof((now_string.substr(0, position2 - 1)).c_str());
+			now_string = now_string.substr(position2 + 2);
+
+			position2 = now_string.find_first_of(",");
+			float x_max_2d = atof((now_string.substr(0, position2 - 1)).c_str());
+			now_string = now_string.substr(position2 + 2);
+
+			position2 = now_string.find_first_of(",");
+			float y_max_2d = atof((now_string.substr(0, position2 - 1)).c_str());
+			now_string = now_string.substr(position2 + 2);
+
+			position2 = now_string.find_first_of(",");
+			float no_use = atof((now_string.substr(0, position2 - 1)).c_str());
+			now_string = now_string.substr(position2 + 2);
+
+			position2 = now_string.find_first_of(",");
+			no_use = atof((now_string.substr(0, position2 - 1)).c_str());
+			now_string = now_string.substr(position2 + 2);
+
+			position2 = now_string.find_first_of(",");
+			float x_center = atof((now_string.substr(0, position2 - 1)).c_str());
+			now_string = now_string.substr(position2 + 2);
+
+			position2 = now_string.find_first_of(",");
+			float y_center = atof((now_string.substr(0, position2 - 1)).c_str());
+			now_string = now_string.substr(position2 + 2);
+
+			position2 = now_string.find_first_of(",");
+			float z_center = atof((now_string.substr(0, position2 - 1)).c_str());
+			now_string = now_string.substr(position2 + 2);
+
+			position2 = now_string.find_first_of(",");
+			float width = atof((now_string.substr(0, position2 - 1)).c_str());
+			now_string = now_string.substr(position2 + 2);
+
+			position2 = now_string.find_first_of(",");
+			float height = atof((now_string.substr(0, position2 - 1)).c_str());
+			now_string = now_string.substr(position2 + 2);
+
+			position2 = now_string.find_first_of(",");
+			float length = atof((now_string.substr(0, position2 - 1)).c_str());
+			now_string = now_string.substr(position2 + 2);
+
+			position2 = now_string.find_first_of(",");
+			float angle = atof((now_string.substr(0, position2 - 1)).c_str());
+			now_string = now_string.substr(position2 + 2);
+
+			position2 = now_string.find_first_of("]");
+			float score = atof((now_string.substr(0, position2 - 1)).c_str());
+
+			Building current_building;
+			Eigen::Vector3f camera_translate = v_current_pos.pos_mesh;
+			Eigen::AlignedBox3f box_3d(Eigen::Vector3f(-x_center - width / 2, -z_center - length / 2, -y_center - height / 2) + camera_translate,
+				Eigen::Vector3f(-x_center + width / 2, -z_center + length / 2, -y_center + height / 2) + camera_translate);
+			Rotated_box bounding_box_3d(box_3d, angle / M_PI * 180);
+
+			current_building.bounding_box_3d = bounding_box_3d;
+			current_building.bounding_box_2d = CGAL::Bbox_2(x_min_2d, y_min_2d, x_max_2d, y_max_2d);
+			current_buildings.push_back(current_building);
+			num_building_current_frame += 1;
+		}
+	}
 	void get_buildings(std::vector<Building>& v_buildings,
 		const Pos_Pack& v_current_pos,
 		const int v_cur_frame_id, Height_map& v_height_map) override {
@@ -2656,8 +2744,6 @@ public:
 		{
 			m_airsim_client->adjust_pose(v_current_pos);
 			current_image = m_airsim_client->get_images();
-			cv::imwrite("M:\\YRS_debug\\current.jpg", current_image["rgb"]);
-			cv::imwrite("M:\\YRS_debug\\seg.jpg", current_image["segmentation"]);
 			//cv::imwrite("D:/test_data/" + std::to_string(v_cur_frame_id) + ".png", current_image.at("rgb"));
 			//std::ofstream pose("D:/test_data/" + std::to_string(v_cur_frame_id) + ".txt");
 			//pose << v_current_pos.camera_matrix.matrix();
@@ -2665,41 +2751,72 @@ public:
 			LOG(INFO) << "Image done";
 		}
 
+
 		// 3D Bounding Box Detection
 		// Input: Current_image
 		// Output: 3D Bounding Boxes(std::vector<>)
+		if (m_motion_status == Motion_status::exploration)
 		{
-			bool isValid;
-			std::vector <CGAL::Bbox_2> boxes_2d;
-			std::vector <cv::RotatedRect> boxes_3d;
-			std::vector<Point_2> zses;
-			std::vector<ImageCluster> clusters = solveCluster(current_image["segmentation"], m_color_to_mesh_name_map, isValid);
-			for (auto& building : clusters)
+			if (m_args["use_bbox_detect"].asBool())
 			{
-				Building current_building;
-				int index = &building - &clusters[0];
-				// Transform the point cloud and meshes from world to camera
-				if (m_meshes.find(building.name) == m_meshes.end())
-					continue;
-				Surface_mesh item_mesh(m_meshes.at(building.name));
+				cv::Mat img = current_image["rgb"];
+				std::vector<uchar> data(img.ptr(), img.ptr() + img.size().width * img.size().height * img.channels());
+				std::string s(data.begin(), data.end());
 
-				Point_set item_points;
-				std::copy(item_mesh.points().begin(), item_mesh.points().end(), item_points.point_back_inserter());
-
-				auto box = get_bbox_3d(item_points);
-
-				// 3D Box in mesh coordinate
-				Eigen::AlignedBox3f box_3d(Eigen::Vector3f(box.first.center.x - box.first.size.width / 2, box.first.center.y - box.first.size.height / 2, box.second.x()),
-					Eigen::Vector3f(box.first.center.x + box.first.size.width / 2, box.first.center.y + box.first.size.height / 2, box.second.y()));
-
-				float angle = (-box.first.angle + 90) / 180.f * M_PI;
-
-				Rotated_box bounding_box_3d(box_3d, angle);
+				//auto r = cpr::Post(cpr::Url{ "http://172.31.224.4:10000/index" },
+				auto r = cpr::Post(cpr::Url{ "http://192.168.10.168:5000/index" },
+					cpr::Body{ s },
+					cpr::Header{ {"Content-Type", "text/plain"} });
+				std::cout << r.text << std::endl;
+				process_cpr_data(r.text, current_buildings, v_current_pos, num_building_current_frame);
+			}
 			
-				current_building.bounding_box_3d = bounding_box_3d;
-				current_building.bounding_box_2d = building.box;
-				current_buildings.push_back(current_building);
-				num_building_current_frame += 1;
+			else
+			{
+				//// ----------------------------------------------Test
+				//cv::Mat img = current_image["rgb"];
+				//std::vector<uchar> data(img.ptr(), img.ptr() + img.size().width * img.size().height * img.channels());
+				//std::string s(data.begin(), data.end());
+
+				////auto r = cpr::Post(cpr::Url{ "http://172.31.224.4:10000/index" },
+				//auto r = cpr::Post(cpr::Url{ "http://192.168.10.168:5000/index" },
+				//	cpr::Body{ s },
+				//	cpr::Header{ {"Content-Type", "text/plain"} });
+				//std::cout << r.text << std::endl;
+				//process_cpr_data(r.text, current_buildings, v_current_pos, num_building_current_frame);
+				////---------------------------------------------------
+				bool isValid;
+				std::vector <CGAL::Bbox_2> boxes_2d;
+				std::vector <cv::RotatedRect> boxes_3d;
+				std::vector<Point_2> zses;
+				std::vector<ImageCluster> clusters = solveCluster(current_image["segmentation"], m_color_to_mesh_name_map, isValid);
+				for (auto& building : clusters)
+				{
+					Building current_building;
+					int index = &building - &clusters[0];
+					// Transform the point cloud and meshes from world to camera
+					if (m_meshes.find(building.name) == m_meshes.end())
+						continue;
+					Surface_mesh item_mesh(m_meshes.at(building.name));
+
+					Point_set item_points;
+					std::copy(item_mesh.points().begin(), item_mesh.points().end(), item_points.point_back_inserter());
+
+					auto box = get_bbox_3d(item_points);
+
+					// 3D Box in mesh coordinate
+					Eigen::AlignedBox3f box_3d(Eigen::Vector3f(box.first.center.x - box.first.size.width / 2, box.first.center.y - box.first.size.height / 2, box.second.x()),
+						Eigen::Vector3f(box.first.center.x + box.first.size.width / 2, box.first.center.y + box.first.size.height / 2, box.second.y()));
+
+					float angle = (-box.first.angle + 90);
+
+					Rotated_box bounding_box_3d(box_3d, angle);
+
+					current_building.bounding_box_3d = bounding_box_3d;
+					current_building.bounding_box_2d = building.box;
+					current_buildings.push_back(current_building);
+					num_building_current_frame += 1;
+				}
 			}
 		}
 
@@ -2799,17 +2916,20 @@ public:
 		// Output: Total building vectors (std::vector<Building>)
 		{
 			float max_iou = 0;
-			int max_id = 0;
+			int max_id = -1;
 			std::vector<bool> need_register(num_building_current_frame, false);
 			for (auto& item_current_building : current_buildings) {
+				max_id = -1;
+				max_iou = 0;
 				size_t index_box = &item_current_building - &current_buildings[0];
 				for (auto& item_building : v_buildings) {
 					size_t index_total_box = &item_building - &v_buildings[0];
 					float current_iou = calculate_3d_iou(item_current_building, item_building);
 					max_iou = std::max(current_iou, max_iou);
-					max_id = index_total_box;
+					if (max_iou == current_iou)
+						max_id = index_total_box;
 				}
-				if (max_iou <= m_args["IOU_threshold"].asFloat())
+				if (max_iou <= m_args["IOU_threshold"].asFloat() || max_id == -1)
 					need_register[index_box] = true;
 				else
 				{
@@ -3182,6 +3302,7 @@ int main(int argc, char** argv){
 
 		auto t = recordTime();
 		//if(next_best_target->m_motion_status==Motion_status::exploration)
+		mapper->m_motion_status = next_best_target->m_motion_status;
 		mapper->get_buildings(total_buildings, current_pos, cur_frame_id, height_map);
 		next_best_target->update_uncertainty(current_pos, total_buildings);
 		profileTime(t, "Height map", is_log);
