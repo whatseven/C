@@ -1229,8 +1229,16 @@ public:
 				if(inside_box(Eigen::Vector2f(sample_points[nearest_region_id].x(), sample_points[nearest_region_id].y()), item))
 					inside = true;
 			
-			if(inside && m_boundary.bounded_side(sample_points[nearest_region_id]) == CGAL::ON_BOUNDED_SIDE)
-				region_status[nearest_region_id] = region_viz_color[m_current_color_id % region_viz_color.size()];
+			if (inside)
+			{
+				if (m_boundary.size() != 0) {
+					if (m_boundary.bounded_side(sample_points[nearest_region_id]) == CGAL::ON_BOUNDED_SIDE)
+						region_status[nearest_region_id] = region_viz_color[m_current_color_id % region_viz_color.size()];
+				}
+				else
+					region_status[nearest_region_id] = region_viz_color[m_current_color_id % region_viz_color.size()];
+			}
+				
 		}
 		
 		for (int i_point = 0; i_point < region_status.size(); i_point++) {
@@ -2056,6 +2064,7 @@ public:
 	Json::Value m_args;
 	Polygon_2 m_boundary;
 	Motion_status m_motion_status;
+	std::vector<cv::Vec3b> region_status;
 	Mapper(const Json::Value& v_args):m_args(v_args)
 	{
 		std::vector<Point_2> points;
@@ -2493,7 +2502,8 @@ public:
 	: Mapper(args), m_airsim_client(v_airsim_client){
 		m_unreal_object_detector =new Unreal_object_detector;
 		m_color_to_mesh_name_map = color_to_mesh_name_map;
-		read_mesh(m_args["mesh_root"].asString(), m_point_clouds, m_meshes);
+		if(!args["use_bbox_detect"].asBool())
+			read_mesh(m_args["mesh_root"].asString(), m_point_clouds, m_meshes);
 		//m_synthetic_SLAM = new Synthetic_SLAM;
 	}
 
@@ -2653,7 +2663,7 @@ public:
 			}
 		}
 	}
-	void process_cpr_data(std::string input, std::vector<Building>& current_buildings, const Pos_Pack& v_current_pos, int& num_building_current_frame)
+	void process_cpr_data(std::string input, std::vector<Building>& current_buildings, const Pos_Pack& v_current_pos, int& num_building_current_frame, int mat_width, int mat_length)
 	{
 		if (input == "")
 			return;
@@ -2729,6 +2739,9 @@ public:
 			position2 = now_string.find_first_of("]");
 			float score = atof((now_string.substr(0, position2 - 1)).c_str());
 
+			if (x_min_2d < 0 || y_min_2d < 0 || x_max_2d > mat_width || y_max_2d > mat_length)
+				continue;
+			//if ()
 			Building current_building;
 			Eigen::Vector3f camera_translate = v_current_pos.pos_mesh;
 			Eigen::AlignedBox3f box_3d(Eigen::Vector3f(-x_center - width / 2, -z_center - length / 2, -y_center - height / 2) + camera_translate,
@@ -2777,7 +2790,7 @@ public:
 					cpr::Body{ s },
 					cpr::Header{ {"Content-Type", "text/plain"} });
 				std::cout << r.text << std::endl;
-				process_cpr_data(r.text, current_buildings, v_current_pos, num_building_current_frame);
+				process_cpr_data(r.text, current_buildings, v_current_pos, num_building_current_frame,img.cols, img.rows);
 			}
 			
 			else
@@ -3311,6 +3324,7 @@ int main(int argc, char** argv){
 
 		auto t = recordTime();
 		//if(next_best_target->m_motion_status==Motion_status::exploration)
+		mapper->region_status = next_best_target->region_status;
 		mapper->m_motion_status = next_best_target->m_motion_status;
 		mapper->get_buildings(total_buildings, current_pos, cur_frame_id, height_map);
 		if (cur_frame_id != 0)
