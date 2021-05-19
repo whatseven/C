@@ -2235,6 +2235,7 @@ public:
 					m_buildings_target[i_building_1].bounding_box_3d = get_bounding_box_rotated(m_buildings_target[i_building_1].points_world_space);
 					m_buildings_target[i_building_1].bounding_box_3d.box.min().z() -= args["HEIGHT_CLIP"].asFloat();
 					m_buildings_target[i_building_1].boxes.push_back(m_buildings_target[i_building_1].bounding_box_3d);
+					m_buildings_target[i_building_1].viz_num = 99;
 				}
 
 				for (int i_building_1 = m_buildings_target.size() - 1; i_building_1 >= 0; --i_building_1) 
@@ -2483,6 +2484,7 @@ public:
 					(Eigen::Vector2f(v_current_pos.pos_mesh.x() - item_building.bounding_box_3d.box.center().x(),
 						v_current_pos.pos_mesh.y() - item_building.bounding_box_3d.box.center().y())).norm() < m_args["ccpp_cell_distance"].asFloat() * 3)
 				{
+					item_building.viz_num = 99;
 					v_buildings.push_back(item_building);
 					m_is_building_add[&item_building - &m_buildings_target[0]] = true;
 				}
@@ -2666,6 +2668,32 @@ public:
 			}
 		}
 	}
+	void write_box_test(const std::vector<Building>& current_buildings)
+	{
+		cv::Point2f cornerPoints[4];
+		std::vector<cv::Point3f> cornerPoints3D;
+		std::ofstream f_out("./bbox_test.xyz");
+		for (auto& building : current_buildings)
+		{
+			cornerPoints3D.clear();
+			building.bounding_box_3d.cv_box.points(cornerPoints);
+			for (auto points : cornerPoints)
+			{
+				float z = building.bounding_box_3d.box.center().z() - building.bounding_box_3d.box.sizes().z() / 2;
+				for (int i = 0; i < 2; i++)
+				{
+					cornerPoints3D.push_back(cv::Point3f(points.x, points.y, z));
+					z = building.bounding_box_3d.box.center().z() + building.bounding_box_3d.box.sizes().z() / 2;
+				}
+			}
+			for (auto outPoints : cornerPoints3D)
+			{
+				f_out << outPoints.x << " " << outPoints.y << " " << outPoints.z << "\n";
+			}
+		}
+		
+		f_out.close();
+	}
 	void process_cpr_data(std::string input, std::vector<Building>& current_buildings, const Pos_Pack& v_current_pos, int& num_building_current_frame, int mat_width, int mat_length)
 	{
 		if (input == "")
@@ -2747,15 +2775,23 @@ public:
 			//if ()
 			Building current_building;
 			Eigen::Vector3f camera_translate = v_current_pos.pos_mesh;
-			Eigen::AlignedBox3f box_3d(Eigen::Vector3f(-x_center - width / 2, -z_center - length / 2, -y_center - height / 2) + camera_translate,
-				Eigen::Vector3f(-x_center + width / 2, -z_center + length / 2, -y_center + height / 2) + camera_translate);
-			Rotated_box bounding_box_3d(box_3d, angle / M_PI * 180);
+
+			/*Eigen::Matrix3f rotation = Eigen::AngleAxisf(v_current_pos.pitch, Eigen::AngleAxisf::Vector3::UnitX()).toRotationMatrix();
+			Eigen::AlignedBox3f box_3d(v_current_pos.camera_matrix * (rotation * Eigen::Vector3f(x_center - width / 2, y_center - height / 2, z_center - length / 2)) + camera_translate,
+				v_current_pos.camera_matrix * (rotation * Eigen::Vector3f(x_center + width / 2, y_center + height / 2, z_center + length / 2)) + camera_translate);
+			Rotated_box bounding_box_3d(box_3d, angle / M_PI * 180);*/
+
+			Eigen::Matrix3f rotation = Eigen::AngleAxisf(v_current_pos.yaw + M_PI/2, Eigen::AngleAxisf::Vector3::UnitZ()).toRotationMatrix();
+			Eigen::AlignedBox3f box_3d(rotation * Eigen::Vector3f(-x_center - width / 2, -z_center - length / 2, -y_center - height / 2) + camera_translate,
+				rotation * Eigen::Vector3f(-x_center + width / 2, -z_center + length / 2, -y_center + height / 2) + camera_translate);
+			Rotated_box bounding_box_3d(box_3d, -angle / M_PI * 180 + 90);
 
 			current_building.bounding_box_3d = bounding_box_3d;
 			current_building.bounding_box_2d = CGAL::Bbox_2(x_min_2d, y_min_2d, x_max_2d, y_max_2d);
 			current_buildings.push_back(current_building);
 			num_building_current_frame += 1;
 		}
+		//write_box_test(current_buildings);
 	}
 	void get_buildings(std::vector<Building>& v_buildings,
 		const Pos_Pack& v_current_pos,
@@ -2798,18 +2834,18 @@ public:
 			
 			else
 			{
-				//// ----------------------------------------------Test
-				//cv::Mat img = current_image["rgb"];
-				//std::vector<uchar> data(img.ptr(), img.ptr() + img.size().width * img.size().height * img.channels());
-				//std::string s(data.begin(), data.end());
+				// ----------------------------------------------Test
+				cv::Mat img = current_image["rgb"];
+				std::vector<uchar> data(img.ptr(), img.ptr() + img.size().width * img.size().height * img.channels());
+				std::string s(data.begin(), data.end());
 
-				////auto r = cpr::Post(cpr::Url{ "http://172.31.224.4:10000/index" },
-				//auto r = cpr::Post(cpr::Url{ "http://192.168.10.168:5000/index" },
-				//	cpr::Body{ s },
-				//	cpr::Header{ {"Content-Type", "text/plain"} });
-				//std::cout << r.text << std::endl;
-				//process_cpr_data(r.text, current_buildings, v_current_pos, num_building_current_frame);
-				////---------------------------------------------------
+				//auto r = cpr::Post(cpr::Url{ "http://172.31.224.4:10000/index" },
+				auto r = cpr::Post(cpr::Url{ "http://192.168.10.168:5000/index" },
+					cpr::Body{ s },
+					cpr::Header{ {"Content-Type", "text/plain"} });
+				std::cout << r.text << std::endl;
+				process_cpr_data(r.text, current_buildings, v_current_pos, num_building_current_frame, img.cols, img.rows);
+				//---------------------------------------------------
 				bool isValid;
 				std::vector <CGAL::Bbox_2> boxes_2d;
 				std::vector <cv::RotatedRect> boxes_3d;
@@ -2959,12 +2995,16 @@ public:
 				else
 				{
 					item_current_building.passed_trajectory = v_buildings[max_id].passed_trajectory;
+					item_current_building.viz_num = v_buildings[max_id].viz_num;
+					item_current_building.id_in_all_possible_buildings = v_buildings[max_id].id_in_all_possible_buildings;
 					v_buildings[max_id] = item_current_building;
+					v_buildings[max_id].viz_num += 1;
 				}
 			}
 			for (int i = 0; i < need_register.size(); ++i) {
 				if (need_register[i]) {
 					v_buildings.push_back(current_buildings[i]);
+					v_buildings[v_buildings.size() - 1].id_in_all_possible_buildings = v_buildings.size() - 1;
 				}
 			}
 			LOG(INFO) << "Building BBox update: DONE!";
@@ -3268,6 +3308,7 @@ int main(int argc, char** argv){
 		args["heightmap_dilate"].asInt()
 		);
 	std::vector<Building> total_buildings;
+	std::vector<Building> all_possible_buildings;
 	Pos_Pack current_pos = map_converter.get_pos_pack_from_unreal(
 		Eigen::Vector3f(args["START_X"].asFloat(), 
 			args["START_Y"].asFloat(), 
@@ -3327,9 +3368,24 @@ int main(int argc, char** argv){
 
 		auto t = recordTime();
 		//if(next_best_target->m_motion_status==Motion_status::exploration)
+		/*if (cur_frame_id % 2 == 0)
+			current_pos = map_converter.get_pos_pack_from_unreal(Eigen::Vector3f(-7000, -20000, 10000), -M_PI / 2, 63 / 180.f * M_PI);
+		else
+			current_pos = map_converter.get_pos_pack_from_unreal(Eigen::Vector3f(-7000, -20000, 10000), M_PI / 2, 63 / 180.f * M_PI);*/
+		if (next_best_target->m_motion_status == Motion_status::exploration)
+			total_buildings.clear();
 		mapper->region_status = next_best_target->region_status;
 		mapper->m_motion_status = next_best_target->m_motion_status;
-		mapper->get_buildings(total_buildings, current_pos, cur_frame_id, height_map);
+		mapper->get_buildings(all_possible_buildings, current_pos, cur_frame_id, height_map);
+		if (next_best_target->m_motion_status == Motion_status::exploration)
+		{
+			for (auto& item_building : all_possible_buildings)
+			{
+				if (item_building.viz_num >= 0)
+					total_buildings.push_back(item_building);
+			}
+		}
+
 		if (cur_frame_id != 0)
 			next_best_target->update_uncertainty(current_pos, total_buildings);
 		profileTime(t, "Height map", is_log);
@@ -3496,6 +3552,14 @@ int main(int argc, char** argv){
 			//write_normal_path_with_flag(total_passed_trajectory, 
 			//	"log/gradually_results/camera_normal_" + std::to_string(cur_frame_id) + ".log", 
 			//	trajectory_flag);
+		}
+
+		if (args["mapper"] == "Virtual_mapper")
+		{
+			for (auto& item_building : total_buildings)
+			{
+				all_possible_buildings.at(item_building.id_in_all_possible_buildings) = item_building;
+			}
 		}
 		//debug_img(std::vector<cv::Mat>{height_map.m_map_dilated});
 	}
