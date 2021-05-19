@@ -451,8 +451,11 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> ensure_three_meter_dji(
 
 std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> ensure_global_safe(
 	const std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>>& v_trajectory,
+	std::vector<int>& v_trajectory_flag,
+	std::map<int, int>& v_relation_vector,
 	const Height_map& v_height_map, const float v_safe_distance,const Polygon_2& v_boundary)
 {
+	std::vector<int> safe_trajectory_flag;
 	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> safe_trajectory;
 	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> boundary_safe_trajectory = v_trajectory;
 
@@ -536,6 +539,8 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> ensure_global_safe(
 		}
 
 		safe_trajectory.push_back(boundary_safe_trajectory[i]);
+		safe_trajectory_flag.push_back(v_trajectory_flag[i]);
+		v_relation_vector.insert(std::make_pair(i, safe_trajectory.size() - 1));
 		
 		Eigen::Vector3f direction = (next_item.first - cur_item).normalized();
 		bool accept = true;
@@ -558,7 +563,9 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> ensure_global_safe(
 		if(!accept)
 		{
 			safe_trajectory.emplace_back(Eigen::Vector3f(boundary_safe_trajectory[i].first.x(), boundary_safe_trajectory[i].first.y(), top_height), boundary_safe_trajectory[i].second);
+			safe_trajectory_flag.push_back(v_trajectory_flag[i]);
 			safe_trajectory.emplace_back(Eigen::Vector3f(next_item.first.x(), next_item.first.y(), top_height), next_item.second);
+			safe_trajectory_flag.push_back(v_trajectory_flag[i]);
 		}
 		/*
 		while((cur_item-next_item.first).norm()>5)
@@ -577,6 +584,8 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> ensure_global_safe(
 
 	}
 	safe_trajectory.push_back(boundary_safe_trajectory.back());
+	safe_trajectory_flag.push_back(v_trajectory_flag.back());
+	v_trajectory_flag = safe_trajectory_flag;
 	return safe_trajectory;
 }
 

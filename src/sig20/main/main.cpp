@@ -2026,11 +2026,13 @@ public:
 			else {
 				auto& item = m_ccpp_trajectory[m_current_ccpp_trajectory_id].first;
 
-				std::pair<Eigen::Vector3f, Eigen::Vector3f> start_points = std::make_pair(Eigen::Vector3f(
-					item.x(),
+				Eigen::Vector3f pos(item.x(),
 					item.y(),
-					100),
-					Eigen::Vector3f(1, 0, 0));
+					100);
+				
+				std::pair<Eigen::Vector3f, Eigen::Vector3f> start_points = std::make_pair(pos,
+					pos + Eigen::Vector3f(std::cos(64.f / 180 * M_PI), 0, -std::sin(64.f / 180 * M_PI)));
+				
 				next_pos = start_points;
 			}
 		}
@@ -2452,7 +2454,8 @@ public:
 						for (int i_point = 0; i_point < 4; ++i_point) {
 							Point_2 p(points[i_point].x, points[i_point].y);
 							for (auto iter_segment = m_boundary.edges_begin(); iter_segment != m_boundary.edges_end(); ++iter_segment)
-								if (CGAL::squared_distance(p, *iter_segment) < args["safe_distance"].asFloat() * args["safe_distance"].asFloat() * 2)
+								//if (CGAL::squared_distance(p, *iter_segment) < args["safe_distance"].asFloat() * args["safe_distance"].asFloat() * 2)
+									if (CGAL::squared_distance(p, *iter_segment) < 0)
 									should_delete = true;
 							if (m_boundary.bounded_side(p) != CGAL::ON_BOUNDED_SIDE)
 								should_delete = true;
@@ -3363,7 +3366,7 @@ int main(int argc, char** argv){
 			if (cur_frame_id > 1)
 			{
 				float distance = (next_pos_direction.first - current_pos.pos_mesh).norm();
-				if(next_best_target->m_motion_status==Motion_status::exploration || next_best_target->m_motion_status == Motion_status::final_check)
+				if(next_best_target->m_motion_status == Motion_status::exploration || next_best_target->m_motion_status == Motion_status::final_check)
 					exploration_length += distance;
 				else
 					reconstruction_length+= distance;
@@ -3483,16 +3486,16 @@ int main(int argc, char** argv){
 		//	break;
 
 		std::vector<Rotated_box> boxes;
-		if(cur_frame_id == 50 || cur_frame_id == 100 || cur_frame_id==150|| cur_frame_id == 450||cur_frame_id == 750)
+		if(cur_frame_id == 50 || cur_frame_id == 400 || cur_frame_id == 800 || cur_frame_id==2)
 		{
 			for (const auto& item : total_buildings)
 				boxes.push_back(item.bounding_box_3d);
 			//Surface_mesh mesh = get_box_mesh(boxes);
 			Surface_mesh mesh = get_rotated_box_mesh(boxes);
 			CGAL::write_ply(std::ofstream("log/gradually_results/box" + std::to_string(cur_frame_id) + ".ply"), mesh);
-			write_normal_path_with_flag(total_passed_trajectory, 
-				"log/gradually_results/camera_normal_" + std::to_string(cur_frame_id) + ".log", 
-				trajectory_flag);
+			//write_normal_path_with_flag(total_passed_trajectory, 
+			//	"log/gradually_results/camera_normal_" + std::to_string(cur_frame_id) + ".log", 
+			//	trajectory_flag);
 		}
 		//debug_img(std::vector<cv::Mat>{height_map.m_map_dilated});
 	}
@@ -3562,9 +3565,10 @@ int main(int argc, char** argv){
 	height_map.save_height_map_tiff("height_map.tiff");
 	debug_img(std::vector<cv::Mat>{height_map.m_map_dilated});
 
+	std::map<int, int> relation_vector;
 	if (args["output_waypoint"].asBool())
 	{
-		total_passed_trajectory = ensure_global_safe(total_passed_trajectory, height_map, args["safe_distance"].asFloat(), mapper->m_boundary);
+		total_passed_trajectory = ensure_global_safe(total_passed_trajectory, trajectory_flag, relation_vector, height_map, args["safe_distance"].asFloat(), mapper->m_boundary);
 	}
 
 	// Change focus point into direction
@@ -3580,6 +3584,20 @@ int main(int argc, char** argv){
 	write_normal_path(total_passed_trajectory, "camera_normal.log");
 	write_smith_path(total_passed_trajectory, "camera_smith_invert_x.log");
 	write_normal_path_with_flag(total_passed_trajectory, "camera_with_flag.log", trajectory_flag);
+
+	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> part_trajectory;
+	std::copy(total_passed_trajectory.begin(), total_passed_trajectory.begin() + relation_vector[2], std::back_inserter(part_trajectory));
+	write_normal_path_with_flag(part_trajectory, "log/gradually_results/camera_normal_" + std::to_string(2) + ".log", trajectory_flag);
+	part_trajectory.clear();
+	std::copy(total_passed_trajectory.begin(), total_passed_trajectory.begin() + relation_vector[50], std::back_inserter(part_trajectory));
+	write_normal_path_with_flag(part_trajectory, "log/gradually_results/camera_normal_" + std::to_string(50) + ".log", trajectory_flag);
+	part_trajectory.clear();
+	std::copy(total_passed_trajectory.begin(), total_passed_trajectory.begin() + relation_vector[400], std::back_inserter(part_trajectory));
+	write_normal_path_with_flag(part_trajectory, "log/gradually_results/camera_normal_" + std::to_string(400) + ".log", trajectory_flag);
+	part_trajectory.clear();
+	std::copy(total_passed_trajectory.begin(), total_passed_trajectory.begin() + relation_vector[800], std::back_inserter(part_trajectory));
+	write_normal_path_with_flag(part_trajectory, "log/gradually_results/camera_normal_" + std::to_string(800) + ".log", trajectory_flag);
+	
 	LOG(ERROR) << "Write trajectory done!";
 
 	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> safe_global_trajectory;

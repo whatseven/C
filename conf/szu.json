@@ -27,8 +27,8 @@
     "heightmap_resolution": 5,
     "heightmap_dilate": 5,
     "cluster_radius": 4,
-    "model_path": "F:\\Sig\\Real\\centralize_points.ply",
-    "safe_zone_model_path": "F:\\Sig\\Real\\SZU_0509.ply",
+    "model_path": "D:\\Projects\\SEAR\\Real\\SZU\\centralize_points.ply",
+    "safe_zone_model_path": "D:\\Projects\\SEAR\\Real\\SZU\\centralize_points_safe_zone.ply",
     "boundary": [
         113.92798662185669,
         22.542121410369873,
