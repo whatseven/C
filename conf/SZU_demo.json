@@ -8,8 +8,8 @@
     "split_flag": false,
     "cluster_duplicate_flag": false,
     //Exploration Flags
-    "fix_angle_flag": true,
-    "explore_multi_angle": false,
+    "fix_angle_flag": false,
+    "explore_multi_angle": true,
 
     // Reconstruction parameters
     "view_distance": 40,
@@ -31,15 +31,15 @@
     "heightmap_resolution": 5,
     "heightmap_dilate": 0,
     "cluster_radius": 10,
-    "model_path1": "F:\\Sig\\Real\\paper_2nd\\2_3_global\\Shanghai_points_2.ply",
-    "safe_zone_model_path1": "F:\\Sig\\Real\\paper_2nd\\2_3_global\\Shanghai_points_2.ply",
-    "mesh_root1": "F:\\DataSet\\Shenzhen\\SZU_split_latest\\split",
-    "color_map1": "F:\\Unreal\\City\\Plugins\\AirSim\\Content\\HUDAssets\\seg_color_pallet.png",
-
     "model_path": "F:\\Sig\\Real\\paper_2nd\\2_3_global\\Shanghai_points_2.ply",
     "safe_zone_model_path": "F:\\Sig\\Real\\paper_2nd\\2_3_global\\Shanghai_points_2.ply",
-    "mesh_root": "D:\\DATASET\\Realcity\\ShenzhenUniv\\split\\split",
-    "color_map": "D:\\env\\Env\\Plugins\\AirSim\\Content\\HUDAssets\\seg_color_pallet.png",
+    "mesh_root": "F:\\DataSet\\Shenzhen\\SZU_split_latest\\split",
+    "color_map": "F:\\Unreal\\City\\Plugins\\AirSim\\Content\\HUDAssets\\seg_color_pallet.png",
+
+    "model_path1": "F:\\Sig\\Real\\paper_2nd\\2_3_global\\Shanghai_points_2.ply",
+    "safe_zone_model_path1": "F:\\Sig\\Real\\paper_2nd\\2_3_global\\Shanghai_points_2.ply",
+    "mesh_root1": "D:\\DATASET\\Realcity\\ShenzhenUniv\\split\\split",
+    "color_map1": "D:\\env\\Env\\Plugins\\AirSim\\Content\\HUDAssets\\seg_color_pallet.png",
 
     "is_viz": true,
     "is_viz1": false,
@@ -59,14 +59,14 @@
     "MAP_END_UNREAL_Y1": 43000.0,
     "MAP_END_UNREAL_Z1": 9000.0,
 
-    "START_X": -27000.0,
-    "START_Y": 143000.0,
-    "START_Z": 4000.0,
+    "START_X": 0.0,
+    "START_Y": 0.0,
+    "START_Z": 0.0,
     "MAP_START_UNREAL_X": -52000.0,
     "MAP_START_UNREAL_Y": -88000.0,
     "MAP_START_UNREAL_Z": -500.0,
     "MAP_END_UNREAL_X": 62000.0,
-    "MAP_END_UNREAL_Y": 85000.0,
+    "MAP_END_UNREAL_Y": 86000.0,
     "MAP_END_UNREAL_Z": 9000.0,
 
 
@@ -107,13 +107,13 @@
     "mapper": "Virtual_mapper",
     // "mapper": "real_mapper",
 
-    "nbv_target1": "Topology_decomposition",
+    "nbv_target": "Topology_decomposition",
     "nbv_target3": "Min_distance",
     "nbv_target1": "Reconstruction_only",
     "nbv_target1": "Min_max_information",
 
     // Ablation study
-    "nbv_target": "Exploration_first",
+    "nbv_target1": "Exploration_first",
     "nbv_target1": "Random_min_distance",
 
     "CCPP_CELL_THRESHOLD": 5,

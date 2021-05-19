@@ -1112,7 +1112,7 @@ public:
 		}
 
 		Building fake_building;
-		if (num_already_travelled_cell > 0.5 * sample_points.size() && (m_map_start.x() + max_x + DISTANCE_THRESHOLD * CCPP_CELL_THRESHOLD < m_map_end.x()
+		if (num_already_travelled_cell < 0.5 * sample_points.size() && (m_map_start.x() + max_x + DISTANCE_THRESHOLD * CCPP_CELL_THRESHOLD < m_map_end.x()
 			|| m_map_start.y() + max_y + DISTANCE_THRESHOLD * CCPP_CELL_THRESHOLD < m_map_end.y())) // Expand in default size
 		{
 			m_motion_status = Motion_status::exploration;
@@ -1145,7 +1145,7 @@ public:
 	
 	void get_next_target(int frame_id,const Pos_Pack& v_cur_pos, const std::vector<Building>& v_buildings, bool with_exploration) override{
 		m_ccpp_trajectory.clear();
-		m_current_ccpp_trajectory_id = -1;
+		m_current_ccpp_trajectory_id = 0;
 		// Find next target (building or place) with higher confidence
 		std::vector<int> untraveled_buildings;
 		for (int i_building = 0; i_building < v_buildings.size(); ++i_building) {
@@ -2863,18 +2863,18 @@ public:
 			
 			else
 			{
-				// ----------------------------------------------Test
-				cv::Mat img = current_image["rgb"];
-				std::vector<uchar> data(img.ptr(), img.ptr() + img.size().width * img.size().height * img.channels());
-				std::string s(data.begin(), data.end());
+				//// ----------------------------------------------Test
+				//cv::Mat img = current_image["rgb"];
+				//std::vector<uchar> data(img.ptr(), img.ptr() + img.size().width * img.size().height * img.channels());
+				//std::string s(data.begin(), data.end());
 
-				//auto r = cpr::Post(cpr::Url{ "http://172.31.224.4:10000/index" },
-				auto r = cpr::Post(cpr::Url{ "http://192.168.10.168:5000/index" },
-					cpr::Body{ s },
-					cpr::Header{ {"Content-Type", "text/plain"} });
-				std::cout << r.text << std::endl;
-				process_cpr_data(r.text, current_buildings, v_current_pos, num_building_current_frame, img.cols, img.rows);
-				//---------------------------------------------------
+				////auto r = cpr::Post(cpr::Url{ "http://172.31.224.4:10000/index" },
+				//auto r = cpr::Post(cpr::Url{ "http://192.168.10.168:5000/index" },
+				//	cpr::Body{ s },
+				//	cpr::Header{ {"Content-Type", "text/plain"} });
+				//std::cout << r.text << std::endl;
+				//process_cpr_data(r.text, current_buildings, v_current_pos, num_building_current_frame, img.cols, img.rows);
+				////---------------------------------------------------
 				bool isValid;
 				std::vector <CGAL::Bbox_2> boxes_2d;
 				std::vector <cv::RotatedRect> boxes_3d;
