@@ -780,7 +780,7 @@ void cluster_duplicate(
 
 
 std::vector<Viewpoint> generate_trajectory(const Json::Value& v_params,
-	std::vector<Building>& v_buildings, const Height_map& v_height_map, const float vertical_step, const float horizontal_step, const float split_min_distance)
+	std::vector<Building>& v_buildings, const Height_map& v_height_map, const float v_vertical_step, const float horizontal_step, const float split_min_distance)
 {
 	float view_distance = v_params["view_distance"].asFloat();
 	float safe_distance = v_params["safe_distance"].asFloat();
@@ -908,15 +908,18 @@ std::vector<Viewpoint> generate_trajectory(const Json::Value& v_params,
 
 		float z_up_bounds = view_distance / 3;
 		// Detect if it needs drop
+		float fake_vertical_step = v_vertical_step; // When num_pass<=2. the vertical_step will be the height / 2
 		int num_pass = 1;
 		{
 			if (double_flag) {
-				float vertical_reception_field = vertical_step / (1 - v_params["vertical_overlap"].asFloat());
-				num_pass = (zmax + z_up_bounds - vertical_reception_field) / vertical_step;
+				float vertical_reception_field = v_vertical_step / (1 - v_params["vertical_overlap"].asFloat());
+				num_pass = (zmax + z_up_bounds - vertical_reception_field) / v_vertical_step;
 				num_pass += 1; // Cell the division
-				if (num_pass < 0)
-					num_pass = 0;
-				num_pass += 1; // Ensure
+				if (num_pass <=1)
+				{
+					num_pass = 2;
+					fake_vertical_step = (zmax + z_up_bounds) / 2;
+				}
 			}
 		}
 
@@ -928,7 +931,7 @@ std::vector<Viewpoint> generate_trajectory(const Json::Value& v_params,
 			Eigen::Vector3f cur_pos(xmin - view_distance, ymin - view_distance, zmax + z_up_bounds);
 			Eigen::Vector3f focus_point;
 
-			cur_pos.z() = zmax + z_up_bounds - vertical_step * i_pass;
+			cur_pos.z() = zmax + z_up_bounds - fake_vertical_step * i_pass;
 			
 			float delta = (xmax + view_distance - cur_pos.x()) / horizontal_step;
 			delta = delta > 4 ? delta : 4.1;

@@ -1421,7 +1421,7 @@ int main(int argc, char** argv){
 		throw;
 
 	float vertical_step = 0, horizontal_step = 0, split_min_distance = 0; // Calculated trajectory intrinsic
-	calculate_trajectory_intrinsic(args, vertical_step, horizontal_step, split_min_distance);
+	calculate_trajectory_intrinsic(args, horizontal_step, vertical_step, split_min_distance);
 	
 	std::vector<Building> total_buildings; // Map result
 	std::vector<Viewpoint> total_passed_trajectory; // Trajectory result
