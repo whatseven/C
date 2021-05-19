@@ -2806,11 +2806,11 @@ public:
 			Rotated_box bounding_box_3d;
 			bounding_box_3d.cv_box= cv::RotatedRect(cv::Point2f(point1.x(), point1.y()), cv::Point2f(point2.x(), point2.y()), cv::Point2f(point3.x(), point3.y()));
 			bounding_box_3d.box = Eigen::AlignedBox3f(
-				Eigen::Vector3f(bounding_box_3d.cv_box.center.x - bounding_box_3d.cv_box.size.width,
-					bounding_box_3d.cv_box.center.y - bounding_box_3d.cv_box.size.height,
-					point3.z()),
-				Eigen::Vector3f(bounding_box_3d.cv_box.center.x + bounding_box_3d.cv_box.size.width,
-					bounding_box_3d.cv_box.center.y + bounding_box_3d.cv_box.size.height,
+				Eigen::Vector3f(bounding_box_3d.cv_box.center.x - bounding_box_3d.cv_box.size.width / 2,
+					bounding_box_3d.cv_box.center.y - bounding_box_3d.cv_box.size.height / 2,
+					0),
+				Eigen::Vector3f(bounding_box_3d.cv_box.center.x + bounding_box_3d.cv_box.size.width / 2,
+					bounding_box_3d.cv_box.center.y + bounding_box_3d.cv_box.size.height / 2,
 					point1.z())
 			);
 			
@@ -3410,7 +3410,7 @@ int main(int argc, char** argv){
 		{
 			for (auto& item_building : all_possible_buildings)
 			{
-				if (item_building.viz_num >= 0)
+				if (item_building.viz_num >= 1)
 					total_buildings.push_back(item_building);
 			}
 		}
