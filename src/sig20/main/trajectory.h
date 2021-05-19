@@ -78,19 +78,17 @@ void write_smith_path(const std::vector<std::pair<Eigen::Vector3f, Eigen::Vector
 	pose.close();
 }
 
-void write_normal_path_with_flag(const std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>>& v_trajectories,
-	const std::string& v_path, std::vector<int> v_flags)
+void write_normal_path_with_flag(const std::vector<Viewpoint>& v_trajectories,
+	const std::string& v_path, const std::vector<int>& v_flags)
 {
+	if (v_trajectories.size() != v_flags.size())
+		throw;
 	std::ofstream pose(v_path);
 	for (int i = 0; i < v_trajectories.size(); ++i) {
-		const Eigen::Vector3f& position = v_trajectories[i].first;
-		const Eigen::Vector3f& direction = v_trajectories[i].second;
+		const Eigen::Vector3f& position = v_trajectories[i].pos_mesh;
+		const Eigen::Vector3f& direction = v_trajectories[i].direction;
 		boost::format fmt("%04d.png,%s,%s,%s,%s,0,%s,%s\n");
-		float pitch = std::atan2f(direction[2], std::sqrtf(direction[0] * direction[0] + direction[1] * direction[1])) *
-			180. / M_PI;
-		float yaw = std::atan2f(direction[1], direction[0]) * 180. / M_PI;
-
-		pose << (fmt % i % position[0] % position[1] % position[2] % pitch % yaw% v_flags[i]).str();
+		pose << (fmt % i % position[0] % position[1] % position[2] % v_trajectories[i].pitch % v_trajectories[i].yaw % v_flags[i]).str();
 	}
 
 	pose.close();
@@ -138,22 +136,22 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> interpolate_path(const 
 }
 
 // Second element of the pair is the direction
-std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> simplify_path_reduce_waypoints(const std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>>& v_trajectories) {
-	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> simplified_trajectory;
+std::vector<Viewpoint> simplify_path_reduce_waypoints(const std::vector<Viewpoint>& v_trajectories) {
+	std::vector<Viewpoint> simplified_trajectory;
 	int i1 = 1;
 	Eigen::Vector3f towards(0.f, 0.f, 0.f);
 	simplified_trajectory.push_back(v_trajectories[0]);
 	while(i1 < v_trajectories.size())
 	{
-		const Eigen::Vector3f& position0 = v_trajectories[i1-1].first;
-		const Eigen::Vector3f& position1 = v_trajectories[i1].first;
+		const Eigen::Vector3f& position0 = v_trajectories[i1-1].pos_mesh;
+		const Eigen::Vector3f& position1 = v_trajectories[i1].pos_mesh;
 		Eigen::Vector3f next_towards = (position1 - position0).normalized();
 		if(towards== Eigen::Vector3f (0.f, 0.f, 0.f))
 		{
 			i1 += 1;
 			towards = next_towards;
 		}
-		else if (towards.dot(next_towards)>0.99f && v_trajectories[i1 - 1].second.dot(v_trajectories[i1].second)>0.95)
+		else if (towards.dot(next_towards)>0.99f && v_trajectories[i1 - 1].direction.dot(v_trajectories[i1].direction)>0.95)
 			i1 += 1;
 		else
 		{
@@ -166,7 +164,7 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> simplify_path_reduce_wa
 	return simplified_trajectory;
 }
 
-void write_wgs_path(const Json::Value& v_args,const std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>>& v_trajectories,const std::string& v_path) {
+void write_wgs_path(const Json::Value& v_args,const std::vector<Viewpoint>& v_trajectories,const std::string& v_path) {
 	//Eigen::Vector2f origin_wgs(113.92332,22.64429); // Yingrenshi
 	Eigen::Vector3f origin_wgs(v_args["geo_origin"][0].asFloat(), v_args["geo_origin"][1].asFloat(), 0.f);
 	//Eigen::Vector2f origin_xy=lonLat2Mercator(origin_wgs);
@@ -174,18 +172,17 @@ void write_wgs_path(const Json::Value& v_args,const std::vector<std::pair<Eigen:
 	std::ofstream pose_total(v_path+"camera_wgs.txt");
 	std::ofstream pose(v_path+"camera_wgs_0.txt");
 
-	Eigen::Vector3f prev_pos = v_trajectories[0].first;
+	Eigen::Vector3f prev_pos = v_trajectories[0].pos_mesh;
 	int cur_log_id = 0;
 	for (int i_id = 0; i_id < v_trajectories.size(); i_id++) {
-		const Eigen::Vector3f& position = v_trajectories[i_id].first;
+		const Eigen::Vector3f& position = v_trajectories[i_id].pos_mesh;
 		Eigen::Vector2f pos_mac = Eigen::Vector2f(position.x(), position.y()) + origin_xy;
 		Eigen::Vector2f pos_wgs = mercator2lonLat(pos_mac);
-		const Eigen::Vector3f& direction = v_trajectories[i_id].second;
+		const Eigen::Vector3f& direction = v_trajectories[i_id].direction;
 
 		boost::format fmt("%f %f %f %f %f\n");
-		float pitch = std::atan2f(direction[2], std::sqrtf(direction[0] * direction[0] + direction[1] * direction[1])) *
-			180. / M_PI;
-		float yaw = -std::atan2f(direction[1], direction[0]) * 180. / M_PI + 90.f;
+		float pitch = v_trajectories[i_id].pitch;
+		float yaw = - v_trajectories[i_id].yaw + 90.f;
 		if (yaw > 180.f)
 			yaw -= 360.f;
 
@@ -415,12 +412,12 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> read_smith_spline_traje
 	return o_trajectories;
 }
 
-float evaluate_length(const std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> v_trajectory) {
+float evaluate_length(const std::vector<Viewpoint> v_trajectory) {
 	float total_length = 0;
 	if (v_trajectory.size() < 2)
 		return 0;
 	for (int idx = 0; idx < v_trajectory.size() - 1; ++idx) {
-		total_length += (v_trajectory[idx + 1].first - v_trajectory[idx].first).norm();
+		total_length += (v_trajectory[idx + 1].pos_mesh - v_trajectory[idx].pos_mesh).norm();
 	}
 
 	return total_length;
@@ -449,12 +446,12 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> ensure_three_meter_dji(
 	return safe_trajectory;
 }
 
-std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> ensure_global_safe(
-	const std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>>& v_trajectory,
+std::vector<Viewpoint> ensure_global_safe(
+	const std::vector<Viewpoint>& v_trajectory,
 	const Height_map& v_height_map, const float v_safe_distance,const Polygon_2& v_boundary)
 {
-	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> safe_trajectory;
-	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> boundary_safe_trajectory = v_trajectory;
+	std::vector<Viewpoint> safe_trajectory;
+	std::vector<Viewpoint> boundary_safe_trajectory = v_trajectory;
 
 	//// Ensure boundary safe
 	//for (int i = 0; i < v_trajectory.size() - 1; ++i) {
@@ -524,24 +521,23 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> ensure_global_safe(
 
 	// Ensure Height Safe
 	for (int i = 0; i < boundary_safe_trajectory.size()-1;++i) {
-		Eigen::Vector3f cur_item = boundary_safe_trajectory[i].first;
+		Eigen::Vector3f cur_item = boundary_safe_trajectory[i].pos_mesh;
 		auto next_item = boundary_safe_trajectory[i + 1];
 
-		while (v_height_map.get_height(boundary_safe_trajectory[i].first.x(), boundary_safe_trajectory[i].first.y()) + v_safe_distance > boundary_safe_trajectory[i].first.z()) {
-			boundary_safe_trajectory[i].first.z() += 5;
-		}
 
-		while (v_height_map.get_height(boundary_safe_trajectory[i + 1].first.x(), boundary_safe_trajectory[i + 1].first.y()) + v_safe_distance > boundary_safe_trajectory[i + 1].first.z()) {
-			boundary_safe_trajectory[i + 1].first.z() += 5;
-		}
+		if (v_height_map.in_bound(boundary_safe_trajectory[i].pos_mesh.x(), boundary_safe_trajectory[i].pos_mesh.y()) && v_height_map.get_height(boundary_safe_trajectory[i].pos_mesh.x(), boundary_safe_trajectory[i].pos_mesh.y()) + v_safe_distance > boundary_safe_trajectory[i].pos_mesh.z())
+			boundary_safe_trajectory[i].pos_mesh[2] = v_height_map.get_height(boundary_safe_trajectory[i].pos_mesh.x(), boundary_safe_trajectory[i].pos_mesh.y()) + v_safe_distance;
+		boundary_safe_trajectory[i].calculate_direction();
+		if (v_height_map.in_bound(boundary_safe_trajectory[i + 1].pos_mesh.x(), boundary_safe_trajectory[i + 1].pos_mesh.y()) && v_height_map.get_height(boundary_safe_trajectory[i + 1].pos_mesh.x(), boundary_safe_trajectory[i + 1].pos_mesh.y()) + v_safe_distance > boundary_safe_trajectory[i + 1].pos_mesh.z())
+			boundary_safe_trajectory[i + 1].pos_mesh[2] = v_height_map.get_height(boundary_safe_trajectory[i + 1].pos_mesh.x(), boundary_safe_trajectory[i + 1].pos_mesh.y()) + v_safe_distance;
+		boundary_safe_trajectory[i + 1].calculate_direction();
 
 		safe_trajectory.push_back(boundary_safe_trajectory[i]);
-		
-		Eigen::Vector3f direction = (next_item.first - cur_item).normalized();
+		Eigen::Vector3f direction = (next_item.pos_mesh - cur_item).normalized();
 		bool accept = true;
 		float top_height = cur_item.z();
 		
-		while ((cur_item - next_item.first).norm() > 5)
+		while ((cur_item - next_item.pos_mesh).norm() > 5)
 		{
 			cur_item += direction * 2;
 
@@ -557,8 +553,8 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> ensure_global_safe(
 		}
 		if(!accept)
 		{
-			safe_trajectory.emplace_back(Eigen::Vector3f(boundary_safe_trajectory[i].first.x(), boundary_safe_trajectory[i].first.y(), top_height), boundary_safe_trajectory[i].second);
-			safe_trajectory.emplace_back(Eigen::Vector3f(next_item.first.x(), next_item.first.y(), top_height), next_item.second);
+			safe_trajectory.emplace_back(Eigen::Vector3f(boundary_safe_trajectory[i].pos_mesh.x(), boundary_safe_trajectory[i].pos_mesh.y(), top_height), boundary_safe_trajectory[i].focus_point);
+			safe_trajectory.emplace_back(Eigen::Vector3f(next_item.pos_mesh.x(), next_item.pos_mesh.y(), top_height), next_item.focus_point);
 		}
 		/*
 		while((cur_item-next_item.first).norm()>5)
@@ -580,19 +576,15 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> ensure_global_safe(
 	return safe_trajectory;
 }
 
-std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> ensure_safe_trajectory_and_calculate_direction(
-	const std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>>& v_trajectory,
-	const Height_map& v_height_map,const float Z_UP_BOUNDS)
+std::vector<Viewpoint> ensure_safe_trajectory(
+	const std::vector<Viewpoint>& v_trajectory,
+	const Height_map& v_height_map,const float v_safe_distance)
 {
-	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> safe_trajectory;
+	std::vector<Viewpoint> safe_trajectory;
 	for (auto item : v_trajectory) {
-		while (v_height_map.get_height(item.first.x(), item.first.y()) + Z_UP_BOUNDS > item.first.z()) {
-			item.first[2] += 5;
-		}
-		//item.second = (item.second - item.first);
-		//if (item.second.z() > 0)
-		//	item.second.z() = 0;
-		//item.second = item.second.normalized();
+		if (v_height_map.in_bound(item.pos_mesh.x(), item.pos_mesh.y()) && v_height_map.get_height(item.pos_mesh.x(), item.pos_mesh.y()) + v_safe_distance > item.pos_mesh.z())
+			item.pos_mesh[2] = v_height_map.get_height(item.pos_mesh.x(), item.pos_mesh.y()) + v_safe_distance;
+		item.calculate_direction();
 		safe_trajectory.push_back(item);
 	}
 	return safe_trajectory;
@@ -679,30 +671,29 @@ bool generate_next_view_curvature(const Trajectory_params& v_params,
 }
 */
 
-std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> find_short_cut(
-	const std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>>& v_trajectory,
-	const Height_map& v_height_map, const float Z_UP_BOUNDS,const Building& v_cur_building)
+std::vector<Viewpoint> find_short_cut(
+	const std::vector<Viewpoint>& v_trajectory,
+	const Height_map& v_height_map, const float v_safe_distance,const Building& v_cur_building)
 {
 	Eigen::Vector3f center = v_cur_building.bounding_box_3d.box.center();
-	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> safe_trajectory;
+	std::vector<Viewpoint> safe_trajectory;
 
 	for (auto item : v_trajectory) {
 		size_t id_item = &item-&v_trajectory[0];
-		Eigen::Vector3f safe_position = item.first;
-		while (v_height_map.get_height(item.first.x(), item.first.y()) + Z_UP_BOUNDS > safe_position.z()) {
-			safe_position.z() += 5;
-		}
+		Eigen::Vector3f safe_position = item.pos_mesh;
+
+		if (v_height_map.in_bound(item.pos_mesh.x(), item.pos_mesh.y()) && v_height_map.get_height(item.pos_mesh.x(), item.pos_mesh.y()) + v_safe_distance > item.pos_mesh.z())
+			safe_position[2] = v_height_map.get_height(item.pos_mesh.x(), item.pos_mesh.y()) + v_safe_distance;
 		
-		
-		if(safe_position.z() > 1 * item.first.z() && v_height_map.get_height(safe_position.x(), safe_position.y()) > v_cur_building.bounding_box_3d.box.max().z())
+		if(safe_position.z() > 1 * item.pos_mesh.z() && v_height_map.get_height(safe_position.x(), safe_position.y()) > v_cur_building.bounding_box_3d.box.max().z())
 		{
-			safe_position = item.first;
+			safe_position = item.pos_mesh;
 			Eigen::Vector3f direction = center - safe_position;
 			direction.z() = 0;
 			direction.normalize();
 			direction.z() = 1;
 
-			while (v_height_map.get_undilated_height(safe_position.x(), safe_position.y()) + Z_UP_BOUNDS > safe_position.z()) {
+			while (v_height_map.get_undilated_height(safe_position.x(), safe_position.y()) + v_safe_distance > safe_position.z()) {
 				safe_position += direction * 1;
 
 				// Abort if the viewpoint is on above the roof
@@ -714,18 +705,15 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> find_short_cut(
 			}
 		}
 
-		item.first = safe_position;
-		item.second = (item.second - item.first);
-		if (item.second.z() > 0)
-			item.second.z() = 0;
-		item.second = item.second.normalized();
+		item.pos_mesh = safe_position;
+		item.calculate_direction();
 		safe_trajectory.push_back(item);
 	}
 	return safe_trajectory;
 }
 
 void cluster_duplicate(
-	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>>& v_trajectory,
+	std::vector<Viewpoint>& v_trajectory,
 	const float v_vertical_overlap, const float v_fov,const float v_view_distance)
 {
 	float duplicate_threshold = 5; // Threshold to cluster views
@@ -735,7 +723,7 @@ void cluster_duplicate(
 	// Clustering
 	for (int i_view1 = 0;i_view1 < v_trajectory.size();i_view1++) {
 		for (int i_view2 = 0;i_view2 < i_view1;i_view2++) {
-			if((v_trajectory[i_view1].first - v_trajectory[i_view2].first).norm() < duplicate_threshold)
+			if((v_trajectory[i_view1].pos_mesh - v_trajectory[i_view2].pos_mesh).norm() < duplicate_threshold)
 			{
 				if(index_table[i_view2]!=-1) // i_view2 has a cluster
 				{
@@ -755,9 +743,9 @@ void cluster_duplicate(
 	std::vector<bool> delete_flag(v_trajectory.size(), false);
 	for(int i_pair = 0; i_pair < duplicate_pairs.size(); ++i_pair)
 	{
-		const Eigen::Vector3f& pos = v_trajectory[duplicate_pairs[i_pair][0]].first;
-		const Eigen::Vector3f& first_focus_point= v_trajectory[duplicate_pairs[i_pair][0]].second;
-		const Eigen::Vector3f& last_focus_point= v_trajectory[duplicate_pairs[i_pair].back()].second;
+		const Eigen::Vector3f& pos = v_trajectory[duplicate_pairs[i_pair][0]].pos_mesh;
+		const Eigen::Vector3f& first_focus_point= v_trajectory[duplicate_pairs[i_pair][0]].pos_mesh;
+		const Eigen::Vector3f& last_focus_point= v_trajectory[duplicate_pairs[i_pair].back()].pos_mesh;
 		
 		Eigen::Vector3f direction = (first_focus_point - pos).normalized();
 		
@@ -778,7 +766,8 @@ void cluster_duplicate(
 			else
 			{
 				current_focus_point.z() -= surface_distance_one_view;
-				v_trajectory[duplicate_pairs[i_pair][i_view]].second = current_focus_point;
+				v_trajectory[duplicate_pairs[i_pair][i_view]].focus_point = current_focus_point;
+				v_trajectory[duplicate_pairs[i_pair][i_view]].calculate_direction();
 			}
 		}
 	}
@@ -787,44 +776,20 @@ void cluster_duplicate(
 		{
 			return delete_flag[&item - &v_trajectory[0]];
 		}), v_trajectory.end());
-	return;
 }
 
 
-std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(const Json::Value& v_params,
-	std::vector<Building>& v_buildings, const Height_map& v_height_map, float& vertical_step, float& horizontal_step, float& split_min_distance)
+std::vector<Viewpoint> generate_trajectory(const Json::Value& v_params,
+	std::vector<Building>& v_buildings, const Height_map& v_height_map, const float vertical_step, const float horizontal_step, const float split_min_distance)
 {
 	float view_distance = v_params["view_distance"].asFloat();
 	float safe_distance = v_params["safe_distance"].asFloat();
-	
-	float overlap_step = view_distance * std::tanf(v_params["fov"].asFloat() / 180.f * M_PI / 2) * 2 * (1. - v_params["horizontal_overlap"].asFloat());
-	horizontal_step = overlap_step;
-
-	float vertical_surface_distance_one_view;
-	if (v_params["fov"].asFloat() < 60)
-	{
-		float total_part = std::tan((30 + v_params["fov"].asFloat() / 2) / 180.f * M_PI) * view_distance;
-		float first_part = std::tan((30 - v_params["fov"].asFloat() / 2) / 180.f * M_PI) * view_distance;
-		vertical_surface_distance_one_view = total_part - first_part;
-	}
-	else
-	{
-		float second_part = std::tan((30 + v_params["fov"].asFloat() / 2) / 180.f * M_PI) * view_distance;
-		float first_part = std::tan((v_params["fov"].asFloat() / 2 - 30) / 180.f * M_PI) * view_distance;
-		vertical_surface_distance_one_view = first_part + second_part;
-	}
-	if (v_params.isMember("ratio"))
-		vertical_surface_distance_one_view = vertical_surface_distance_one_view / v_params["ratio"].asFloat();
-	vertical_step = vertical_surface_distance_one_view * (1 - v_params["vertical_overlap"].asFloat());
 	
 	// Split building when it cannot be covered by one round flight
 	std::vector<bool> building_valid_flags(v_buildings.size(), true);
 	
 	if (v_params["split_flag"].asBool())
 	{
-		//float min_distance = (v_params.z_up_bounds * tan((v_params.fov / 2 + 60.f) / 180.f * M_PI) - 35) / 3 * 4;
-		float min_distance = (160 - 2 * view_distance) / (1 + v_params["split_overlap"].asFloat());
-		split_min_distance = min_distance;
 		for (int i_building = v_buildings.size() - 1;i_building >= 0 ; --i_building)
 		{
 			auto& item_building = v_buildings[i_building];
@@ -836,8 +801,8 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 			{
 				continue;
 			}
-			int split_width_num = int((item_building.bounding_box_3d.box.max().x() - item_building.bounding_box_3d.box.min().x()) / min_distance);
-			int split_length_num = int((item_building.bounding_box_3d.box.max().y() - item_building.bounding_box_3d.box.min().y()) / min_distance);
+			int split_width_num = int((item_building.bounding_box_3d.box.max().x() - item_building.bounding_box_3d.box.min().x()) / split_min_distance);
+			int split_length_num = int((item_building.bounding_box_3d.box.max().y() - item_building.bounding_box_3d.box.min().y()) / split_min_distance);
 			split_width_num += 1;
 			split_length_num += 1;
 			if (split_width_num < 1)
@@ -861,8 +826,8 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 			{
 				max_vector[2] = item_building.bounding_box_3d.box.max().z();
 				min_vector[2] = item_building.bounding_box_3d.box.min().z();
-				min_vector[0] = item_building.bounding_box_3d.box.min().x() + i * min_distance;
-				max_vector[0] = item_building.bounding_box_3d.box.min().x() + (i + 1) * min_distance;
+				min_vector[0] = item_building.bounding_box_3d.box.min().x() + i * split_min_distance;
+				max_vector[0] = item_building.bounding_box_3d.box.min().x() + (i + 1) * split_min_distance;
 				if (i == split_width_num - 1)
 					max_vector[0] = item_building.bounding_box_3d.box.max().x();
 
@@ -870,8 +835,8 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 				
 				for (int j = 0; j < split_length_num; j++)
 				{
-					min_vector[1] = item_building.bounding_box_3d.box.min().y() + j * min_distance;
-					max_vector[1] = item_building.bounding_box_3d.box.min().y() + (j + 1) * min_distance;
+					min_vector[1] = item_building.bounding_box_3d.box.min().y() + j * split_min_distance;
+					max_vector[1] = item_building.bounding_box_3d.box.min().y() + (j + 1) * split_min_distance;
 					if (j == split_length_num - 1)
 						max_vector[1] = item_building.bounding_box_3d.box.max().y();
 
@@ -921,7 +886,7 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 				return !building_valid_flags[idx];
 		}), v_buildings.end());
 	
-	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> total_trajectory;
+	std::vector<Viewpoint> total_trajectory;
 	for (int id_building = 0; id_building < v_buildings.size(); ++id_building) {
 		if(!v_buildings[id_building].is_changed)
 			continue;
@@ -930,7 +895,7 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 			v_buildings[id_building].is_changed = false;
 			continue;
 		}
-		std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> item_trajectory;
+		std::vector<Viewpoint> item_trajectory;
 
 		float xmin = v_buildings[id_building].bounding_box_3d.box.min().x();
 		float ymin = v_buildings[id_building].bounding_box_3d.box.min().y();
@@ -945,19 +910,13 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 		// Detect if it needs drop
 		int num_pass = 1;
 		{
-			//Eigen::Vector3f cur_pos(xmin + v_params.view_distance, ymin + v_params.view_distance, zmax + v_params.z_up_bounds);
-			//Eigen::Vector3f focus_point((xmax + xmin) / 2, (ymax + ymin) / 2, zmax/2.f);
-			//Eigen::Vector3f view_dir = (focus_point - cur_pos).normalized();
-			//Eigen::Vector3f ground_pos(xmin, ymin, 0);
-			//Eigen::Vector3f view_dir_camera_to_ground = (ground_pos - cur_pos).normalized();
 			if (double_flag) {
-				//if (view_dir.dot(view_dir_camera_to_ground) < std::cos(v_params.fov / 180.f * M_PI / 2)) {
-					num_pass = (zmax + z_up_bounds - vertical_surface_distance_one_view) / vertical_step;
-					num_pass += 1; // Cell the division
-					if (num_pass < 0)
-						num_pass = 0;
-					num_pass += 1; // Ensure
-				//}
+				float vertical_reception_field = vertical_step / (1 - v_params["vertical_overlap"].asFloat());
+				num_pass = (zmax + z_up_bounds - vertical_reception_field) / vertical_step;
+				num_pass += 1; // Cell the division
+				if (num_pass < 0)
+					num_pass = 0;
+				num_pass += 1; // Ensure
 			}
 		}
 
@@ -971,170 +930,138 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 
 			cur_pos.z() = zmax + z_up_bounds - vertical_step * i_pass;
 			
-			float delta = (xmax + view_distance - cur_pos.x()) / overlap_step;
-			delta = delta > 4 ? delta : 4;
+			float delta = (xmax + view_distance - cur_pos.x()) / horizontal_step;
+			delta = delta > 4 ? delta : 4.1;
 			v_buildings[id_building].one_pass_trajectory_num += int(delta);
 			for (int i = 0; i <  delta ;++i)
 			{
 				if(i==0)
 				{
 					focus_point = cur_pos + Eigen::Vector3f(view_distance, view_distance, focus_z_corner);
-					item_trajectory.push_back(std::make_pair(
-						cur_pos, focus_point
-					));
-					cur_pos[0] += overlap_step;
+					item_trajectory.emplace_back(cur_pos, focus_point);
+					cur_pos[0] += horizontal_step;
 				}
 				else if (i == 1) {
 					focus_point = cur_pos + Eigen::Vector3f(view_distance / 2, view_distance, focus_z_second_corner);
-					item_trajectory.push_back(std::make_pair(
+					item_trajectory.emplace_back(
 						cur_pos, focus_point
-					));
-					cur_pos[0] += overlap_step;
+					);
+					cur_pos[0] += horizontal_step;
 				}
-				else if(i >= delta-1)
-				{
-					cur_pos[0] = xmax + view_distance;
-					focus_point = cur_pos + Eigen::Vector3f(-view_distance, view_distance, focus_z_corner);
-					item_trajectory.push_back(std::make_pair(
-						cur_pos, focus_point
-					));
-				}
-				else if (i >= delta - 2) {
+				else if (i >= delta - 1) {
 					focus_point = cur_pos + Eigen::Vector3f(-view_distance / 2, view_distance, focus_z_second_corner);
-					item_trajectory.push_back(std::make_pair(
+					item_trajectory.emplace_back(
 						cur_pos, focus_point
-					));
-					cur_pos[0] += overlap_step;
+					);
+					cur_pos[0] += horizontal_step;
 				}
 				else
 				{
 					focus_point = cur_pos + Eigen::Vector3f(0, view_distance, focus_z_corner_normal);
-					item_trajectory.push_back(std::make_pair(
+					item_trajectory.emplace_back(
 						cur_pos, focus_point
-					));
-					cur_pos[0] += overlap_step;
+					);
+					cur_pos[0] += horizontal_step;
 				}
 			}
-			delta = (ymax + view_distance - cur_pos.y()) / overlap_step;
-			delta = delta > 4 ? delta : 4;
+			delta = (ymax + view_distance - cur_pos.y()) / horizontal_step;
+			delta = delta > 4 ? delta : 4.1;
 			v_buildings[id_building].one_pass_trajectory_num += int(delta);
 			for (int i = 0; i < delta; ++i) {
 				if (i == 0) {
 					focus_point = cur_pos + Eigen::Vector3f(-view_distance, view_distance, focus_z_corner);
-					item_trajectory.push_back(std::make_pair(
+					item_trajectory.emplace_back(
 						cur_pos, focus_point
-					));
-					cur_pos[1] += overlap_step;
+					);
+					cur_pos[1] += horizontal_step;
 				}
 				else if (i == 1) {
 					focus_point = cur_pos + Eigen::Vector3f(-view_distance, view_distance /2, focus_z_second_corner);
-					item_trajectory.push_back(std::make_pair(
+					item_trajectory.emplace_back(
 						cur_pos, focus_point
-					));
-					cur_pos[1] += overlap_step;
+					);
+					cur_pos[1] += horizontal_step;
 				}
+
 				else if (i >= delta - 1) {
-					cur_pos[1] = ymax + view_distance;
-					focus_point = cur_pos + Eigen::Vector3f(-view_distance, -view_distance, focus_z_corner);
-					item_trajectory.push_back(std::make_pair(
-						cur_pos, focus_point
-					));
-				}
-				else if (i >= delta - 2) {
 					focus_point = cur_pos + Eigen::Vector3f(-view_distance, -view_distance / 2, focus_z_second_corner);
-					item_trajectory.push_back(std::make_pair(
+					item_trajectory.emplace_back(
 						cur_pos, focus_point
-					));
-					cur_pos[1] += overlap_step;
+					);
+					cur_pos[1] += horizontal_step;
 				}
 				else {
 					focus_point = cur_pos + Eigen::Vector3f(-view_distance, 0, focus_z_corner_normal);
-					item_trajectory.push_back(std::make_pair(
+					item_trajectory.emplace_back(
 						cur_pos, focus_point
-					));
-					cur_pos[1] += overlap_step;
+					);
+					cur_pos[1] += horizontal_step;
 				}
 			}
-			delta = (cur_pos.x() - (xmin - view_distance)) / overlap_step;
-			delta = delta > 4 ? delta : 4;
+			delta = (cur_pos.x() - (xmin - view_distance)) / horizontal_step;
+			delta = delta > 4 ? delta : 4.1;
 			v_buildings[id_building].one_pass_trajectory_num += int(delta);
 			for (int i = 0; i < delta; ++i) {
 				if (i == 0) {
 					focus_point = cur_pos + Eigen::Vector3f(-view_distance, -view_distance, focus_z_corner);
-					item_trajectory.push_back(std::make_pair(
+					item_trajectory.emplace_back(
 						cur_pos, focus_point
-					));
-					cur_pos[0] -= overlap_step;
+					);
+					cur_pos[0] -= horizontal_step;
 				}
 				else if (i == 1) {
 					focus_point = cur_pos + Eigen::Vector3f(-view_distance /2, -view_distance, focus_z_second_corner);
-					item_trajectory.push_back(std::make_pair(
+					item_trajectory.emplace_back(
 						cur_pos, focus_point
-					));
-					cur_pos[0] -= overlap_step;
+					);
+					cur_pos[0] -= horizontal_step;
 				}
-				else if (i >= delta - 1){
-					cur_pos[0] = xmin - view_distance;
-					focus_point = cur_pos + Eigen::Vector3f(view_distance, -view_distance, focus_z_corner);
-					item_trajectory.push_back(std::make_pair(
-						cur_pos, focus_point
-					));
-				}
-				else if (i >= delta - 2) {
+				else if (i >= delta - 1) {
 					focus_point = cur_pos + Eigen::Vector3f(view_distance / 2, -view_distance, focus_z_second_corner);
-					item_trajectory.push_back(std::make_pair(
+					item_trajectory.emplace_back(
 						cur_pos, focus_point
-					));
-					cur_pos[0] -= overlap_step;
+					);
+					cur_pos[0] -= horizontal_step;
 				}
 				else {
 					focus_point = cur_pos + Eigen::Vector3f(0, -view_distance, focus_z_corner_normal);
-					item_trajectory.push_back(std::make_pair(
+					item_trajectory.emplace_back(
 						cur_pos, focus_point
-					));
-					cur_pos[0] -= overlap_step;
+					);
+					cur_pos[0] -= horizontal_step;
 				}
 			}
-			delta = (cur_pos.y() - (ymin - view_distance)) / overlap_step;
-			delta = delta > 4 ? delta : 4;
+			delta = (cur_pos.y() - (ymin - view_distance)) / horizontal_step;
+			delta = delta > 4 ? delta : 4.1;
 			v_buildings[id_building].one_pass_trajectory_num += int(delta);
 			for (int i = 0; i <  delta; ++i) {
 				if (i == 0) {
 					focus_point = cur_pos + Eigen::Vector3f(view_distance, -view_distance, focus_z_corner);
-					item_trajectory.push_back(std::make_pair(
+					item_trajectory.emplace_back(
 						cur_pos, focus_point
-					));
-					cur_pos[1] -= overlap_step;
+					);
+					cur_pos[1] -= horizontal_step;
 				}
 				else if (i == 1) {
 					focus_point = cur_pos + Eigen::Vector3f(view_distance, -view_distance /2, focus_z_second_corner);
-					item_trajectory.push_back(std::make_pair(
+					item_trajectory.emplace_back(
 						cur_pos, focus_point
-					));
-					cur_pos[1] -= overlap_step;
+					);
+					cur_pos[1] -= horizontal_step;
 				}
 				else if (i >= delta - 1) {
-					cur_pos[1] = ymin - view_distance;
-					focus_point = cur_pos + Eigen::Vector3f(view_distance, view_distance, focus_z_corner);
-					/*item_trajectory.push_back(std::make_pair(
-						cur_pos, focus_point
-					));*/
-				}
-				else if (i >= delta - 2) {
 					focus_point = cur_pos + Eigen::Vector3f(view_distance, view_distance /2, focus_z_second_corner);
-					item_trajectory.push_back(std::make_pair(
-						cur_pos, focus_point
-					));
-					cur_pos[1] -= overlap_step;
-
+					//item_trajectory.emplace_back(
+					//	cur_pos, focus_point
+					//);
+					cur_pos[1] -= horizontal_step;
 				}
-
 				else {
 					focus_point = cur_pos + Eigen::Vector3f(view_distance, 0, focus_z_corner_normal);
-					item_trajectory.push_back(std::make_pair(
+					item_trajectory.emplace_back(
 						cur_pos, focus_point
-					));
-					cur_pos[1] -= overlap_step;
+					);
+					cur_pos[1] -= horizontal_step;
 				}
 			}
 			
@@ -1152,7 +1079,7 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 			int id = 0; 
 			for (auto& item : item_trajectory)
 			{
-				item.first.z() = height_max - id * height_step;
+				item.pos_mesh.z() = height_max - id * height_step;
 				++id;
 			}
 		}
@@ -1163,42 +1090,30 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 		transform.translate(-v_buildings[id_building].bounding_box_3d.box.center());
 		for (int i=0;i< item_trajectory.size();++i)
 		{
-			item_trajectory[i].first = transform * item_trajectory[i].first;
-			item_trajectory[i].second = transform * item_trajectory[i].second;
+			item_trajectory[i].pos_mesh = transform * item_trajectory[i].pos_mesh;
+			item_trajectory[i].focus_point = transform * item_trajectory[i].focus_point;
+			item_trajectory[i].calculate_direction();
 		}
 		
 		if(v_params["with_erosion_flag"].asBool())
 			item_trajectory = find_short_cut(item_trajectory, v_height_map, safe_distance, v_buildings[id_building]);
 		else
-			item_trajectory = ensure_safe_trajectory_and_calculate_direction(item_trajectory, v_height_map, safe_distance);
+			item_trajectory = ensure_safe_trajectory(item_trajectory, v_height_map, safe_distance);
 
 		if(v_params.isMember("z_down_bounds"))
 		{
 			for (int i = 0;i < item_trajectory.size();++i)
 			{
-				if (item_trajectory[i].first.z() < v_params["z_down_bounds"].asFloat())
-					item_trajectory[i].first.z() = v_params["z_down_bounds"].asFloat();
+				if (item_trajectory[i].pos_mesh.z() < v_params["z_down_bounds"].asFloat())
+				{
+					item_trajectory[i].pos_mesh.z() = v_params["z_down_bounds"].asFloat();
+					item_trajectory[i].calculate_direction();
+				}
 			}
 		}
 		
 		if (v_params["cluster_duplicate_flag"].asBool())
 			cluster_duplicate(item_trajectory, v_params["vertical_overlap"].asFloat(), v_params["fov"].asFloat(),view_distance);
-
-
-		
-		//// Remove duplication
-		//std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> clean_trajectory;
-		//std::copy_if(item_trajectory.begin(), item_trajectory.end(),
-		//	std::back_inserter(clean_trajectory),
-		//	[&item_trajectory, overlap_step, &clean_trajectory](const auto& item_new_trajectory) {
-		//		bool untraveled = true;
-		//		for (const auto& item_passed_trajectory : clean_trajectory)
-		//			if ((item_passed_trajectory.first - item_new_trajectory.first).norm() < overlap_step / 2) {
-		//				untraveled = false;
-		//			}
-		//		return untraveled;
-		//	});
-		//splited_buildings[id_building].trajectory = clean_trajectory;
 
 		v_buildings[id_building].trajectory = item_trajectory;
 		total_trajectory.insert(total_trajectory.end(), item_trajectory.begin(), item_trajectory.end());

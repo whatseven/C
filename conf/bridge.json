@@ -60,7 +60,7 @@
     "with_interpolated": false, // Whether the algorithm output the interpolated trajectory
     "nbv_target1": "Topology_decomposition",
     "nbv_target3": "Min_distance",
-    "nbv_target": "Reconstruction_only",
+    "nbv_target": "Random_min_distance",
     "nbv_target2": "Min_max_information",
     "CCPP_CELL_THRESHOLD": 5,
     "ccpp_cell_distance": 30,

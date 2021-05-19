@@ -25,9 +25,9 @@ public:
     std::mutex m_mutex;
     std::vector<Building> m_buildings;
     int m_current_building;
-    std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> m_trajectories;
+    std::vector<Viewpoint> m_trajectories;
     std::vector<int> m_is_reconstruction_status;
-    std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> m_trajectories_spline;
+    //std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> m_trajectories_spline;
     std::vector<std::pair<Eigen::Vector2f, cv::Vec3b>> m_uncertainty_map;
     float m_uncertainty_map_distance;
     Eigen::Vector3f m_pos;
@@ -43,16 +43,6 @@ public:
         return;
 	}
 
-    void calculate_pitch() {
-        for (auto& item : m_trajectories)
-        {
-            item.second = (item.second - item.first);
-            if (item.second.z() > 0)
-                item.second.z() = 0;
-            item.second = item.second.normalized();
-        }
-    }
-    
     void draw_point_cloud(const Point_set& v_points) {
         glBegin(GL_POINTS);
         glColor3f(1,1,1);
@@ -243,15 +233,14 @@ public:
 
         	//View points
             for (const auto& item_trajectory : m_trajectories) {
-                draw_cube(Eigen::AlignedBox3f(item_trajectory.first - Eigen::Vector3f(1.f, 1.f, 1.f), item_trajectory.first + Eigen::Vector3f(1.f, 1.f, 1.f)),
+                draw_cube(Eigen::AlignedBox3f(item_trajectory.pos_mesh - Eigen::Vector3f(1.f, 1.f, 1.f), item_trajectory.pos_mesh + Eigen::Vector3f(1.f, 1.f, 1.f)),
                     Eigen::Vector4f(0.f, 1.f, 0.f, 1.f));
-                Eigen::Vector3f look_at = item_trajectory.first + item_trajectory.second * 10;
-                draw_line(item_trajectory.first, look_at,2,Eigen::Vector4f(0,1,0,1));
+                Eigen::Vector3f look_at = item_trajectory.pos_mesh + item_trajectory.direction * 10;
+                draw_line(item_trajectory.pos_mesh, look_at,2,Eigen::Vector4f(0,1,0,1));
             }
-            m_trajectories_spline = m_trajectories;
         	//View spline
-            for (const auto& item_trajectory: m_trajectories_spline) {
-                int index = &item_trajectory - &m_trajectories_spline[0];
+            for (const auto& item_trajectory: m_trajectories) {
+                int index = &item_trajectory - &m_trajectories[0];
 
                 Eigen::Vector4f color(250./255, 157./255, 0./255, 1);
                 //if (m_is_reconstruction_status[index] == 1)
@@ -261,22 +250,12 @@ public:
                 //    Eigen::Vector4f(0.f, 1.f, 0.f, 1.f));
                 glColor3f(color.x(), color.y(), color.z());
             	if(index >=1)
-                    pangolin::glDrawLine(item_trajectory.first[0], item_trajectory.first[1], item_trajectory.first[2], 
-                        m_trajectories_spline[index -1].first[0], m_trajectories_spline[index - 1].first[1], m_trajectories_spline[index - 1].first[2]);
+                    pangolin::glDrawLine(item_trajectory.pos_mesh[0], item_trajectory.pos_mesh[1], item_trajectory.pos_mesh[2],
+                        m_trajectories[index -1].pos_mesh[0], m_trajectories[index - 1].pos_mesh[1], m_trajectories[index - 1].pos_mesh[2]);
 
                 glColor3f(0,0,0);
             }
-        	// View points
-            //for (const auto& id_point : m_points)
-            //{
-                //Eigen::Vector4f color(1.f, 1.f, 1.f, 1.f);
-                //if (m_points_color.size() > 0)
-                //    color = m_points_color[&id_point - &*m_points.begin()];
-                //Point_3& p = m_points.point(id_point);
-                //float radius = 0.1f;
-                //draw_cube(Eigen::AlignedBox3f(Eigen::Vector3f(p.x()- radius, p.y()- radius, p.z()- radius), 
-            //        Eigen::Vector3f(p.x() + radius, p.y() + radius, p.z() + radius)), color);
-            //}
+        	
         	// Current Position and orientation
             draw_cube(Eigen::AlignedBox3f(m_pos - Eigen::Vector3f(4.f, 4.f, 4.f), m_pos + Eigen::Vector3f(4.f, 4.f, 4.f)),
                 Eigen::Vector4f(1.f, 0.f, 0.f, 1.f));
