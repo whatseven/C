@@ -595,9 +595,12 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> ensure_safe_trajectory_
 {
 	std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> safe_trajectory;
 	for (auto item : v_trajectory) {
-		while (v_height_map.get_height(item.first.x(), item.first.y()) + Z_UP_BOUNDS > item.first.z()) {
-			item.first[2] += 5;
-		}
+		//while (v_height_map.get_height(item.first.x(), item.first.y()) + Z_UP_BOUNDS > item.first.z()) {
+		//	item.first[2] += 5;
+		//}
+		if(v_height_map.in_bound(item.first.x(), item.first.y()))
+			if(v_height_map.get_height(item.first.x(), item.first.y()) + Z_UP_BOUNDS > item.first.z())
+				item.first[2] = v_height_map.get_height(item.first.x(), item.first.y()) + Z_UP_BOUNDS;
 		//item.second = (item.second - item.first);
 		//if (item.second.z() > 0)
 		//	item.second.z() = 0;

@@ -2679,11 +2679,11 @@ public:
 			building.bounding_box_3d.cv_box.points(cornerPoints);
 			for (auto points : cornerPoints)
 			{
-				float z = building.bounding_box_3d.box.center().z() - building.bounding_box_3d.box.sizes().z() / 2;
+				float z = building.bounding_box_3d.box.center().y() - building.bounding_box_3d.box.sizes().y() / 2;
 				for (int i = 0; i < 2; i++)
 				{
-					cornerPoints3D.push_back(cv::Point3f(points.x, points.y, z));
-					z = building.bounding_box_3d.box.center().z() + building.bounding_box_3d.box.sizes().z() / 2;
+					cornerPoints3D.push_back(cv::Point3f(points.x,  z, points.y));
+					z = building.bounding_box_3d.box.center().y() + building.bounding_box_3d.box.sizes().y() / 2;
 				}
 			}
 			for (auto outPoints : cornerPoints3D)
@@ -2774,18 +2774,47 @@ public:
 				continue;
 			//if ()
 			Building current_building;
-			Eigen::Vector3f camera_translate = v_current_pos.pos_mesh;
 
-			/*Eigen::Matrix3f rotation = Eigen::AngleAxisf(v_current_pos.pitch, Eigen::AngleAxisf::Vector3::UnitX()).toRotationMatrix();
-			Eigen::AlignedBox3f box_3d(v_current_pos.camera_matrix * (rotation * Eigen::Vector3f(x_center - width / 2, y_center - height / 2, z_center - length / 2)) + camera_translate,
-				v_current_pos.camera_matrix * (rotation * Eigen::Vector3f(x_center + width / 2, y_center + height / 2, z_center + length / 2)) + camera_translate);
-			Rotated_box bounding_box_3d(box_3d, angle / M_PI * 180);*/
+			Eigen::Vector3f point1(-length / 2, -height / 2, -width / 2);
+			Eigen::Vector3f point2(length / 2, height / 2, -width / 2);
+			Eigen::Vector3f point3(length / 2, height / 2, width / 2);
+			Eigen::Matrix3f rotation = Eigen::AngleAxisf(angle, Eigen::AngleAxisf::Vector3::UnitY()).toRotationMatrix();
+			point1 = rotation * point1;
+			point2 = rotation * point2;
+			point3 = rotation * point3;
 
-			Eigen::Matrix3f rotation = Eigen::AngleAxisf(v_current_pos.yaw + M_PI/2, Eigen::AngleAxisf::Vector3::UnitZ()).toRotationMatrix();
-			Eigen::AlignedBox3f box_3d(rotation * Eigen::Vector3f(-x_center - width / 2, -z_center - length / 2, -y_center - height / 2) + camera_translate,
-				rotation * Eigen::Vector3f(-x_center + width / 2, -z_center + length / 2, -y_center + height / 2) + camera_translate);
-			Rotated_box bounding_box_3d(box_3d, -angle / M_PI * 180 + 90);
+			point1 += Eigen::Vector3f(x_center, y_center, z_center);
+			point2 += Eigen::Vector3f(x_center, y_center, z_center);
+			point3 += Eigen::Vector3f(x_center, y_center, z_center);
 
+			Eigen::Matrix3f pitch_rotation = Eigen::AngleAxisf(v_current_pos.pitch, Eigen::AngleAxisf::Vector3::UnitX()).toRotationMatrix();
+			point1 = pitch_rotation * point1;
+			point2 = pitch_rotation * point2;
+			point3 = pitch_rotation * point3;
+
+			point1 = v_current_pos.camera_matrix.inverse() * point1;
+			point2 = v_current_pos.camera_matrix.inverse() * point2;
+			point3 = v_current_pos.camera_matrix.inverse() * point3;
+
+			std::ofstream f_out("./bbox_test.xyz",std::ios::out);
+			f_out << boost::format("%f %f %f\n") % point1.x() % point1.y() % point1.z();
+			f_out << boost::format("%f %f %f\n") % point2.x() % point2.y() % point2.z();
+			f_out << boost::format("%f %f %f\n") % point3.x() % point3.y() % point3.z();
+			f_out.close();
+
+			
+			Rotated_box bounding_box_3d;
+			bounding_box_3d.cv_box= cv::RotatedRect(cv::Point2f(point1.x(), point1.y()), cv::Point2f(point2.x(), point2.y()), cv::Point2f(point3.x(), point3.y()));
+			bounding_box_3d.box = Eigen::AlignedBox3f(
+				Eigen::Vector3f(bounding_box_3d.cv_box.center.x - bounding_box_3d.cv_box.size.width,
+					bounding_box_3d.cv_box.center.y - bounding_box_3d.cv_box.size.height,
+					point3.z()),
+				Eigen::Vector3f(bounding_box_3d.cv_box.center.x + bounding_box_3d.cv_box.size.width,
+					bounding_box_3d.cv_box.center.y + bounding_box_3d.cv_box.size.height,
+					point1.z())
+			);
+			
+			bounding_box_3d.angle = bounding_box_3d.cv_box.angle /180.f * M_PI;
 			current_building.bounding_box_3d = bounding_box_3d;
 			current_building.bounding_box_2d = CGAL::Bbox_2(x_min_2d, y_min_2d, x_max_2d, y_max_2d);
 			current_buildings.push_back(current_building);

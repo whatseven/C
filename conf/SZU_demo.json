@@ -19,6 +19,10 @@
     "split_overlap": 0.5,
     "z_down_bounds": 40, //Optinal
 
+    "IOU_threshold": 0.7,
+    "use_bbox_detect": true,
+
+
     "fov": 53,
 
     "HEIGHT_CLIP": 10, // Effect the clustering of the buildings. Do not important here, we manually select a good point cloud for clustering
@@ -98,7 +102,6 @@
 
     "SYNTHETIC_POINT_CLOUD": true,
     "MAP_2D_BOX_TO_3D": true,
-    "use_bbox_detect": false,
     //"mapper": "gt_mapper",
     //"mapper": "graduate_gt_mapper",
     "mapper": "Virtual_mapper",
@@ -118,6 +121,5 @@
     "ccpp_cell_distance": 30,
 
     "output_waypoint": false,
-    "geo_origin": [ 12682806.58230256, 2575925.37105384 ,0],
-    "IOU_threshold": 0.7
+    "geo_origin": [ 12682806.58230256, 2575925.37105384, 0 ]
 }

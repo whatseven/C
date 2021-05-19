@@ -53,7 +53,7 @@ struct Rotated_box
 {
 	cv::RotatedRect cv_box;
 	Eigen::AlignedBox3f box;
-	float angle;
+	float angle; // Radians
 	Rotated_box(){};
 	Rotated_box(const Eigen::AlignedBox3f& v_box):box(v_box),angle(0.f)
 	{
