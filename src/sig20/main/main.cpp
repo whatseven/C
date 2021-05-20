@@ -2817,10 +2817,83 @@ public:
 			bounding_box_3d.angle = bounding_box_3d.cv_box.angle /180.f * M_PI;
 			current_building.bounding_box_3d = bounding_box_3d;
 			current_building.bounding_box_2d = CGAL::Bbox_2(x_min_2d, y_min_2d, x_max_2d, y_max_2d);
-			current_buildings.push_back(current_building);
-			num_building_current_frame += 1;
+			if (m_boundary.bounded_side(Point_2(bounding_box_3d.cv_box.center.x, bounding_box_3d.cv_box.center.y)) == CGAL::ON_BOUNDED_SIDE) {
+				current_buildings.push_back(current_building);
+				num_building_current_frame += 1;
+			}
 		}
 		//write_box_test(current_buildings);
+	}
+	void self_merge(std::vector<Building>& v_buildings)
+	{
+		std::vector<Building> merged_buildings;
+		for (auto& origin_building : v_buildings)
+		{
+			float max_iou = 0;
+			int max_id = -1;
+			for (auto& new_building : merged_buildings)
+			{
+				int now_id = &new_building - &merged_buildings[0];
+				float current_iou = calculate_3d_iou(origin_building, new_building);
+				if (current_iou > max_iou)
+				{
+					max_iou = current_iou;
+					max_id = now_id;
+				}
+			}
+			if (max_id == -1 || max_iou < m_args["IOU_threhold"].asFloat())
+			{
+				origin_building.id_in_all_possible_buildings = merged_buildings.size();
+				merged_buildings.push_back(origin_building);
+			}
+			else
+			{
+				float origin_area = (origin_building.bounding_box_2d.xmax() - origin_building.bounding_box_2d.xmin()) * (origin_building.bounding_box_2d.ymax() - origin_building.bounding_box_2d.ymin());
+				float new_area = (merged_buildings[max_id].bounding_box_2d.xmax() - merged_buildings[max_id].bounding_box_2d.xmin()) * (merged_buildings[max_id].bounding_box_2d.ymax() - merged_buildings[max_id].bounding_box_2d.ymin());
+				if (origin_area < new_area || merged_buildings[max_id].passed_trajectory.size() != 0)
+				{
+					cv::Point2f points[4];
+					origin_building.bounding_box_3d.cv_box.points(points);
+					float zmin = origin_building.bounding_box_3d.box.center().z() - origin_building.bounding_box_3d.box.sizes().z() / 2;
+					float zmax = origin_building.bounding_box_3d.box.center().z() + origin_building.bounding_box_3d.box.sizes().z() / 2;
+					merged_buildings[max_id].points_world_space.insert(Point_3(points[0].x, points[0].y, zmin));
+					merged_buildings[max_id].points_world_space.insert(Point_3(points[0].x, points[0].y, zmax));
+					merged_buildings[max_id].points_world_space.insert(Point_3(points[1].x, points[1].y, zmin));
+					merged_buildings[max_id].points_world_space.insert(Point_3(points[1].x, points[1].y, zmax));
+					merged_buildings[max_id].points_world_space.insert(Point_3(points[2].x, points[2].y, zmin));
+					merged_buildings[max_id].points_world_space.insert(Point_3(points[2].x, points[2].y, zmax));
+					merged_buildings[max_id].points_world_space.insert(Point_3(points[3].x, points[3].y, zmin));
+					merged_buildings[max_id].points_world_space.insert(Point_3(points[3].x, points[3].y, zmax));
+					merged_buildings[max_id].viz_num += origin_building.viz_num;
+					//merged_buildings[max_id].is_changed = true;
+				}
+				else
+				{
+					cv::Point2f points[4];
+					merged_buildings[max_id].bounding_box_3d.cv_box.points(points);
+					float zmin = merged_buildings[max_id].bounding_box_3d.box.center().z() - merged_buildings[max_id].bounding_box_3d.box.sizes().z() / 2;
+					float zmax = merged_buildings[max_id].bounding_box_3d.box.center().z() + merged_buildings[max_id].bounding_box_3d.box.sizes().z() / 2;
+					merged_buildings[max_id].points_world_space.insert(Point_3(points[0].x, points[0].y, zmin));
+					merged_buildings[max_id].points_world_space.insert(Point_3(points[0].x, points[0].y, zmax));
+					merged_buildings[max_id].points_world_space.insert(Point_3(points[1].x, points[1].y, zmin));
+					merged_buildings[max_id].points_world_space.insert(Point_3(points[1].x, points[1].y, zmax));
+					merged_buildings[max_id].points_world_space.insert(Point_3(points[2].x, points[2].y, zmin));
+					merged_buildings[max_id].points_world_space.insert(Point_3(points[2].x, points[2].y, zmax));
+					merged_buildings[max_id].points_world_space.insert(Point_3(points[3].x, points[3].y, zmin));
+					merged_buildings[max_id].points_world_space.insert(Point_3(points[3].x, points[3].y, zmax));
+					if (merged_buildings[max_id].passed_trajectory.size() == 0)
+					{
+						merged_buildings[max_id].bounding_box_3d = origin_building.bounding_box_3d;
+						merged_buildings[max_id].bounding_box_2d = origin_building.bounding_box_2d;
+						merged_buildings[max_id].trajectory = origin_building.trajectory;
+						merged_buildings[max_id].is_changed = true;
+					}
+					//merged_buildings[max_id].passed_trajectory = origin_building.passed_trajectory;
+					merged_buildings[max_id].viz_num += origin_building.viz_num;
+				}
+			}
+		}
+		v_buildings = merged_buildings;
 	}
 	void get_buildings(std::vector<Building>& v_buildings,
 		const Pos_Pack& v_current_pos,
@@ -3028,6 +3101,48 @@ public:
 					item_current_building.id_in_all_possible_buildings = v_buildings[max_id].id_in_all_possible_buildings;
 					v_buildings[max_id] = item_current_building;
 					v_buildings[max_id].viz_num += 1;
+					float origin_area = (v_buildings[max_id].bounding_box_2d.xmax() - v_buildings[max_id].bounding_box_2d.xmin()) * (v_buildings[max_id].bounding_box_2d.ymax() - v_buildings[max_id].bounding_box_2d.ymin());
+					float new_area = (item_current_building.bounding_box_2d.xmax() - item_current_building.bounding_box_2d.xmin()) * (item_current_building.bounding_box_2d.ymax() - item_current_building.bounding_box_2d.ymin());
+					if (origin_area > new_area || v_buildings[max_id].passed_trajectory.size() != 0)
+					{
+						cv::Point2f points[4];
+						item_current_building.bounding_box_3d.cv_box.points(points);
+						float zmin = item_current_building.bounding_box_3d.box.center().z() - item_current_building.bounding_box_3d.box.sizes().z() / 2;
+						float zmax = item_current_building.bounding_box_3d.box.center().z() + item_current_building.bounding_box_3d.box.sizes().z() / 2;
+						v_buildings[max_id].points_world_space.insert(Point_3(points[0].x, points[0].y, zmin));
+						v_buildings[max_id].points_world_space.insert(Point_3(points[0].x, points[0].y, zmax));
+						v_buildings[max_id].points_world_space.insert(Point_3(points[1].x, points[1].y, zmin));
+						v_buildings[max_id].points_world_space.insert(Point_3(points[1].x, points[1].y, zmax));
+						v_buildings[max_id].points_world_space.insert(Point_3(points[2].x, points[2].y, zmin));
+						v_buildings[max_id].points_world_space.insert(Point_3(points[2].x, points[2].y, zmax));
+						v_buildings[max_id].points_world_space.insert(Point_3(points[3].x, points[3].y, zmin));
+						v_buildings[max_id].points_world_space.insert(Point_3(points[3].x, points[3].y, zmax));
+						v_buildings[max_id].viz_num += item_current_building.viz_num;
+					}
+					else
+					{
+						cv::Point2f points[4];
+						v_buildings[max_id].bounding_box_3d.cv_box.points(points);
+						float zmin = v_buildings[max_id].bounding_box_3d.box.center().z() - v_buildings[max_id].bounding_box_3d.box.sizes().z() / 2;
+						float zmax = v_buildings[max_id].bounding_box_3d.box.center().z() + v_buildings[max_id].bounding_box_3d.box.sizes().z() / 2;
+						v_buildings[max_id].points_world_space.insert(Point_3(points[0].x, points[0].y, zmin));
+						v_buildings[max_id].points_world_space.insert(Point_3(points[0].x, points[0].y, zmax));
+						v_buildings[max_id].points_world_space.insert(Point_3(points[1].x, points[1].y, zmin));
+						v_buildings[max_id].points_world_space.insert(Point_3(points[1].x, points[1].y, zmax));
+						v_buildings[max_id].points_world_space.insert(Point_3(points[2].x, points[2].y, zmin));
+						v_buildings[max_id].points_world_space.insert(Point_3(points[2].x, points[2].y, zmax));
+						v_buildings[max_id].points_world_space.insert(Point_3(points[3].x, points[3].y, zmin));
+						v_buildings[max_id].points_world_space.insert(Point_3(points[3].x, points[3].y, zmax));
+						if (v_buildings[max_id].passed_trajectory.size() == 0)
+						{
+							v_buildings[max_id].bounding_box_3d = item_current_building.bounding_box_3d;
+							v_buildings[max_id].bounding_box_2d = item_current_building.bounding_box_2d;
+							v_buildings[max_id].is_changed = true;
+						}
+						// Should not see again, if have seen it before.
+						v_buildings[max_id].viz_num += 1;
+						//v_buildings[max_id].is_changed = true;
+					}
 				}
 			}
 			for (int i = 0; i < need_register.size(); ++i) {
@@ -3036,8 +3151,11 @@ public:
 					v_buildings[v_buildings.size() - 1].id_in_all_possible_buildings = v_buildings.size() - 1;
 				}
 			}
+			
 			LOG(INFO) << "Building BBox update: DONE!";
 		}
+		if (m_motion_status == Motion_status::exploration)
+			self_merge(v_buildings);
 
 		// Update height map
 		for (auto& item_building : v_buildings) {
@@ -3396,11 +3514,6 @@ int main(int argc, char** argv){
 		LOG(INFO) << "<<<<<<<<<<<<< Frame " << cur_frame_id << " <<<<<<<<<<<<<";
 
 		auto t = recordTime();
-		//if(next_best_target->m_motion_status==Motion_status::exploration)
-		/*if (cur_frame_id % 2 == 0)
-			current_pos = map_converter.get_pos_pack_from_unreal(Eigen::Vector3f(-7000, -20000, 10000), -M_PI / 2, 63 / 180.f * M_PI);
-		else
-			current_pos = map_converter.get_pos_pack_from_unreal(Eigen::Vector3f(-7000, -20000, 10000), M_PI / 2, 63 / 180.f * M_PI);*/
 		if (next_best_target->m_motion_status == Motion_status::exploration)
 			total_buildings.clear();
 		mapper->region_status = next_best_target->region_status;
@@ -3410,7 +3523,7 @@ int main(int argc, char** argv){
 		{
 			for (auto& item_building : all_possible_buildings)
 			{
-				if (item_building.viz_num >= 1)
+				if (item_building.viz_num >= 0)
 					total_buildings.push_back(item_building);
 			}
 		}
@@ -3587,7 +3700,11 @@ int main(int argc, char** argv){
 		{
 			for (auto& item_building : total_buildings)
 			{
-				all_possible_buildings.at(item_building.id_in_all_possible_buildings) = item_building;
+				if (item_building.parent == -1)
+				{
+					std::cout << item_building.id_in_all_possible_buildings << std::endl;
+					all_possible_buildings.at(item_building.id_in_all_possible_buildings) = item_building;
+				}
 			}
 		}
 		//debug_img(std::vector<cv::Mat>{height_map.m_map_dilated});

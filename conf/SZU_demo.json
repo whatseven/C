@@ -19,7 +19,7 @@
     "split_overlap": 0.5,
     "z_down_bounds": 40, //Optinal
 
-    "IOU_threshold": 0.7,
+    "IOU_threshold": 0.68,
     "use_bbox_detect": true,
 
 

@@ -178,7 +178,7 @@ public:
             pangolin::ProjectionMatrix(1280, 960, 50, 50, 640, 480, 0.2, 99999),
             //pangolin::ProjectionMatrix(640, 480, 420, 420, 320, 240, 0.2, 99999),
             // pangolin::ProjectionMatrixOrthographic(-1, 1, -1,1, 0.2, 99999),
-            pangolin::ModelViewLookAt(-250, 1.f, 40.f, -250, 0, 0, pangolin::AxisZ)
+            pangolin::ModelViewLookAt(-800, 1.f, 150.f, -800, 0, 0, pangolin::AxisZ)
         );
 		
 
