@@ -13,6 +13,52 @@
 #include "../main/building.h"
 #include "map_util.h"
 
+void write_proxy(const std::vector<Building>& current_buildings, int frame_id, int current_building_id)
+{
+	std::ofstream proxyFile("./log/demo_log/proxy.txt", std::ios::app);
+	proxyFile << "Frame_id " << frame_id << " "<< current_building_id << std::endl;
+	for (const auto& building : current_buildings)
+	{
+		int has_been_seen = 0;
+		if (building.passed_trajectory.size() > 0)
+			has_been_seen = 1;
+		cv::Point2f points[4];
+		building.bounding_box_3d.cv_box.points(points);
+		for (auto point : points)
+		{
+			proxyFile << "(" << point.x << "," << point.y << ") ";
+		}
+		proxyFile << building.bounding_box_3d.box.min().z() << " " << building.bounding_box_3d.box.max().z() << " " << has_been_seen << std::endl;
+	}
+	proxyFile.close();
+}
+
+void write_region_status(std::vector<cv::Vec3b> region_status, int frame_id)
+{
+	std::vector<cv::Vec3b> color_table;
+	color_table.emplace_back(0, 255, 0);//occupied
+	color_table.emplace_back(205, 205, 209);//unobserved
+	color_table.emplace_back(153, 255, 204);
+	color_table.emplace_back(255, 204, 153);
+	color_table.emplace_back(153, 255, 255);
+	color_table.emplace_back(253, 196, 225);
+	color_table.emplace_back(0, 182, 246);
+	std::ofstream regionFile("./log/demo_log/region_status.txt", std::ios::app);
+	regionFile << "Frame_id " << frame_id << std::endl;
+	for (auto& item_status : region_status)
+	{
+		for (int id = 0; id < color_table.size(); id++)
+		{
+			if (item_status == color_table[id])
+			{
+				regionFile << id << " ";
+				break;
+			}
+		}
+	}
+	regionFile << std::endl;
+	regionFile.close();
+}
 Eigen::Vector2f lonLat2Mercator(const Eigen::Vector2f& lonLat) {
 	Eigen::Vector2f mercator;
 	double x = lonLat.x() * 20037508.34 / 180;
@@ -868,6 +914,7 @@ std::vector<std::pair<Eigen::Vector3f, Eigen::Vector3f>> generate_trajectory(con
 			
 			item_building.is_divide = true;
 			temp_building.parent = i_building;
+			temp_building.id_in_all_possible_buildings = -1;
 			Eigen::Vector3f min_vector, max_vector;
 			for (int i = 0; i < split_width_num; i++)
 			{

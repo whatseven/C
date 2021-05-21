@@ -1314,6 +1314,20 @@ public:
 							LOG(INFO) << dummy3;
 						}
 						else {
+							Eigen::AlignedBox2f last_topology = topology.at(topology.size() - 1);
+							Eigen::AlignedBox2f cur_box_2(Eigen::Vector2f(m_map_start.x(), m_map_start.y()),
+								Eigen::Vector2f(last_topology.max().x(), last_topology.max().y()));
+							for (int i_building = 0; i_building < v_buildings.size(); ++i_building)
+							{
+								if (inside_box(Eigen::Vector2f(v_buildings[i_building].bounding_box_3d.cv_box.center.x, v_buildings[i_building].bounding_box_3d.cv_box.center.y), cur_box_2)
+									&& v_buildings[i_building].passed_trajectory.size() == 0 && v_buildings[i_building].is_divide == false)
+								{
+									m_motion_status = Motion_status::reconstruction_in_exploration;
+									m_current_building_id = i_building;
+									next_pos = determine_next_target(v_frame_id, v_cur_pos, v_buildings, with_exploration, v_threshold);
+									return next_pos;
+								}
+							}
 							get_next_target(v_frame_id, v_cur_pos, v_buildings, with_exploration);
 							m_isFirst = true;
 							next_pos = determine_next_target(v_frame_id, v_cur_pos, v_buildings, with_exploration, v_threshold);
@@ -1512,6 +1526,26 @@ public:
 
 				if (unpassed_trajectory.size() == 0) {
 					//debug_img(std::vector<cv::Mat>{cv::Mat(1, 1, CV_8UC1)});
+					if (v_buildings[cur_building_id].parent!=-1)
+					{
+						bool found = false;
+						for (int i_building = 0; i_building < v_buildings.size(); ++i_building) {
+							if (v_buildings[i_building].is_divide)
+								continue;
+							else if (v_buildings[i_building].parent == v_buildings[cur_building_id].parent&&v_buildings[i_building].passed_trajectory.size()==0)
+							{
+								m_current_building_id = i_building;
+								found = true;
+								break;
+							}
+						}
+						if (found)
+						{
+							m_motion_status = Motion_status::reconstruction_in_exploration;
+							next_pos = determine_next_target(v_frame_id, v_cur_pos, v_buildings, with_exploration, v_threshold);
+							return next_pos;
+						}
+					}
 					if (with_exploration)
 					{
 						m_motion_status = Motion_status::exploration;
@@ -2817,6 +2851,14 @@ public:
 			bounding_box_3d.angle = bounding_box_3d.cv_box.angle /180.f * M_PI;
 			current_building.bounding_box_3d = bounding_box_3d;
 			current_building.bounding_box_2d = CGAL::Bbox_2(x_min_2d, y_min_2d, x_max_2d, y_max_2d);
+			Point_2 p(current_building.bounding_box_3d.cv_box.center.x, current_building.bounding_box_3d.cv_box.center.y);
+			bool is_added = true;
+			for (auto iter_segment = m_boundary.edges_begin(); iter_segment != m_boundary.edges_end(); ++iter_segment)
+				if (CGAL::squared_distance(p, *iter_segment) < 50 * 50)
+					is_added = false;
+			if (!is_added)
+				continue;
+		
 			if (m_boundary.bounded_side(Point_2(bounding_box_3d.cv_box.center.x, bounding_box_3d.cv_box.center.y)) == CGAL::ON_BOUNDED_SIDE) {
 				current_buildings.push_back(current_building);
 				num_building_current_frame += 1;
@@ -2841,7 +2883,7 @@ public:
 					max_id = now_id;
 				}
 			}
-			if (max_id == -1 || max_iou < m_args["IOU_threhold"].asFloat())
+			if (max_id == -1 || max_iou < m_args["IOU_threhold"].asFloat() || origin_building.passed_trajectory.size() > 0)
 			{
 				origin_building.id_in_all_possible_buildings = merged_buildings.size();
 				merged_buildings.push_back(origin_building);
@@ -3096,11 +3138,11 @@ public:
 					need_register[index_box] = true;
 				else
 				{
-					item_current_building.passed_trajectory = v_buildings[max_id].passed_trajectory;
-					item_current_building.viz_num = v_buildings[max_id].viz_num;
-					item_current_building.id_in_all_possible_buildings = v_buildings[max_id].id_in_all_possible_buildings;
-					v_buildings[max_id] = item_current_building;
-					v_buildings[max_id].viz_num += 1;
+					//item_current_building.passed_trajectory = v_buildings[max_id].passed_trajectory;
+					//item_current_building.viz_num = v_buildings[max_id].viz_num;
+					//item_current_building.id_in_all_possible_buildings = v_buildings[max_id].id_in_all_possible_buildings;
+					//v_buildings[max_id] = item_current_building;
+					//v_buildings[max_id].viz_num += 1;
 					float origin_area = (v_buildings[max_id].bounding_box_2d.xmax() - v_buildings[max_id].bounding_box_2d.xmin()) * (v_buildings[max_id].bounding_box_2d.ymax() - v_buildings[max_id].bounding_box_2d.ymin());
 					float new_area = (item_current_building.bounding_box_2d.xmax() - item_current_building.bounding_box_2d.xmin()) * (item_current_building.bounding_box_2d.ymax() - item_current_building.bounding_box_2d.ymin());
 					if (origin_area > new_area || v_buildings[max_id].passed_trajectory.size() != 0)
@@ -3157,6 +3199,7 @@ public:
 		if (m_motion_status == Motion_status::exploration)
 			self_merge(v_buildings);
 
+		std::cout << "test" << std::endl;
 		// Update height map
 		for (auto& item_building : v_buildings) {
 			v_height_map.update(item_building.bounding_box_3d);
@@ -3413,6 +3456,7 @@ int main(int argc, char** argv){
 		boost::filesystem::create_directories(log_root/"ccpp_map");
 		boost::filesystem::create_directories(log_root/"wgs_log");
 		boost::filesystem::create_directories(log_root/"gradually_results");
+		boost::filesystem::create_directories(log_root / "demo_log");
 		
 		map_converter.initDroneStart(UNREAL_START);
 		INTRINSIC << 400, 0, 400, 0, 400, 400, 0, 0, 1;
@@ -3696,14 +3740,46 @@ int main(int argc, char** argv){
 			//	trajectory_flag);
 		}
 
+		// Demo_output
+		{
+			write_proxy(total_buildings, cur_frame_id, next_best_target->m_current_building_id);
+			write_region_status(next_best_target->region_status,cur_frame_id);
+		}
+
 		if (args["mapper"] == "Virtual_mapper")
 		{
+			if (next_best_target->m_motion_status == Motion_status::exploration)
+			{
+				for (auto& item_building : total_buildings)
+				{
+					if (item_building.parent != -1)
+					{
+						if (item_building.passed_trajectory.size() == 0)
+						{
+							total_buildings[item_building.parent].is_divide = false;
+							total_buildings[item_building.parent].is_changed = true;
+						}
+						else
+							total_buildings[item_building.parent].passed_trajectory.push_back(item_building.passed_trajectory[0]);
+					}
+				}
+			}
 			for (auto& item_building : total_buildings)
 			{
 				if (item_building.parent == -1)
 				{
-					std::cout << item_building.id_in_all_possible_buildings << std::endl;
+					//std::cout << item_building.id_in_all_possible_buildings << std::endl;
 					all_possible_buildings.at(item_building.id_in_all_possible_buildings) = item_building;
+				}
+				else if(item_building.passed_trajectory.size() > 0)
+				{
+					if (item_building.id_in_all_possible_buildings >= 0)
+						all_possible_buildings.at(item_building.id_in_all_possible_buildings) = item_building;
+					else
+					{
+						item_building.id_in_all_possible_buildings = all_possible_buildings.size();
+						all_possible_buildings.push_back(item_building);
+					}
 				}
 			}
 		}

@@ -19,7 +19,7 @@ struct Building {
 	int one_pass_trajectory_num = 0;
 	int closest_trajectory_id = 0;
 	int viz_num = 0;
-	int id_in_all_possible_buildings;
+	int id_in_all_possible_buildings = -1;
 
 	//Used for trajectory generation
 	int start_box = -1;

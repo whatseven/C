@@ -238,7 +238,7 @@ public:
                         Eigen::Vector4f(1.f, 1.f, 1.f, 1.f));
                 else
                     draw_cube(item_building.bounding_box_3d,
-                        Eigen::Vector4f(0.5f, .5f, .5f, .5f));
+                        Eigen::Vector4f(0.5f, .5f, .5f, 1.f));
             }
 
         	//View points
